@@ -1,0 +1,223 @@
+import { useEffect, useState } from 'react'
+import { API_BASE } from '../api'
+import { CATEGORY_META, FEST_META } from '../constants'
+
+const STATUS_COLOR = { verified:'#2E9E5B', pending:'#E07414', rejected:'#D7263D' }
+
+async function adminFetch(path, method='GET', body=null, secret) {
+  const sep = path.includes('?') ? '&' : '?'
+  const res = await fetch(`${API_BASE}${path}${sep}secret=${encodeURIComponent(secret)}`, {
+    method,
+    headers: body ? {'Content-Type':'application/json'} : {},
+    body: body ? JSON.stringify(body) : null,
+  })
+  if (!res.ok) { const d = await res.json().catch(()=>({})); throw new Error(d.detail||`Error ${res.status}`) }
+  return res.json()
+}
+
+const LOCATION_IDS = ['main-gate','parking','admin-block','central-library','eee-block',
+  'cse-block','ece-block','it-block','mech-block','civil-block','biomed-block',
+  'tcs-auditorium','mini-hall-1','food-rishabhs','food-snowcube','food-metro',
+  'food-pr','food-aswins','sports-complex','boys-hostel-gate','boys-hostel-office',
+  'girls-hostel','medical-center','clock-tower','cdc-block','ssn-fountain','snu-academic']
+
+const BLANK_FORM = { name:'', fest:'Invente', department:'', location_id:'tcs-auditorium',
+  date:'', start_time:'', end_time:'', description:'', open_to_external:true }
+
+export default function AdminDashboard() {
+  const [secret, setSecret]   = useState('')
+  const [authed, setAuthed]   = useState(false)
+  const [events, setEvents]   = useState([])
+  const [segments, setSegments] = useState([])
+  const [error, setError]     = useState(null)
+  const [msg, setMsg]         = useState(null)
+  const [tab, setTab]         = useState('events')
+  const [form, setForm]       = useState(BLANK_FORM)
+  const [submitting, setSubmitting] = useState(false)
+
+  function flash(text, isErr=false) {
+    if (isErr) setError(text); else setMsg(text)
+    setTimeout(()=>{ setError(null); setMsg(null) }, 4000)
+  }
+
+  async function login() {
+    try {
+      const data = await adminFetch('/api/admin/events','GET',null,secret)
+      setEvents(data); setAuthed(true)
+      fetch(`${API_BASE}/api/road-segments`).then(r=>r.json()).then(setSegments)
+    } catch(e) { flash(e.message,true) }
+  }
+
+  async function reload() {
+    try {
+      const data = await adminFetch('/api/admin/events','GET',null,secret)
+      setEvents(data)
+    } catch(e) { flash(e.message,true) }
+  }
+
+  async function reloadSegments() {
+    const data = await fetch(`${API_BASE}/api/road-segments`).then(r=>r.json())
+    setSegments(data)
+  }
+
+  async function action(path, method='PATCH') {
+    try { const res=await adminFetch(path,method,null,secret); flash(res.message); reload() }
+    catch(e) { flash(e.message,true) }
+  }
+
+  async function toggleSegment(seg) {
+    const endpoint = seg.closed ? 'open' : 'close'
+    try {
+      const res = await adminFetch(`/api/admin/road-segments/${seg.id}/${endpoint}`,'PATCH',null,secret)
+      flash(res.message); reloadSegments()
+    } catch(e) { flash(e.message,true) }
+  }
+
+  async function submitEvent() {
+    setSubmitting(true)
+    try {
+      const res = await adminFetch('/api/admin/events','POST',form,secret)
+      flash(`Submitted! ID: ${res.event_id}`); setForm(BLANK_FORM); setTab('events'); reload()
+    } catch(e) { flash(e.message,true) }
+    finally { setSubmitting(false) }
+  }
+
+  const pill = {padding:'6px 14px',borderRadius:999,fontFamily:'var(--font-display)',fontWeight:600,fontSize:'0.78rem'}
+
+  if (!authed) return (
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',gap:14,padding:24}}>
+      <div style={{fontFamily:'var(--font-display)',fontSize:'1.3rem',fontWeight:700}}>Admin Login</div>
+      <input type="password" placeholder="Admin secret" value={secret}
+        onChange={e=>setSecret(e.target.value)} onKeyDown={e=>e.key==='Enter'&&login()}
+        style={{padding:'10px 14px',borderRadius:10,border:'1px solid var(--line)',fontFamily:'var(--font-sans)',fontSize:'0.95rem',width:260,outline:'none'}} />
+      <button onClick={login} style={{background:'var(--brand)',padding:'10px 28px',borderRadius:999,fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.9rem'}}>Sign in</button>
+      {error && <div style={{color:'#D7263D',fontSize:'0.85rem'}}>{error}</div>}
+    </div>
+  )
+
+  return (
+    <div style={{height:'100%',overflow:'hidden',display:'flex',flexDirection:'column'}}>
+      {/* Tab bar */}
+      <div style={{display:'flex',gap:8,padding:'12px 16px',borderBottom:'1px solid var(--line)',flexShrink:0,flexWrap:'wrap'}}>
+        {[['events',`Events (${events.length})`],['roads','Road Closures'],['add','+ Add Event']].map(([t,label])=>(
+          <button key={t} onClick={()=>setTab(t)} style={{...pill,
+            background:tab===t?'var(--ink)':'transparent',
+            color:tab===t?'var(--canvas)':'var(--ink)',
+            border:'1px solid var(--line)'}}>
+            {label}
+          </button>
+        ))}
+        <div style={{flex:1}}/>
+        {msg   && <span style={{fontSize:'0.8rem',color:'#2E9E5B',alignSelf:'center'}}>{msg}</span>}
+        {error && <span style={{fontSize:'0.8rem',color:'#D7263D',alignSelf:'center'}}>{error}</span>}
+      </div>
+
+      {/* Events list */}
+      {tab==='events' && (
+        <div style={{flex:1,overflowY:'auto',padding:'14px 16px',display:'flex',flexDirection:'column',gap:10}}>
+          {events.length===0 && <div className="state-message">No events yet.</div>}
+          {events.map(e=>(
+            <div key={e.id} style={{background:'var(--surface)',borderRadius:14,padding:'14px 18px',boxShadow:'var(--shadow-md)'}}>
+              <div style={{display:'flex',alignItems:'flex-start',gap:10,flexWrap:'wrap'}}>
+                <span style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.97rem',flex:1}}>{e.name}</span>
+                <span style={{fontSize:'0.7rem',fontWeight:700,padding:'3px 10px',borderRadius:999,
+                  background:STATUS_COLOR[e.status]+'22',color:STATUS_COLOR[e.status],
+                  border:`1px solid ${STATUS_COLOR[e.status]}`,textTransform:'uppercase',letterSpacing:'0.06em'}}>
+                  {e.status}
+                </span>
+              </div>
+              <div style={{fontSize:'0.78rem',color:'var(--muted)',marginTop:4}}>
+                {e.fest} · {e.location?.name||e.location_id} · {e.date} {e.start_time}–{e.end_time}
+              </div>
+              {e.reject_reason && <div style={{fontSize:'0.78rem',color:'#D7263D',marginTop:4}}>Reason: {e.reject_reason}</div>}
+              <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
+                {e.status!=='verified' && (
+                  <button onClick={()=>action(`/api/admin/events/${e.id}/verify`)}
+                    style={{...pill,background:'#2E9E5B',color:'#fff'}}>✓ Verify</button>
+                )}
+                {e.status==='verified' && (
+                  <button onClick={()=>action(`/api/admin/events/${e.id}/reject?reason=Manually+rejected`)}
+                    style={{...pill,background:'#E03E52',color:'#fff'}}>✗ Reject</button>
+                )}
+                <button onClick={()=>{ if(window.confirm('Delete permanently?')) action(`/api/admin/events/${e.id}`,'DELETE') }}
+                  style={{...pill,background:'transparent',border:'1px solid var(--line)'}}>Delete</button>
+                <a href={`/event/${e.id}`} target="_blank" rel="noreferrer"
+                  style={{...pill,background:'var(--canvas)',border:'1px solid var(--line)'}}>Preview →</a>
+                <a href={`${API_BASE}/api/events/${e.id}/qr`} target="_blank" rel="noreferrer"
+                  style={{...pill,background:'var(--canvas)',border:'1px solid var(--line)'}}>QR ↓</a>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Road closures */}
+      {tab==='roads' && (
+        <div style={{flex:1,overflowY:'auto',padding:'14px 16px',display:'flex',flexDirection:'column',gap:10}}>
+          <div style={{fontFamily:'var(--font-sans)',fontSize:'0.82rem',color:'var(--muted)',marginBottom:4}}>
+            Toggle road segments on/off. Closed roads get a very high penalty — the router automatically finds an alternate route.
+          </div>
+          {segments.map(seg=>(
+            <div key={seg.id} style={{background:'var(--surface)',borderRadius:14,padding:'14px 18px',boxShadow:'var(--shadow-md)',
+              borderLeft:`4px solid ${seg.closed?'#D7263D':'#2E9E5B'}`}}>
+              <div style={{display:'flex',alignItems:'center',gap:12}}>
+                <div style={{flex:1}}>
+                  <div style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.92rem'}}>{seg.name}</div>
+                  <div style={{fontSize:'0.78rem',color:'var(--muted)',marginTop:2}}>{seg.description}</div>
+                </div>
+                <button onClick={()=>toggleSegment(seg)}
+                  style={{...pill,
+                    background: seg.closed ? '#2E9E5B' : '#D7263D',
+                    color:'#fff', flexShrink:0}}>
+                  {seg.closed ? '✓ Reopen' : '⚠ Close'}
+                </button>
+              </div>
+              {seg.closed && (
+                <div style={{marginTop:8,fontSize:'0.75rem',color:'#D7263D',fontWeight:600}}>
+                  🚧 CLOSED — router is using alternate path
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add event form */}
+      {tab==='add' && (
+        <div style={{flex:1,overflowY:'auto',padding:'16px',maxWidth:520}}>
+          <div style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:'1.1rem',marginBottom:14}}>Add New Event</div>
+          {[['name','Event name','text'],['fest','Fest (Invente / Instincts)','text'],
+            ['department','Organising department','text'],['date','Date','date'],
+            ['start_time','Start time','time'],['end_time','End time','time']].map(([key,label,type])=>(
+            <div key={key} style={{marginBottom:12}}>
+              <label style={{fontSize:'0.75rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--muted)',display:'block',marginBottom:4}}>{label}</label>
+              <input type={type} value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))}
+                style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid var(--line)',fontFamily:'var(--font-sans)',fontSize:'0.92rem',outline:'none'}} />
+            </div>
+          ))}
+          <div style={{marginBottom:12}}>
+            <label style={{fontSize:'0.75rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--muted)',display:'block',marginBottom:4}}>Venue</label>
+            <select value={form.location_id} onChange={e=>setForm(f=>({...f,location_id:e.target.value}))}
+              style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid var(--line)',fontFamily:'var(--font-sans)',fontSize:'0.92rem',background:'var(--surface)'}}>
+              {LOCATION_IDS.map(id=><option key={id} value={id}>{id}</option>)}
+            </select>
+          </div>
+          <div style={{marginBottom:12}}>
+            <label style={{fontSize:'0.75rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--muted)',display:'block',marginBottom:4}}>Description</label>
+            <textarea rows={3} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}
+              style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid var(--line)',fontFamily:'var(--font-sans)',fontSize:'0.92rem',resize:'vertical',outline:'none'}} />
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:18}}>
+            <input type="checkbox" id="ext" checked={form.open_to_external}
+              onChange={e=>setForm(f=>({...f,open_to_external:e.target.checked}))} />
+            <label htmlFor="ext" style={{fontSize:'0.88rem'}}>Open to external/visiting colleges</label>
+          </div>
+          <button onClick={submitEvent} disabled={submitting}
+            style={{width:'100%',padding:'12px',borderRadius:999,background:'var(--brand)',fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.95rem'}}>
+            {submitting ? 'Submitting…' : 'Submit Event (pending verification)'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}

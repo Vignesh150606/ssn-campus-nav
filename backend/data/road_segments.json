@@ -1,0 +1,86 @@
+[
+  {
+    "id": "seg_main_spine",
+    "name": "Main Road Spine (Gate \u2192 Fountain \u2192 Academic blocks)",
+    "description": "Primary road from main gate through campus centre",
+    "closed": false,
+    "bbox": {
+      "lat_min": 12.751,
+      "lat_max": 12.7525,
+      "lng_min": 80.1955,
+      "lng_max": 80.2045
+    }
+  },
+  {
+    "id": "seg_cse_it_road",
+    "name": "CSE / IT / BME / EEE / Civil Road",
+    "description": "Internal road connecting CSE, IT, BME, EEE, Civil blocks",
+    "closed": false,
+    "bbox": {
+      "lat_min": 12.749,
+      "lat_max": 12.752,
+      "lng_min": 80.196,
+      "lng_max": 80.199
+    }
+  },
+  {
+    "id": "seg_research_road",
+    "name": "Research Center Road (south spine)",
+    "description": "Road going south past EEE, Civil, Medical",
+    "closed": false,
+    "bbox": {
+      "lat_min": 12.749,
+      "lat_max": 12.7515,
+      "lng_min": 80.196,
+      "lng_max": 80.1975
+    }
+  },
+  {
+    "id": "seg_hostel_road",
+    "name": "Boys Hostel Gate Road",
+    "description": "Road through boys hostel gate (avoided for non-hostel routes)",
+    "closed": false,
+    "bbox": {
+      "lat_min": 12.7495,
+      "lat_max": 12.752,
+      "lng_min": 80.1985,
+      "lng_max": 80.2005
+    }
+  },
+  {
+    "id": "seg_ladies_hostel",
+    "name": "Ladies Hostel Road",
+    "description": "Road leading to girls hostel and Ashwin's food court area",
+    "closed": false,
+    "bbox": {
+      "lat_min": 12.752,
+      "lat_max": 12.754,
+      "lng_min": 80.194,
+      "lng_max": 80.199
+    }
+  },
+  {
+    "id": "seg_sports_road",
+    "name": "Sports Complex Road",
+    "description": "Road to sports complex and SNU area",
+    "closed": false,
+    "bbox": {
+      "lat_min": 12.7505,
+      "lat_max": 12.7535,
+      "lng_min": 80.192,
+      "lng_max": 80.196
+    }
+  },
+  {
+    "id": "seg_mini_audi",
+    "name": "Mini Auditorium / Mechanical Road",
+    "description": "Road to mini auditorium, mechanical block and SNU",
+    "closed": false,
+    "bbox": {
+      "lat_min": 12.7495,
+      "lat_max": 12.7525,
+      "lng_min": 80.192,
+      "lng_max": 80.196
+    }
+  }
+]

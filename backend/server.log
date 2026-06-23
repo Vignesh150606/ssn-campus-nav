@@ -1,0 +1,7 @@
+INFO:     Started server process [1494]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:46448 - "GET /api/route?from_id=main-gate&to_id=it-block HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46452 - "GET /api/route?from_id=it-block&to_id=eee-block HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52372 - "GET /api/route?from_lat=12.751&from_lng=80.196&to_id=it-block HTTP/1.1" 200 OK

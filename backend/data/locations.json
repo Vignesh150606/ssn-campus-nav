@@ -1,0 +1,398 @@
+[
+  {
+    "id": "main-gate",
+    "name": "Main Gate / Entrance",
+    "category": "gate",
+    "department": null,
+    "lat": 12.75137,
+    "lng": 80.204085,
+    "floors": 1,
+    "accessible": true,
+    "description": "Primary entry/exit point of the campus, bordering OMR. Visitors and event guests enter here.",
+    "facilities": []
+  },
+  {
+    "id": "parking",
+    "name": "Visitor Parking",
+    "category": "parking",
+    "department": null,
+    "lat": 12.75137,
+    "lng": 80.204085,
+    "floors": 1,
+    "accessible": true,
+    "description": "Parking area near the main gate for visitors and event attendees.",
+    "facilities": []
+  },
+  {
+    "id": "admin-block",
+    "name": "Admin Block (Main Building)",
+    "category": "admin",
+    "department": "Administration",
+    "lat": 12.751549,
+    "lng": 80.19531,
+    "floors": 3,
+    "accessible": true,
+    "description": "Administrative offices, principal's office, and main reception.",
+    "facilities": []
+  },
+  {
+    "id": "central-library",
+    "name": "Central Library (CS Block)",
+    "category": "library",
+    "department": null,
+    "lat": 12.75109002177318,
+    "lng": 80.19627421822494,
+    "floors": 2,
+    "accessible": true,
+    "description": "Main library with reading halls and digital resource center.",
+    "facilities": [
+      "restroom",
+      "water_station"
+    ]
+  },
+  {
+    "id": "eee-block",
+    "name": "EEE Block",
+    "category": "academic",
+    "department": "Electrical and Electronics Engineering",
+    "lat": 12.749336,
+    "lng": 80.196345,
+    "floors": 4,
+    "accessible": true,
+    "description": "Department of Electrical and Electronics Engineering - classrooms, labs and faculty offices.",
+    "facilities": [
+      "restroom",
+      "water_station"
+    ]
+  },
+  {
+    "id": "cse-block",
+    "name": "CSE Block",
+    "category": "academic",
+    "department": "Computer Science and Engineering",
+    "lat": 12.75144648538412,
+    "lng": 80.19727760308989,
+    "floors": 4,
+    "accessible": true,
+    "description": "Department of Computer Science and Engineering.",
+    "facilities": [
+      "restroom",
+      "water_station"
+    ]
+  },
+  {
+    "id": "ece-block",
+    "name": "ECE Block",
+    "category": "academic",
+    "department": "Electronics and Communication Engineering",
+    "lat": 12.750828470728912,
+    "lng": 80.19607068758035,
+    "floors": 4,
+    "accessible": true,
+    "description": "Department of Electronics and Communication Engineering.",
+    "facilities": [
+      "restroom",
+      "water_station"
+    ]
+  },
+  {
+    "id": "it-block",
+    "name": "IT Block",
+    "category": "academic",
+    "department": "Information Technology",
+    "lat": 12.751499694517467,
+    "lng": 80.19683371807155,
+    "floors": 3,
+    "accessible": true,
+    "description": "Department of Information Technology.",
+    "facilities": [
+      "restroom",
+      "water_station"
+    ]
+  },
+  {
+    "id": "mech-block",
+    "name": "Mechanical Block",
+    "category": "academic",
+    "department": "Mechanical Engineering",
+    "lat": 12.751814856537402,
+    "lng": 80.19426085063138,
+    "floors": 3,
+    "accessible": false,
+    "description": "Department of Mechanical Engineering - includes workshop and labs.",
+    "facilities": [
+      "restroom",
+      "water_station"
+    ]
+  },
+  {
+    "id": "civil-block",
+    "name": "Civil Block",
+    "category": "academic",
+    "department": "Civil Engineering",
+    "lat": 12.749336,
+    "lng": 80.196345,
+    "floors": 3,
+    "accessible": false,
+    "description": "Department of Civil Engineering. (Same building area as EEE Block)",
+    "facilities": [
+      "restroom",
+      "water_station"
+    ]
+  },
+  {
+    "id": "biomed-block",
+    "name": "Biomedical / Chemical Block",
+    "category": "academic",
+    "department": "Biomedical and Chemical Engineering",
+    "lat": 12.74928,
+    "lng": 80.197625,
+    "floors": 3,
+    "accessible": true,
+    "description": "Departments of Biomedical Engineering and Chemical Engineering.",
+    "facilities": [
+      "restroom",
+      "water_station"
+    ]
+  },
+  {
+    "id": "tcs-auditorium",
+    "name": "TCS Auditorium (Main)",
+    "category": "auditorium",
+    "department": null,
+    "lat": 12.752932986844874,
+    "lng": 80.20007114965748,
+    "floors": 1,
+    "accessible": true,
+    "description": "Large auditorium used for major fest events, conferences and cultural programs.",
+    "facilities": []
+  },
+  {
+    "id": "mini-hall-1",
+    "name": "Mini Auditorium",
+    "category": "auditorium",
+    "department": null,
+    "lat": 12.750731438520807,
+    "lng": 80.19375537881632,
+    "floors": 1,
+    "accessible": true,
+    "description": "Seminar hall used for expos, workshops and smaller fest events.",
+    "facilities": []
+  },
+  {
+    "id": "food-rishabhs",
+    "name": "Rishabh's Food Court",
+    "category": "dining",
+    "department": null,
+    "lat": 12.751237725724911,
+    "lng": 80.19514641902035,
+    "floors": 1,
+    "accessible": true,
+    "description": "Food court near the central academic zone.",
+    "facilities": []
+  },
+  {
+    "id": "food-snowcube",
+    "name": "Snow Cube",
+    "category": "dining",
+    "department": null,
+    "lat": 12.751314817754336,
+    "lng": 80.19511993748014,
+    "floors": 1,
+    "accessible": true,
+    "description": "Popular dessert and snacks spot near Rishabh's Food Court.",
+    "facilities": []
+  },
+  {
+    "id": "food-metro",
+    "name": "Metro Cafe",
+    "category": "dining",
+    "department": null,
+    "lat": 12.750990100942847,
+    "lng": 80.19516770288732,
+    "floors": 1,
+    "accessible": true,
+    "description": "Cafe near the food court cluster.",
+    "facilities": []
+  },
+  {
+    "id": "food-pr",
+    "name": "PR Food Court",
+    "category": "dining",
+    "department": null,
+    "lat": 12.749342946955847,
+    "lng": 80.19700460408247,
+    "floors": 1,
+    "accessible": true,
+    "description": "Food court on Research Center Road.",
+    "facilities": []
+  },
+  {
+    "id": "food-aswins",
+    "name": "Ashwin's Food Court",
+    "category": "dining",
+    "department": null,
+    "lat": 12.753411792490132,
+    "lng": 80.19659361070748,
+    "floors": 1,
+    "accessible": true,
+    "description": "Food court on the northern side of campus.",
+    "facilities": []
+  },
+  {
+    "id": "sports-complex",
+    "name": "Sports Complex & Ground",
+    "category": "sports",
+    "department": null,
+    "lat": 12.752833051730693,
+    "lng": 80.19413658105321,
+    "floors": 1,
+    "accessible": true,
+    "description": "Outdoor ground and indoor sports facilities, used for fest sports events.",
+    "facilities": []
+  },
+  {
+    "id": "boys-hostel-gate",
+    "name": "Boys Hostel - Gate",
+    "category": "hostel",
+    "department": null,
+    "lat": 12.751583395844568,
+    "lng": 80.19986818519021,
+    "floors": 1,
+    "accessible": false,
+    "description": "Main gate entrance to the boys hostel block.",
+    "facilities": []
+  },
+  {
+    "id": "boys-hostel-office",
+    "name": "Boys Hostel - Office",
+    "category": "hostel",
+    "department": null,
+    "lat": 12.750065795165932,
+    "lng": 80.19925282891312,
+    "floors": 4,
+    "accessible": false,
+    "description": "Boys hostel administrative office / warden's block.",
+    "facilities": []
+  },
+  {
+    "id": "girls-hostel",
+    "name": "Girls Hostel (Ladies Hostel)",
+    "category": "hostel",
+    "department": null,
+    "lat": 12.753312,
+    "lng": 80.195472,
+    "floors": 4,
+    "accessible": false,
+    "description": "Residential block for female students.",
+    "facilities": []
+  },
+  {
+    "id": "medical-center",
+    "name": "Medical Center (Dispensary)",
+    "category": "medical",
+    "department": null,
+    "lat": 12.749084065594056,
+    "lng": 80.19812760602677,
+    "floors": 1,
+    "accessible": true,
+    "description": "On-campus first aid and medical facility.",
+    "facilities": []
+  },
+  {
+    "id": "clock-tower",
+    "name": "SSN Fountain / Clock Tower",
+    "category": "landmark",
+    "department": null,
+    "lat": 12.752737409968413,
+    "lng": 80.19633719602709,
+    "floors": 1,
+    "accessible": true,
+    "description": "Central landmark and key intersection. Straight ahead: ECE Block. Left: CDC Block. Right: Admin Block. Further right: food courts cluster.",
+    "facilities": []
+  },
+  {
+    "id": "cdc-block",
+    "name": "CDC - Career Development Cell",
+    "category": "admin",
+    "department": "Career Development Cell",
+    "lat": 12.751633310274613,
+    "lng": 80.19618875641105,
+    "floors": 2,
+    "accessible": true,
+    "description": "Career Development Cell \u2014 placement drives, internship coordination, and career guidance.",
+    "facilities": []
+  },
+  {
+    "id": "ssn-fountain",
+    "name": "SSN Fountain",
+    "category": "landmark",
+    "department": null,
+    "lat": 12.751622,
+    "lng": 80.195791,
+    "floors": 1,
+    "accessible": true,
+    "description": "Decorative fountain \u2014 a central meeting point near the academic zone.",
+    "facilities": []
+  },
+  {
+    "id": "snu-academic",
+    "name": "Shiv Nadar University (SNU) Academic Block",
+    "category": "landmark",
+    "department": null,
+    "lat": 12.75229014371435,
+    "lng": 80.19260692553253,
+    "floors": 3,
+    "accessible": true,
+    "description": "Academic block of Shiv Nadar University \u2014 a separate institution located within the campus grounds.",
+    "facilities": []
+  },
+  {
+    "id": "open-air-theatre",
+    "name": "Open Air Theatre",
+    "category": "auditorium",
+    "department": null,
+    "lat": 12.75127778152762,
+    "lng": 80.19802052724584,
+    "floors": 1,
+    "accessible": true,
+    "description": "Open-air performance space used for cultural events, fests, and outdoor gatherings.",
+    "facilities": []
+  },
+  {
+    "id": "sports-complex-main",
+    "name": "Sports Complex",
+    "category": "sports",
+    "department": null,
+    "lat": 12.753197638892628,
+    "lng": 80.19434508239344,
+    "floors": 1,
+    "accessible": true,
+    "description": "Main sports complex with indoor and outdoor facilities.",
+    "facilities": []
+  },
+  {
+    "id": "ssn-cricket-ground",
+    "name": "SSN Cricket Ground",
+    "category": "sports",
+    "department": null,
+    "lat": 12.751224938954016,
+    "lng": 80.18966193694821,
+    "floors": 1,
+    "accessible": true,
+    "description": "Dedicated cricket ground on the western end of campus.",
+    "facilities": []
+  },
+  {
+    "id": "ssn-football-ground",
+    "name": "SSN Football Ground",
+    "category": "sports",
+    "department": null,
+    "lat": 12.751685851530238,
+    "lng": 80.19112217101687,
+    "floors": 1,
+    "accessible": true,
+    "description": "Football ground on the western side of campus.",
+    "facilities": []
+  }
+]

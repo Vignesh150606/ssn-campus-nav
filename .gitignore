@@ -1,0 +1,14 @@
+## Backend
+backend/__pycache__/
+backend/.venv/
+*.pyc
+
+## Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/dev-dist/
+frontend/.env
+
+## OS / editor
+.DS_Store
+.vscode/
