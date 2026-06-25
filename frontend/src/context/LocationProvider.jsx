@@ -36,8 +36,10 @@ const ANNOUNCE_THRESHOLDS = [200, 100, 50, 20] // metres from destination
 // that boundary could flip the flag back and forth on every tick, which
 // would re-trigger the off-route voice announcement repeatedly even
 // though the user hadn't really left and rejoined the route.
-const OFF_ROUTE_ENTER_M = 60
-const OFF_ROUTE_CLEAR_M = 40
+// Phase 2 — corrected thresholds per spec:
+// Deviation < 15m → stay on route  |  Deviation > 20m → recalculate
+const OFF_ROUTE_ENTER_M = 20
+const OFF_ROUTE_CLEAR_M = 15
 const AUTO_WALK_STEP_M = 15      // metres advanced per auto-walk tick
 const AUTO_WALK_INTERVAL_MS = 1000
 const OFF_ROUTE_TEST_DISTANCE_M = 80
@@ -61,7 +63,7 @@ const GPS_ACCURACY_THRESHOLD_M = 50
 //   position stale and re-enter acquiring mode even if accuracy was good.
 const GPS_POSITION_MAX_AGE_MS = 30000
 
-const RECALC_COOLDOWN_MS = 12000     // minimum time between reroute attempts, to avoid loops
+const RECALC_COOLDOWN_MS = 4000      // Phase 2: 3-5 second cooldown per spec
 const RECALC_MIN_REMAINING_M = 15    // don't bother rerouting if basically already there
 
 function isDevModeAvailable() {
@@ -77,6 +79,8 @@ export function LocationProvider({ children }) {
   // --- Public, pre-existing state (unchanged shape from useUserLocation) ---
   const [position, setPosition]           = useState(null)
   const [accuracy, setAccuracy]            = useState(null)
+  // Phase 9 (Q7): dynamic arrival radius — max(15m, GPS_accuracy)
+  const [arrivalRadius, setArrivalRadius]  = useState(20)
   const [acquiringGps, setAcquiringGps]     = useState(false) // true until first accurate fix
   const [tracking, setTracking]            = useState(false)
   const [error, setError]                  = useState(null)
@@ -268,12 +272,17 @@ export function LocationProvider({ children }) {
       maybeRecalculate(lat, lng, remDist)
     }
 
-    for (const threshold of ANNOUNCE_THRESHOLDS) {
+    // Phase 9 (Q7): dynamic arrival — uses max(15m, GPS accuracy)
+    const arrivalM = Math.max(15, Math.min(acc ?? 15, 50))
+    const dynamicThresholds = [200, 100, 50, arrivalM]
+    for (const threshold of dynamicThresholds) {
       if (remDist <= threshold && !announced.current.has(threshold)) {
         announced.current.add(threshold)
-        const msg = remDist <= 20 ? '🎯 You have arrived!' : `📍 ${threshold}m from destination`
+        const isArrival = threshold <= 20 || threshold === arrivalM && remDist <= arrivalM
+        const msg = isArrival ? '🎯 You have arrived!' : `📍 ${Math.round(threshold)}m from destination`
         setGuidance(msg)
         setTimeout(() => setGuidance(null), 4000)
+        if (isArrival) setArrivalRadius(arrivalM)  // expose for Home.jsx
         break
       }
     }
@@ -506,7 +515,7 @@ export function LocationProvider({ children }) {
 
   const value = {
     // existing public API — unchanged
-    position, accuracy, acquiringGps, tracking, error,
+    position, accuracy, acquiringGps, tracking, error, arrivalRadius,
     remainingPath, remainingDist, liveEta,
     guidance, offRoute,
     start, stop, setRoute, clearRoute,

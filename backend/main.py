@@ -11,7 +11,7 @@ Interactive API docs available at http://127.0.0.1:8000/docs
 import json
 import math
 import os
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -265,14 +265,26 @@ def save_events(events: list):
 
 class EventCreate(BaseModel):
     name: str
-    fest: str                   # e.g. "Invente" or "Instincts"
+    fest: str                           # e.g. "Invente" or "Instincts"
     department: str
     location_id: str
-    date: str                   # YYYY-MM-DD
-    start_time: str             # HH:MM
+    date: str                           # YYYY-MM-DD
+    start_time: str                     # HH:MM
     end_time: str
     description: str
     open_to_external: bool = True
+    # Phase 10 — rich event detail fields
+    organizer: Optional[str] = None          # organising club / person
+    category: Optional[str] = None           # Workshop, Competition, Performance, Exhibition…
+    contact_info: Optional[str] = None       # email or phone
+    registration_link: Optional[str] = None  # URL
+    poster_url: Optional[str] = None         # hero image URL
+    photo_urls: Optional[List[str]] = []     # gallery (0-10 URLs)
+    # Phase 11 — room / floor / wing (venue detail for classrooms / labs)
+    building: Optional[str] = None           # e.g. "EEE Block"
+    room_number: Optional[str] = None        # e.g. "EEE-302"
+    floor: Optional[str] = None              # e.g. "3rd Floor"
+    wing: Optional[str] = None               # e.g. "Left Wing" 
 
 
 @app.post("/api/admin/events")

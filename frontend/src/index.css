@@ -1727,3 +1727,1019 @@ input, select, textarea { font-family: inherit; color: inherit; }
   .dev-panel { width: calc(100vw - 24px); bottom: 12px; right: 12px; }
   .dev-panel-chip { bottom: 12px; right: 12px; }
 }
+
+/* =====================================================================
+   NAVIGATION MODE — Phases 1, 3, 4, 5, 6, 7, 13, 14
+   Added for production-quality mobile navigation experience.
+===================================================================== */
+
+/* ── Phase 1: map goes full height in nav mode ── */
+.home.nav-mode .map-layer {
+  bottom: 0 !important;
+}
+
+/* ── Keyframes ── */
+@keyframes slide-down-in {
+  from { transform: translateY(-12px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+@keyframes slide-up {
+  from { transform: translateY(30px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes nav-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(37,99,235,0.4); }
+  70%  { box-shadow: 0 0 0 10px rgba(37,99,235,0); }
+  100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); }
+}
+
+/* ── Phase 3: Turn instruction card ── */
+.nav-instruction-card {
+  position: fixed;
+  top: calc(var(--header-h) + 10px);
+  left: 12px;
+  right: 12px;
+  background: rgba(15, 15, 20, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 14px 16px;
+  color: #fff;
+  z-index: 800;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  animation: slide-down-in 0.3s ease;
+}
+
+.nav-turn-icon-wrap {
+  width: 54px;
+  height: 54px;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.10);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-turn-icon {
+  font-size: 1.85rem;
+  line-height: 1;
+}
+
+.nav-turn-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.nav-turn-label {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.1rem;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.nav-turn-distance {
+  font-size: 0.82rem;
+  opacity: 0.72;
+  margin-top: 2px;
+}
+
+.nav-turn-landmark {
+  font-size: 0.72rem;
+  opacity: 0.52;
+  margin-top: 2px;
+  font-style: italic;
+}
+
+.nav-dest-badge {
+  display: inline-block;
+  margin-top: 5px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.nav-recalc-dot {
+  font-size: 1.1rem;
+  animation: spin 1s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── GPS status pill in nav mode ── */
+.nav-gps-pill {
+  position: fixed;
+  top: calc(var(--header-h) + 102px);
+  left: 12px;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 0.72rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 799;
+  backdrop-filter: blur(10px);
+}
+
+/* ── Phase 6: Exit Navigation button ── */
+.nav-exit-btn {
+  position: fixed;
+  bottom: 96px;
+  left: 14px;
+  background: #DC2626;
+  color: #fff;
+  border: none;
+  border-radius: 24px;
+  padding: 12px 20px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+  letter-spacing: 0.01em;
+  box-shadow: 0 4px 18px rgba(220,38,38,0.45);
+  z-index: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.nav-exit-btn:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 10px rgba(220,38,38,0.4);
+}
+
+/* ── Phase 14: Recenter button ── */
+.recenter-btn {
+  position: fixed;
+  bottom: 100px;
+  right: 14px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1.5px solid var(--line-strong);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  z-index: 900;
+  cursor: pointer;
+  animation: fade-in 0.2s ease;
+  transition: transform 0.15s ease;
+}
+.recenter-btn:active { transform: scale(0.92); }
+
+/* ── Phase 5: Navigation bottom sheet ── */
+.nav-bottom-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -4px 30px rgba(0,0,0,0.15);
+  z-index: 750;
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4,0,0.2,1);
+  max-height: 90px;
+}
+.nav-bottom-sheet.expanded {
+  max-height: 320px;
+}
+
+.nav-sheet-grip {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 4px;
+  background: none;
+  border: none;
+  width: 100%;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.nav-bottom-row-collapsed {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 20px 14px;
+}
+
+.nav-dist-big {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.nav-eta-big {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--ink);
+}
+
+.nav-dist-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-top: 1px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.nav-divider-v {
+  width: 1px;
+  height: 36px;
+  background: var(--line-strong);
+  margin: 0 16px;
+  flex-shrink: 0;
+}
+
+.nav-bottom-expanded-content {
+  padding: 2px 20px 24px;
+  border-top: 1px solid var(--line);
+}
+
+.nav-expanded-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  gap: 12px;
+}
+.nav-expanded-row:last-of-type { border-bottom: none; }
+
+.nav-expanded-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.nav-expanded-value {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 65%;
+}
+
+/* ── Phase 7: Arrival overlay ── */
+.arrival-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  animation: fade-in 0.3s ease;
+  padding: 24px;
+}
+
+.arrival-card {
+  background: var(--surface);
+  border-radius: 28px;
+  padding: 36px 28px 28px;
+  text-align: center;
+  max-width: 340px;
+  width: 100%;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+  animation: slide-up 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.arrival-emoji {
+  font-size: 3.2rem;
+  margin-bottom: 14px;
+  display: block;
+}
+
+.arrival-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.45rem;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.arrival-subtitle {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.arrival-dest {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--ink);
+  display: block;
+}
+
+.arrival-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.arrival-btn {
+  padding: 15px;
+  border-radius: 16px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  touch-action: manipulation;
+}
+.arrival-btn:active { transform: scale(0.97); opacity: 0.85; }
+
+.arrival-btn.primary {
+  background: var(--brand);
+  color: #fff;
+}
+
+.arrival-btn.secondary {
+  background: var(--canvas);
+  color: var(--ink);
+  border: 1.5px solid var(--line-strong);
+}
+
+/* =====================================================================
+   EVENT PAGE V2 — Phase 10, 11, 12
+===================================================================== */
+
+.event-page-v2 {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  background: var(--canvas);
+}
+
+/* Banner */
+.event-banner {
+  position: relative;
+  height: 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background-size: cover;
+  background-position: center;
+  flex-shrink: 0;
+}
+
+.event-banner-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.72) 100%);
+}
+
+.event-banner-content {
+  position: relative;
+  z-index: 1;
+  padding: 0 18px 20px;
+}
+
+.event-fest-tag {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  margin-bottom: 6px;
+  margin-right: 6px;
+}
+
+.event-category-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.3);
+  margin-bottom: 6px;
+}
+
+.event-title-large {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.45rem;
+  line-height: 1.2;
+  color: #fff;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+}
+
+.event-meta-row {
+  display: flex;
+  gap: 14px;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.82);
+  flex-wrap: wrap;
+}
+
+/* Content area */
+.event-content {
+  padding: 14px 14px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.event-card {
+  background: var(--surface);
+  border-radius: 18px;
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.event-card-title {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+/* Quick details row */
+.event-quick-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.event-quick-item {}
+
+.event-quick-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+
+.event-quick-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Description */
+.event-description-text {
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Photo gallery */
+.event-photo-carousel {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
+}
+.event-photo-carousel::-webkit-scrollbar { display: none; }
+
+.event-photo-item {
+  width: 150px;
+  height: 110px;
+  border-radius: 12px;
+  object-fit: cover;
+  flex-shrink: 0;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition: opacity 0.15s ease;
+}
+.event-photo-item:active { opacity: 0.85; }
+
+/* Contact / more info */
+.event-info-row {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.event-info-row:last-child { border-bottom: none; }
+
+.event-info-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  flex-shrink: 0;
+  width: 68px;
+}
+
+.event-info-value {
+  font-size: 0.88rem;
+  color: var(--ink-2);
+  word-break: break-word;
+}
+
+.event-reg-link {
+  font-size: 0.88rem;
+  color: var(--brand);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* Venue & location */
+.event-location-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.event-location-icon { font-size: 1.4rem; margin-top: 1px; flex-shrink: 0; }
+
+.event-location-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+
+.event-location-dist {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+/* Phase 8: Route preview panel (no tiny map) */
+.event-route-preview {
+  background: var(--canvas);
+  border-radius: 14px;
+  padding: 14px;
+  margin-top: 12px;
+  border: 1.5px solid var(--line-strong);
+}
+
+.event-route-info-row {
+  display: flex;
+  gap: 0;
+  margin-bottom: 14px;
+}
+
+.event-route-stat {
+  flex: 1;
+  padding: 0 12px 0 0;
+}
+.event-route-stat + .event-route-stat {
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+
+.event-route-stat-value {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.event-route-stat-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.event-route-landmarks {
+  margin-bottom: 4px;
+}
+
+.event-route-landmark-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.event-route-landmark-chip {
+  display: inline-block;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  margin: 0 4px 6px 0;
+  color: var(--ink-2);
+}
+
+/* Navigation buttons */
+.event-nav-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.event-nav-btn {
+  padding: 16px;
+  border-radius: 16px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  border: none;
+  text-align: center;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  touch-action: manipulation;
+  display: block;
+  width: 100%;
+}
+.event-nav-btn:active { opacity: 0.85; transform: scale(0.98); }
+.event-nav-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.event-nav-btn.primary {
+  background: var(--brand);
+  color: #fff;
+}
+
+.event-nav-btn.secondary {
+  background: var(--canvas);
+  color: var(--ink);
+  border: 1.5px solid var(--line-strong);
+}
+
+/* QR section */
+.event-qr-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.event-qr-block {}
+
+.event-qr-img {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  display: block;
+}
+
+/* Photo lightbox */
+.photo-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.96);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: fade-in 0.2s ease;
+  padding: 16px;
+}
+
+.photo-lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.photo-lightbox-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 42px;
+  height: 42px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 50%;
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2001;
+}
+
+/* =====================================================================
+   PHASE 12 — Mobile-first design polish
+===================================================================== */
+
+/* Larger touch targets everywhere on mobile */
+@media (max-width: 430px) {
+  .nav-instruction-card {
+    top: calc(var(--header-h) + 8px);
+    padding: 12px 14px;
+  }
+
+  .nav-turn-icon-wrap {
+    width: 48px;
+    height: 48px;
+  }
+
+  .nav-turn-label { font-size: 1rem; }
+
+  .nav-exit-btn {
+    bottom: 88px;
+    padding: 13px 18px;
+    font-size: 0.85rem;
+  }
+
+  .recenter-btn {
+    width: 52px;
+    height: 52px;
+    bottom: 92px;
+    font-size: 1.4rem;
+  }
+
+  .nav-bottom-sheet { border-radius: 18px 18px 0 0; }
+
+  .nav-dist-big  { font-size: 1.2rem; }
+  .nav-eta-big   { font-size: 1rem; }
+  .nav-divider-v { margin: 0 12px; }
+
+  /* Arrival card */
+  .arrival-card {
+    padding: 28px 20px 22px;
+    border-radius: 22px;
+  }
+  .arrival-emoji    { font-size: 2.8rem; }
+  .arrival-title    { font-size: 1.3rem; }
+  .arrival-btn      { padding: 14px; font-size: 0.9rem; }
+
+  /* Event page */
+  .event-banner { height: 200px; }
+  .event-title-large { font-size: 1.25rem; }
+  .event-content { padding: 12px 12px 0; gap: 10px; }
+  .event-card { padding: 14px 15px; }
+  .event-photo-item { width: 130px; height: 95px; }
+  .event-route-stat-value { font-size: 1.05rem; }
+  .event-nav-btn { padding: 15px; font-size: 0.9rem; }
+}
+
+/* 390px viewport */
+@media (max-width: 390px) {
+  .nav-instruction-card { left: 10px; right: 10px; }
+  .event-content { padding: 10px 10px 0; }
+}
+
+
+/* =====================================================================
+   PHASE 6 — OFF-ROUTE NOTIFICATION (prominently visible, mobile-friendly)
+===================================================================== */
+.off-route-banner {
+  position: fixed;
+  top: calc(var(--header-h) + 108px);
+  left: 12px;
+  right: 12px;
+  background: #DC2626;
+  color: #fff;
+  border-radius: 14px;
+  padding: 12px 18px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-align: center;
+  z-index: 850;
+  box-shadow: 0 4px 20px rgba(220,38,38,0.45);
+  animation: slide-down-in 0.25s ease;
+}
+.off-route-banner.recalculating {
+  background: #D97706;
+  box-shadow: 0 4px 20px rgba(217,119,6,0.45);
+}
+
+/* =====================================================================
+   PHASE 11 — ARRIVAL ROOM CARD (room / floor / wing guidance)
+===================================================================== */
+.arrival-room-card {
+  background: var(--canvas);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin: 14px 0 4px;
+  border: 1.5px solid var(--line-strong);
+  text-align: left;
+}
+.arrival-room-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+}
+.arrival-room-row:last-of-type { border-bottom: none; }
+.arrival-room-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.arrival-room-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+.arrival-room-hint {
+  margin-top: 10px;
+  font-size: 0.82rem;
+  color: var(--ink-2);
+  line-height: 1.5;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+/* =====================================================================
+   PHASE 10 — EVENT ROOM SECTION (on EventPage)
+===================================================================== */
+.event-room-card {
+  background: var(--canvas);
+  border-radius: 14px;
+  border: 1.5px solid var(--line-strong);
+  padding: 12px 14px;
+  margin: 12px 0;
+}
+.event-room-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+}
+.event-room-row:last-of-type { border-bottom: none; }
+.event-room-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.event-room-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.event-room-hint {
+  font-size: 0.78rem;
+  color: var(--ink-2);
+  line-height: 1.5;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+/* =====================================================================
+   PHOTO LIGHTBOX — swipe-ready with prev/next buttons
+===================================================================== */
+.photo-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.97);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: fade-in 0.18s ease;
+  touch-action: manipulation;
+}
+.photo-lightbox img {
+  max-width: calc(100% - 80px);
+  max-height: calc(100% - 80px);
+  object-fit: contain;
+  border-radius: 6px;
+  user-select: none;
+}
+.photo-lightbox-close {
+  position: absolute;
+  top: 14px; right: 14px;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 2001;
+}
+.lightbox-nav {
+  position: absolute;
+  top: 50%; transform: translateY(-50%);
+  width: 44px; height: 64px;
+  background: rgba(255,255,255,0.10);
+  border: none; color: #fff;
+  font-size: 1.8rem;
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  touch-action: manipulation;
+  z-index: 2001;
+}
+.lightbox-nav.left  { left: 10px; }
+.lightbox-nav.right { right: 10px; }
+.lightbox-counter {
+  position: absolute;
+  bottom: 16px; left: 50%; transform: translateX(-50%);
+  color: rgba(255,255,255,0.7);
+  font-size: 0.82rem;
+  background: rgba(0,0,0,0.4);
+  padding: 4px 12px;
+  border-radius: 999px;
+}
+
+/* =====================================================================
+   BACK LINK
+===================================================================== */
+.event-back-link {
+  color: var(--brand);
+  font-weight: 600;
+  font-size: 0.88rem;
+  text-decoration: none;
+}
+.event-back-link:active { opacity: 0.7; }
+
+/* =====================================================================
+   EXTRA MOBILE POLISH — Phases 14
+===================================================================== */
+/* Ensure nav-mode hides header bottom-border artifact */
+.home.nav-mode .header { box-shadow: none; }
+
+/* Better touch targets on sheet handle */
+.nav-sheet-grip { min-height: 32px; }
+
+/* Larger arrival card on small screens */
+@media (max-height: 700px) {
+  .arrival-card {
+    padding: 22px 18px 18px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .arrival-emoji { font-size: 2.2rem; margin-bottom: 8px; }
+  .arrival-title { font-size: 1.2rem; }
+  .arrival-actions { gap: 8px; }
+  .arrival-btn { padding: 12px; }
+}
+
+/* Ensure event-page scrolls on very short screens */
+.event-page-v2 {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Off-route banner overlaps turn card on small screens — move down */
+@media (max-width: 390px) {
+  .off-route-banner {
+    top: calc(var(--header-h) + 100px);
+    font-size: 0.82rem;
+    padding: 10px 14px;
+  }
+}
+

@@ -1,43 +1,60 @@
 [
   {
     "id": "invente-robotics-expo",
-    "name": "Robotics Expo - Invente 2026",
+    "name": "Robotics Expo — Invente 2026",
     "fest": "Invente",
     "department": "Robotics & Automation Club",
     "location_id": "mini-hall-1",
     "date": "2026-09-12",
     "start_time": "10:00",
     "end_time": "17:00",
-    "description": "Showcase of student-built robots, live demos and an open robo-soccer match. Open to all visiting colleges.",
+    "description": "Showcase of student-built robots, live demos and an open robo-soccer match.\n\nHighlights this year:\n• Autonomous maze-solving bots\n• Line-follower sprint challenge\n• Open robo-soccer tournament (register at the door)\n• Q&A session with faculty mentors\n\nOpen to all visiting colleges. No prior registration needed for spectators.",
     "open_to_external": true,
-    "status": "verified"
+    "status": "verified",
+    "organizer": "Robotics & Automation Club, SSN",
+    "category": "Exhibition",
+    "contact_info": "robotics@ssn.edu.in | +91 98400 00001",
+    "registration_link": "https://invente.ssn.edu.in/robotics-expo",
+    "poster_url": "",
+    "photo_urls": []
   },
   {
     "id": "invente-hackathon",
-    "name": "24-Hour Hackathon - Invente 2026",
+    "name": "24-Hour Hackathon — Invente 2026",
     "fest": "Invente",
     "department": "Computer Science and Engineering",
     "location_id": "cse-block",
     "date": "2026-09-12",
     "start_time": "09:00",
     "end_time": "09:00 (next day)",
-    "description": "Overnight build challenge for teams of up to 4. Registration desk at CSE Block entrance.",
+    "description": "Overnight build challenge for teams of up to 4. Push your limits, ship something real, and compete for prizes worth ₹1,00,000+.\n\nTheme revealed at kickoff.\n\nRules:\n• Teams of 2–4 participants\n• Any tech stack, any platform\n• Code must be written during the event\n• Final demos at 8:00 AM on Day 2\n\nRegistration desk at CSE Block entrance. Refreshments provided throughout the night.",
     "open_to_external": true,
-    "status": "verified"
+    "status": "verified",
+    "organizer": "Dept. of CSE, SSN College of Engineering",
+    "category": "Competition",
+    "contact_info": "hackathon@ssn.edu.in | +91 98400 00002",
+    "registration_link": "https://invente.ssn.edu.in/hackathon",
+    "poster_url": "",
+    "photo_urls": []
   },
   {
     "id": "instincts-battle-of-bands",
-    "name": "Battle of Bands - Instincts 2026",
+    "name": "Battle of Bands — Instincts 2026",
     "fest": "Instincts",
     "department": "Music Club",
     "location_id": "tcs-auditorium",
     "date": "2026-09-13",
     "start_time": "18:00",
     "end_time": "21:00",
-    "description": "Inter-college band competition. Main highlight event of the cultural fest.",
+    "description": "Inter-college band competition — the main highlight event of SSN's cultural fest.\n\nFeaturing:\n• 8 college bands competing for the title\n• Genres: Rock, Indie, Jazz, Fusion\n• Celebrity guest performance after finals\n• Prize pool: ₹75,000\n\nSeating is free and open to all. Doors open at 17:30. Don't miss the opening act at 18:15!",
     "open_to_external": true,
     "status": "verified",
-    "reject_reason": "Manually rejected"
+    "organizer": "SSN Music Club",
+    "category": "Performance",
+    "contact_info": "music@ssn.edu.in | +91 98400 00003",
+    "registration_link": "https://instincts.ssn.edu.in/bands",
+    "poster_url": "",
+    "photo_urls": []
   },
   {
     "id": "f1-4aae7d",
@@ -48,9 +65,15 @@
     "date": "2026-06-16",
     "start_time": "10:00",
     "end_time": "12:00",
-    "description": "REGISTRATION CAN BE DONE AT THE VENUE ",
+    "description": "REGISTRATION CAN BE DONE AT THE VENUE",
     "open_to_external": true,
     "status": "verified",
-    "created_at": "2026-06-16T04:53:48.527949"
+    "created_at": "2026-06-16T04:53:48.527949",
+    "organizer": "Dept. of EEE",
+    "category": "Competition",
+    "contact_info": "",
+    "registration_link": "",
+    "poster_url": "",
+    "photo_urls": []
   }
 ]

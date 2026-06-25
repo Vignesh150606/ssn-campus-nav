@@ -21,8 +21,16 @@ const LOCATION_IDS = ['main-gate','parking','admin-block','central-library','eee
   'food-pr','food-aswins','sports-complex','boys-hostel-gate','boys-hostel-office',
   'girls-hostel','medical-center','clock-tower','cdc-block','ssn-fountain','snu-academic']
 
-const BLANK_FORM = { name:'', fest:'Invente', department:'', location_id:'tcs-auditorium',
-  date:'', start_time:'', end_time:'', description:'', open_to_external:true }
+// Phase 10 — extended event form with rich fields
+const BLANK_FORM = {
+  name:'', fest:'Invente', department:'', location_id:'tcs-auditorium',
+  date:'', start_time:'', end_time:'', description:'', open_to_external:true,
+  // Rich fields (Phase 10)
+  organizer:'', category:'', contact_info:'', registration_link:'',
+  poster_url:'', photo_urls:'',
+  // Phase 11 — room / floor / wing
+  building:'', room_number:'', floor:'', wing:'',
+}
 
 export default function AdminDashboard() {
   const [secret, setSecret]   = useState('')
@@ -76,7 +84,19 @@ export default function AdminDashboard() {
   async function submitEvent() {
     setSubmitting(true)
     try {
-      const res = await adminFetch('/api/admin/events','POST',form,secret)
+      // Phase 10: transform photo_urls text into array before submitting
+      const payload = {
+        ...form,
+        photo_urls: form.photo_urls
+          ? form.photo_urls.split('\n').map(s => s.trim()).filter(Boolean).slice(0, 10)
+          : [],
+        // Phase 11: pass room fields (empty string → null for cleaner JSON)
+        building:     form.building     || null,
+        room_number:  form.room_number  || null,
+        floor:        form.floor        || null,
+        wing:         form.wing         || null,
+      }
+      const res = await adminFetch('/api/admin/events','POST',payload,secret)
       flash(`Submitted! ID: ${res.event_id}`); setForm(BLANK_FORM); setTab('events'); reload()
     } catch(e) { flash(e.message,true) }
     finally { setSubmitting(false) }
@@ -184,36 +204,92 @@ export default function AdminDashboard() {
 
       {/* Add event form */}
       {tab==='add' && (
-        <div style={{flex:1,overflowY:'auto',padding:'16px',maxWidth:520}}>
+        <div style={{flex:1,overflowY:'auto',padding:'16px',maxWidth:540}}>
           <div style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:'1.1rem',marginBottom:14}}>Add New Event</div>
-          {[['name','Event name','text'],['fest','Fest (Invente / Instincts)','text'],
-            ['department','Organising department','text'],['date','Date','date'],
-            ['start_time','Start time','time'],['end_time','End time','time']].map(([key,label,type])=>(
+
+          {/* Phase 10 — Basic fields */}
+          {[['name','Event name *','text'],['fest','Fest (Invente / Instincts) *','text'],
+            ['department','Organising department *','text'],
+            ['organizer','Organiser / club name','text'],
+            ['category','Category (Workshop / Competition / Performance / Exhibition)','text'],
+            ['date','Date *','date'],
+            ['start_time','Start time *','time'],['end_time','End time *','time']].map(([key,label,type])=>(
             <div key={key} style={{marginBottom:12}}>
               <label style={{fontSize:'0.75rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--muted)',display:'block',marginBottom:4}}>{label}</label>
               <input type={type} value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))}
                 style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid var(--line)',fontFamily:'var(--font-sans)',fontSize:'0.92rem',outline:'none'}} />
             </div>
           ))}
+
           <div style={{marginBottom:12}}>
-            <label style={{fontSize:'0.75rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--muted)',display:'block',marginBottom:4}}>Venue</label>
+            <label style={{fontSize:'0.75rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--muted)',display:'block',marginBottom:4}}>Venue *</label>
             <select value={form.location_id} onChange={e=>setForm(f=>({...f,location_id:e.target.value}))}
               style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid var(--line)',fontFamily:'var(--font-sans)',fontSize:'0.92rem',background:'var(--surface)'}}>
               {LOCATION_IDS.map(id=><option key={id} value={id}>{id}</option>)}
             </select>
           </div>
+
           <div style={{marginBottom:12}}>
-            <label style={{fontSize:'0.75rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--muted)',display:'block',marginBottom:4}}>Description</label>
-            <textarea rows={3} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}
+            <label style={{fontSize:'0.75rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--muted)',display:'block',marginBottom:4}}>Description *</label>
+            <textarea rows={4} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}
               style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid var(--line)',fontFamily:'var(--font-sans)',fontSize:'0.92rem',resize:'vertical',outline:'none'}} />
           </div>
+
+          {/* Phase 10 — Rich fields */}
+          <div style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.85rem',marginBottom:10,marginTop:4,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.05em'}}>
+            📸 Media & Contact (optional)
+          </div>
+          {[
+            ['contact_info','Contact info (email / phone)','text'],
+            ['registration_link','Registration link (URL)','url'],
+            ['poster_url','Event poster image URL','url'],
+          ].map(([key,label,type])=>(
+            <div key={key} style={{marginBottom:12}}>
+              <label style={{fontSize:'0.75rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--muted)',display:'block',marginBottom:4}}>{label}</label>
+              <input type={type} value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))}
+                placeholder={type==='url'?'https://…':''}
+                style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid var(--line)',fontFamily:'var(--font-sans)',fontSize:'0.92rem',outline:'none'}} />
+            </div>
+          ))}
+          <div style={{marginBottom:12}}>
+            <label style={{fontSize:'0.75rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--muted)',display:'block',marginBottom:4}}>
+              Event photos (up to 10 URLs, one per line)
+            </label>
+            <textarea rows={4}
+              value={form.photo_urls}
+              onChange={e=>setForm(f=>({...f,photo_urls:e.target.value}))}
+              placeholder={'https://example.com/photo1.jpg\nhttps://example.com/photo2.jpg'}
+              style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid var(--line)',fontFamily:'var(--font-sans)',fontSize:'0.85rem',resize:'vertical',outline:'none'}} />
+            <div style={{fontSize:'0.72rem',color:'var(--muted)',marginTop:4}}>Supports 0–10 photos. Each URL on a new line.</div>
+          </div>
+
+          {/* Phase 11 — Room / Floor / Wing */}
+          <div style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.85rem',marginBottom:10,marginTop:4,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.05em'}}>
+            📍 Venue Details (Room / Floor / Wing)
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
+            {[
+              ['building','Building (e.g. EEE Block)'],
+              ['room_number','Room No. (e.g. EEE-302)'],
+              ['floor','Floor (e.g. 3rd Floor)'],
+              ['wing','Wing (e.g. Left Wing)'],
+            ].map(([key,label])=>(
+              <div key={key}>
+                <label style={{fontSize:'0.72rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--muted)',display:'block',marginBottom:4}}>{label}</label>
+                <input type="text" value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))}
+                  style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid var(--line)',fontFamily:'var(--font-sans)',fontSize:'0.88rem',outline:'none',boxSizing:'border-box'}} />
+              </div>
+            ))}
+          </div>
+
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:18}}>
             <input type="checkbox" id="ext" checked={form.open_to_external}
               onChange={e=>setForm(f=>({...f,open_to_external:e.target.checked}))} />
             <label htmlFor="ext" style={{fontSize:'0.88rem'}}>Open to external/visiting colleges</label>
           </div>
+
           <button onClick={submitEvent} disabled={submitting}
-            style={{width:'100%',padding:'12px',borderRadius:999,background:'var(--brand)',fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.95rem'}}>
+            style={{width:'100%',padding:'13px',borderRadius:999,background:'var(--brand)',fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.95rem',color:'#fff'}}>
             {submitting ? 'Submitting…' : 'Submit Event (pending verification)'}
           </button>
         </div>
