@@ -423,3 +423,33 @@ def open_segment(seg_id: str, secret: str = Query(...)):
             save_segments(segs)
             return {"message": f"Segment '{s['name']}' reopened."}
     raise HTTPException(status_code=404, detail=f"Segment '{seg_id}' not found")
+
+
+# ---------------------------------------------------------------------------
+# Campus Copilot (Phase 1) — text understanding only.
+#
+# This endpoint classifies the message and resolves any building/department
+# it names against the *existing* locations.json. It does not know about
+# the caller's GPS position and does not duplicate the routing, events, or
+# nearby-facility logic that already exists elsewhere — the frontend uses
+# the existing /api/locations, /api/events, /api/route etc. (and the
+# existing utils/facilities.js helpers) to act on whatever this returns.
+# See utils/copilot.py for the engine itself and why it's rule-based rather
+# than a live LLM call.
+# ---------------------------------------------------------------------------
+from utils import copilot as _copilot
+
+
+class CopilotChatRequest(BaseModel):
+    message: str
+    context: Optional[dict] = None
+
+
+@app.post("/api/copilot/chat")
+def copilot_chat(body: CopilotChatRequest):
+    """Public — classify one chatbot message. Stateless: the caller (the
+    frontend) is responsible for holding conversation state and deciding
+    what to do with the returned intent/entities."""
+    locations = load_json("locations.json")
+    result = _copilot.classify(body.message, locations, body.context)
+    return result

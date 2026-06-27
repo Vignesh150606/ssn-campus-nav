@@ -11,6 +11,7 @@
  * Phase 14: Auto-follow + Recenter button when user manually pans
  */
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import MapView from '../components/MapView'
 import SearchBar from '../components/SearchBar'
 import CategoryChips from '../components/CategoryChips'
@@ -19,6 +20,7 @@ import RoutePreviewPanel from '../components/RoutePreviewPanel'
 import NearbyFacilities from '../components/NearbyFacilities'
 import CompassWidget from '../components/CompassWidget'
 import VoiceSettingsPanel from '../components/VoiceSettingsPanel'
+import ChatbotWidget from '../copilot/ChatbotWidget'
 import { getLocations, searchLocations, getRoute, getRouteFromCoords, getRoadSegments } from '../api'
 import { useLocationContext } from '../context/LocationContext'
 import { useVoiceGuidance } from '../hooks/useVoiceGuidance'
@@ -71,6 +73,7 @@ function nearestLandmarkToTurn(turnLat, turnLng, locations, excludeIds = []) {
 }
 
 export default function Home() {
+  const navigate = useNavigate()
   const [locations, setLocations]         = useState([])
   const [query, setQuery]                 = useState('')
   const [searchResults, setSearchResults] = useState(null)
@@ -268,6 +271,41 @@ export default function Home() {
     setNavSheetExpanded(false)
     setArrived(false)
     setUserManuallyPanned(false)
+  }
+
+  // Campus Copilot (Phase 1): start navigation directly from a chat card,
+  // skipping the preview-panel step. Mirrors handleDirections +
+  // handleStartNavigation above but fetches the route and applies it in
+  // one go (no reliance on intermediate state having flushed yet), and
+  // optionally carries classroom room/floor info into the existing
+  // arrival-screen mechanism (navEventInfo) used by event navigation.
+  async function startNavigationFromCopilot(loc, eventInfo = null) {
+    try {
+      const r = (tracking && position)
+        ? await getRouteFromCoords(position.lat, position.lng, loc.id)
+        : await getRoute(ENTRY_ID, loc.id)
+      voice.resetForNewRoute()
+      setDestination(loc.id)
+      setPreviewLoc(loc)
+      setRoutePath(r.path)
+      setRouteDist(r.distance_m)
+      setRouteEta(r.eta_minutes)
+      setRouteWarning(r.warning || null)
+      setRouteError(null)
+      setRoute(r.path, loc.lat, loc.lng, loc.id)
+      voice.announceNavigationStart()
+      if (!tracking) startTracking()
+      setFollowUser(true)
+      setPreviewActive(false)
+      setPreviewRoutes(null)
+      setNavMode(true)
+      setNavSheetExpanded(false)
+      setArrived(false)
+      setUserManuallyPanned(false)
+      if (eventInfo) setNavEventInfo(eventInfo)
+    } catch (e) {
+      setRouteError(e.message)
+    }
   }
 
   function handleCancelPreview() {
@@ -654,6 +692,16 @@ export default function Home() {
       )}
 
       <VoiceSettingsPanel voice={voice} open={voiceSettingsOpen} onClose={() => setVoiceSettingsOpen(false)} />
+
+      <ChatbotWidget
+        locations={locations}
+        position={position}
+        arrivedLocationId={arrived ? previewLoc?.id : null}
+        arrivedLocationName={arrived ? previewLoc?.name : null}
+        onPreviewRoute={handleDirections}
+        onStartNavigation={startNavigationFromCopilot}
+        onViewEventDetails={(eventId) => navigate(`/event/${eventId}`)}
+      />
     </div>
   )
 }
