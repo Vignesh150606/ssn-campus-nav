@@ -693,7 +693,7 @@ export default function Home() {
 
       <VoiceSettingsPanel voice={voice} open={voiceSettingsOpen} onClose={() => setVoiceSettingsOpen(false)} />
 
-      {/* Task 4 — FAB stack: Copilot on top, My Location below (Google Maps style) */}
+      {/* Task 4 — FAB stack: Copilot only (My Location accessible via bottom sheet) */}
       <div className="copilot-fab-stack">
         <ChatbotWidget
           locations={locations}
@@ -704,17 +704,6 @@ export default function Home() {
           onStartNavigation={startNavigationFromCopilot}
           onViewEventDetails={(eventId) => navigate(`/event/${eventId}`)}
         />
-        {/* Floating My Location button */}
-        {!navMode && (
-          <button
-            className={`copilot-location-fab ${tracking ? 'copilot-location-fab--active' : ''}`}
-            onClick={handleToggleTracking}
-            aria-label={tracking ? 'Stop tracking' : 'My location'}
-            title={tracking ? 'Tracking active' : 'Enable My Location'}
-          >
-            {tracking ? '📍' : '🔍'}
-          </button>
-        )}
       </div>
     </div>
   )

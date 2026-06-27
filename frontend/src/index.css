@@ -225,6 +225,30 @@ input, select, textarea { font-family: inherit; color: inherit; }
   font-size: 10px !important;
 }
 
+/* ── P4: Move zoom controls to bottom-right (Google Maps style) ──
+   Leaflet defaults to top-left which overlaps the search bar.
+   Positioned above the Copilot FAB (56px + 20px bottom + 16px gap = 92px). */
+.leaflet-container .leaflet-top.leaflet-left {
+  top: auto !important;
+  left: auto !important;
+  bottom: 92px;
+  right: 16px;
+}
+/* In nav mode: clear the recenter button (bottom: 100px + 50px height + gap) */
+.home.nav-mode .leaflet-container .leaflet-top.leaflet-left {
+  bottom: 168px;
+}
+@media (max-width: 430px) {
+  .home:not(.nav-mode) .leaflet-container .leaflet-top.leaflet-left {
+    bottom: 88px;
+    right: 12px;
+  }
+  .home.nav-mode .leaflet-container .leaflet-top.leaflet-left {
+    bottom: 158px;
+    right: 12px;
+  }
+}
+
 /* ---------- Search overlay (top) ---------- */
 .search-overlay {
   position: absolute;
@@ -906,10 +930,18 @@ input, select, textarea { font-family: inherit; color: inherit; }
 }
 
 /* ---------- Schedule / events pages ---------- */
+/* P2: scroll container ensures full scroll on mobile (no clipped cards) */
+.schedule-scroll-container {
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scroll-behavior: smooth;
+}
 .schedule-page {
   max-width: 720px;
   margin: 0 auto;
-  padding: 24px 16px 80px;
+  padding: 24px 16px max(80px, calc(60px + env(safe-area-inset-bottom, 0px)));
 }
 .schedule-heading {
   font-family: var(--font-display);
@@ -3123,21 +3155,65 @@ input, select, textarea { font-family: inherit; color: inherit; }
 .copilot-send-btn:not(:disabled):active { transform: scale(0.88); }
 .copilot-send-btn:disabled { cursor: default; }
 
-/* Task 3 — Global dark-mode-safe inputs (catch-all for any admin inline styles) */
+/* Task 3 — Global dark-mode-safe inputs (comprehensive: caret, autofill, placeholder, selection) */
 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 textarea,
 select {
   background-color: var(--canvas);
   color: var(--ink);
+  caret-color: var(--ink);
+  /* force light color-scheme so the browser never injects a dark
+     native background (that's what causes the "black rectangle") */
+  color-scheme: light;
 }
-input[type="date"],
-input[type="time"],
-input[type="url"],
-input[type="text"],
-input[type="password"],
-input[type="email"] {
-  color-scheme: light dark;
+input::placeholder, textarea::placeholder {
+  color: var(--muted);
+  opacity: 1;
 }
+/* Autofill override — removes the browser-injected yellow/dark background */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: var(--ink) !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--canvas) inset !important;
+  box-shadow: 0 0 0 1000px var(--canvas) inset !important;
+  caret-color: var(--ink) !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+/* Selection highlight — readable in both modes */
+::selection {
+  background: var(--brand-soft);
+  color: var(--ink);
+}
+/* Search bar input: always transparent (the container provides the background).
+   This fixes the "black rectangle" that appears when typing in dark mode. */
+.search-box input {
+  background: transparent !important;
+  color: var(--ink) !important;
+  caret-color: var(--ink) !important;
+  color-scheme: light !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.search-box input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+  -webkit-text-fill-color: var(--ink) !important;
+}
+/* Admin / form inputs — ensure typed text and caret are always readable */
+.admin-input {
+  color: var(--ink);
+  caret-color: var(--ink);
+}
+.admin-input::placeholder { color: var(--muted); opacity: 1; }
+/* Copilot chat input */
+.copilot-input {
+  color: var(--ink) !important;
+  caret-color: var(--ink) !important;
+}
+.copilot-input::placeholder { color: var(--muted-2) !important; opacity: 1 !important; }
 
 @media (min-width: 720px) {
   .copilot-fab-stack {
@@ -3147,10 +3223,35 @@ input[type="email"] {
   .copilot-sheet {
     left: auto;
     right: 24px;
-    bottom: 156px;   /* above the 56px FAB + 48px loc FAB + gaps + margin */
+    bottom: 100px;   /* above the 56px Copilot FAB + 24px bottom + gap */
     width: 380px;
     max-height: 68vh;
     border-radius: var(--radius-xl);
     border: 1px solid var(--line);
+  }
+}
+
+/* P9 — Safe-area inset support for devices with home indicator / notch */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .copilot-fab-stack {
+    bottom: max(20px, env(safe-area-inset-bottom, 20px));
+  }
+  .nav-bottom-sheet {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .nav-exit-btn {
+    bottom: max(96px, calc(80px + env(safe-area-inset-bottom, 0px)));
+  }
+  .recenter-btn {
+    bottom: max(100px, calc(84px + env(safe-area-inset-bottom, 0px)));
+  }
+  .copilot-sheet-input-row {
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+  }
+  .results-sheet {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .schedule-page {
+    padding-bottom: max(80px, calc(60px + env(safe-area-inset-bottom, 0px)));
   }
 }

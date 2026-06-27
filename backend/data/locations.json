@@ -394,5 +394,13 @@
     "accessible": true,
     "description": "Football ground on the western side of campus.",
     "facilities": []
+  },
+  {
+    "id": "main-canteen",
+    "name": "Main Canteen",
+    "category": "food",
+    "lat": 12.753189480340673,
+    "lng": 80.19468899864601,
+    "description": "Main campus canteen serving breakfast, lunch and dinner."
   }
 ]

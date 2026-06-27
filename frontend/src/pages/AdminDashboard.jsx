@@ -19,7 +19,41 @@ const LOCATION_IDS = ['main-gate','parking','admin-block','central-library','eee
   'cse-block','ece-block','it-block','mech-block','civil-block','biomed-block',
   'tcs-auditorium','mini-hall-1','food-rishabhs','food-snowcube','food-metro',
   'food-pr','food-aswins','sports-complex','boys-hostel-gate','boys-hostel-office',
-  'girls-hostel','medical-center','clock-tower','cdc-block','ssn-fountain','snu-academic']
+  'girls-hostel','medical-center','clock-tower','cdc-block','ssn-fountain','snu-academic',
+  'main-canteen']
+
+// P8 — Updated display names (overrides backend names in the admin UI)
+// Do NOT change the IDs above — routing, graph, and coordinates remain unchanged.
+const LOCATION_DISPLAY_NAMES = {
+  'main-gate':          'Main Gate',
+  'parking':            'Parking',
+  'admin-block':        'Admin Block',
+  'central-library':    'Central Library',
+  'eee-block':          'EEE Block',
+  'cse-block':          'CSE Block',
+  'ece-block':          'ECE Block',
+  'it-block':           'IT Block',
+  'mech-block':         'Mech Block',
+  'civil-block':        'Civil Block',
+  'biomed-block':       'BioMed Block',
+  'tcs-auditorium':     'Main Auditorium',   // was: TCS Auditorium
+  'mini-hall-1':        'Mini Auditorium',   // was: Mini Hall 1
+  'food-rishabhs':      "Rishabh's",
+  'food-snowcube':      'Snow Cube',
+  'food-metro':         'Metro',
+  'food-pr':            'PR (Food Court)',
+  'food-aswins':        "Aswin's",
+  'sports-complex':     'Sports Complex',
+  'boys-hostel-gate':   'Boys Hostel Gate',
+  'boys-hostel-office': 'Boys Hostel Office',
+  'girls-hostel':       'Girls Hostel',
+  'medical-center':     'Medical Center',
+  'clock-tower':        'Clock Tower',
+  'cdc-block':          'CDC Block',
+  'ssn-fountain':       'SSN Fountain',
+  'snu-academic':       'SNU Academic Block',
+  'main-canteen':       'Main Canteen',
+}
 
 const BLANK_FORM = {
   name:'', fest:'Invente', department:'', location_id:'tcs-auditorium',
@@ -176,7 +210,7 @@ export default function AdminDashboard() {
                 </span>
               </div>
               <div style={{fontSize:'0.78rem',color:'var(--muted)',marginTop:4}}>
-                {e.fest} · {e.location?.name||e.location_id} · {e.date} {e.start_time}–{e.end_time}
+                {e.fest} · {e.location ? (LOCATION_DISPLAY_NAMES[e.location.id] || e.location.name) : (LOCATION_DISPLAY_NAMES[e.location_id] || e.location_id)} · {e.date} {e.start_time}–{e.end_time}
               </div>
               {e.reject_reason && <div style={{fontSize:'0.78rem',color:'#D7263D',marginTop:4}}>Reason: {e.reject_reason}</div>}
               <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
@@ -254,7 +288,7 @@ export default function AdminDashboard() {
             <label style={{fontSize:'0.75rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--muted)',display:'block',marginBottom:4}}>Venue *</label>
             <select value={form.location_id} onChange={e=>setForm(f=>({...f,location_id:e.target.value}))}
               style={selectStyle}>
-              {LOCATION_IDS.map(id=><option key={id} value={id}>{id}</option>)}
+              {LOCATION_IDS.map(id=><option key={id} value={id}>{LOCATION_DISPLAY_NAMES[id] || id}</option>)}
             </select>
           </div>
 
