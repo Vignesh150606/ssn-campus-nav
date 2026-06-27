@@ -21,15 +21,36 @@ const LOCATION_IDS = ['main-gate','parking','admin-block','central-library','eee
   'food-pr','food-aswins','sports-complex','boys-hostel-gate','boys-hostel-office',
   'girls-hostel','medical-center','clock-tower','cdc-block','ssn-fountain','snu-academic']
 
-// Phase 10 — extended event form with rich fields
 const BLANK_FORM = {
   name:'', fest:'Invente', department:'', location_id:'tcs-auditorium',
   date:'', start_time:'', end_time:'', description:'', open_to_external:true,
-  // Rich fields (Phase 10)
   organizer:'', category:'', contact_info:'', registration_link:'',
   poster_url:'', photo_urls:'',
-  // Phase 11 — room / floor / wing
   building:'', room_number:'', floor:'', wing:'',
+}
+
+// Task 3 — theme-aware input style; uses CSS variables so it works in both light + dark mode
+const inputStyle = {
+  width:'100%',
+  padding:'9px 12px',
+  borderRadius:10,
+  border:'1px solid var(--line-strong)',
+  fontFamily:'var(--font-sans)',
+  fontSize:'0.92rem',
+  outline:'none',
+  background:'var(--canvas)',
+  color:'var(--ink)',
+  boxSizing:'border-box',
+}
+
+const textareaStyle = {
+  ...inputStyle,
+  resize:'vertical',
+}
+
+const selectStyle = {
+  ...inputStyle,
+  background:'var(--surface)',
 }
 
 export default function AdminDashboard() {
@@ -69,7 +90,15 @@ export default function AdminDashboard() {
   }
 
   async function action(path, method='PATCH') {
-    try { const res=await adminFetch(path,method,null,secret); flash(res.message); reload() }
+    try {
+      const res = await adminFetch(path, method, null, secret)
+      flash(res.message)
+      reload()
+      // Task 2 — broadcast to EventsList + Copilot that a new event is approved
+      if (path.includes('/verify')) {
+        window.dispatchEvent(new CustomEvent('campus:eventApproved'))
+      }
+    }
     catch(e) { flash(e.message,true) }
   }
 
@@ -84,13 +113,11 @@ export default function AdminDashboard() {
   async function submitEvent() {
     setSubmitting(true)
     try {
-      // Phase 10: transform photo_urls text into array before submitting
       const payload = {
         ...form,
         photo_urls: form.photo_urls
           ? form.photo_urls.split('\n').map(s => s.trim()).filter(Boolean).slice(0, 10)
           : [],
-        // Phase 11: pass room fields (empty string → null for cleaner JSON)
         building:     form.building     || null,
         room_number:  form.room_number  || null,
         floor:        form.floor        || null,
@@ -102,15 +129,17 @@ export default function AdminDashboard() {
     finally { setSubmitting(false) }
   }
 
-  const pill = {padding:'6px 14px',borderRadius:999,fontFamily:'var(--font-display)',fontWeight:600,fontSize:'0.78rem'}
+  const pill = {padding:'6px 14px',borderRadius:999,fontFamily:'var(--font-display)',fontWeight:600,fontSize:'0.78rem',cursor:'pointer'}
 
   if (!authed) return (
     <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',gap:14,padding:24}}>
       <div style={{fontFamily:'var(--font-display)',fontSize:'1.3rem',fontWeight:700}}>Admin Login</div>
+      {/* Task 3 — dark mode safe input */}
       <input type="password" placeholder="Admin secret" value={secret}
         onChange={e=>setSecret(e.target.value)} onKeyDown={e=>e.key==='Enter'&&login()}
-        style={{padding:'10px 14px',borderRadius:10,border:'1px solid var(--line)',fontFamily:'var(--font-sans)',fontSize:'0.95rem',width:260,outline:'none'}} />
-      <button onClick={login} style={{background:'var(--brand)',padding:'10px 28px',borderRadius:999,fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.9rem'}}>Sign in</button>
+        className="admin-input"
+        style={{...inputStyle, width:260}} />
+      <button onClick={login} style={{background:'var(--brand)',color:'#fff',padding:'10px 28px',borderRadius:999,fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.9rem'}}>Sign in</button>
       {error && <div style={{color:'#D7263D',fontSize:'0.85rem'}}>{error}</div>}
     </div>
   )
@@ -139,7 +168,7 @@ export default function AdminDashboard() {
           {events.map(e=>(
             <div key={e.id} style={{background:'var(--surface)',borderRadius:14,padding:'14px 18px',boxShadow:'var(--shadow-md)'}}>
               <div style={{display:'flex',alignItems:'flex-start',gap:10,flexWrap:'wrap'}}>
-                <span style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.97rem',flex:1}}>{e.name}</span>
+                <span style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.97rem',flex:1,color:'var(--ink)'}}>{e.name}</span>
                 <span style={{fontSize:'0.7rem',fontWeight:700,padding:'3px 10px',borderRadius:999,
                   background:STATUS_COLOR[e.status]+'22',color:STATUS_COLOR[e.status],
                   border:`1px solid ${STATUS_COLOR[e.status]}`,textTransform:'uppercase',letterSpacing:'0.06em'}}>
@@ -160,11 +189,11 @@ export default function AdminDashboard() {
                     style={{...pill,background:'#E03E52',color:'#fff'}}>✗ Reject</button>
                 )}
                 <button onClick={()=>{ if(window.confirm('Delete permanently?')) action(`/api/admin/events/${e.id}`,'DELETE') }}
-                  style={{...pill,background:'transparent',border:'1px solid var(--line)'}}>Delete</button>
+                  style={{...pill,background:'transparent',border:'1px solid var(--line)',color:'var(--ink)'}}>Delete</button>
                 <a href={`/event/${e.id}`} target="_blank" rel="noreferrer"
-                  style={{...pill,background:'var(--canvas)',border:'1px solid var(--line)'}}>Preview →</a>
+                  style={{...pill,background:'var(--canvas)',border:'1px solid var(--line)',color:'var(--ink)'}}>Preview →</a>
                 <a href={`${API_BASE}/api/events/${e.id}/qr`} target="_blank" rel="noreferrer"
-                  style={{...pill,background:'var(--canvas)',border:'1px solid var(--line)'}}>QR ↓</a>
+                  style={{...pill,background:'var(--canvas)',border:'1px solid var(--line)',color:'var(--ink)'}}>QR ↓</a>
               </div>
             </div>
           ))}
@@ -182,7 +211,7 @@ export default function AdminDashboard() {
               borderLeft:`4px solid ${seg.closed?'#D7263D':'#2E9E5B'}`}}>
               <div style={{display:'flex',alignItems:'center',gap:12}}>
                 <div style={{flex:1}}>
-                  <div style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.92rem'}}>{seg.name}</div>
+                  <div style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.92rem',color:'var(--ink)'}}>{seg.name}</div>
                   <div style={{fontSize:'0.78rem',color:'var(--muted)',marginTop:2}}>{seg.description}</div>
                 </div>
                 <button onClick={()=>toggleSegment(seg)}
@@ -205,9 +234,9 @@ export default function AdminDashboard() {
       {/* Add event form */}
       {tab==='add' && (
         <div style={{flex:1,overflowY:'auto',padding:'16px',maxWidth:540}}>
-          <div style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:'1.1rem',marginBottom:14}}>Add New Event</div>
+          <div style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:'1.1rem',marginBottom:14,color:'var(--ink)'}}>Add New Event</div>
 
-          {/* Phase 10 — Basic fields */}
+          {/* Task 3 — all inputs use theme-aware inputStyle */}
           {[['name','Event name *','text'],['fest','Fest (Invente / Instincts) *','text'],
             ['department','Organising department *','text'],
             ['organizer','Organiser / club name','text'],
@@ -217,14 +246,14 @@ export default function AdminDashboard() {
             <div key={key} style={{marginBottom:12}}>
               <label style={{fontSize:'0.75rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--muted)',display:'block',marginBottom:4}}>{label}</label>
               <input type={type} value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))}
-                style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid var(--line)',fontFamily:'var(--font-sans)',fontSize:'0.92rem',outline:'none'}} />
+                style={inputStyle} />
             </div>
           ))}
 
           <div style={{marginBottom:12}}>
             <label style={{fontSize:'0.75rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--muted)',display:'block',marginBottom:4}}>Venue *</label>
             <select value={form.location_id} onChange={e=>setForm(f=>({...f,location_id:e.target.value}))}
-              style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid var(--line)',fontFamily:'var(--font-sans)',fontSize:'0.92rem',background:'var(--surface)'}}>
+              style={selectStyle}>
               {LOCATION_IDS.map(id=><option key={id} value={id}>{id}</option>)}
             </select>
           </div>
@@ -232,10 +261,9 @@ export default function AdminDashboard() {
           <div style={{marginBottom:12}}>
             <label style={{fontSize:'0.75rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--muted)',display:'block',marginBottom:4}}>Description *</label>
             <textarea rows={4} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}
-              style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid var(--line)',fontFamily:'var(--font-sans)',fontSize:'0.92rem',resize:'vertical',outline:'none'}} />
+              style={textareaStyle} />
           </div>
 
-          {/* Phase 10 — Rich fields */}
           <div style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.85rem',marginBottom:10,marginTop:4,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.05em'}}>
             📸 Media & Contact (optional)
           </div>
@@ -248,7 +276,7 @@ export default function AdminDashboard() {
               <label style={{fontSize:'0.75rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--muted)',display:'block',marginBottom:4}}>{label}</label>
               <input type={type} value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))}
                 placeholder={type==='url'?'https://…':''}
-                style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid var(--line)',fontFamily:'var(--font-sans)',fontSize:'0.92rem',outline:'none'}} />
+                style={inputStyle} />
             </div>
           ))}
           <div style={{marginBottom:12}}>
@@ -259,11 +287,10 @@ export default function AdminDashboard() {
               value={form.photo_urls}
               onChange={e=>setForm(f=>({...f,photo_urls:e.target.value}))}
               placeholder={'https://example.com/photo1.jpg\nhttps://example.com/photo2.jpg'}
-              style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid var(--line)',fontFamily:'var(--font-sans)',fontSize:'0.85rem',resize:'vertical',outline:'none'}} />
+              style={{...textareaStyle,fontSize:'0.85rem'}} />
             <div style={{fontSize:'0.72rem',color:'var(--muted)',marginTop:4}}>Supports 0–10 photos. Each URL on a new line.</div>
           </div>
 
-          {/* Phase 11 — Room / Floor / Wing */}
           <div style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.85rem',marginBottom:10,marginTop:4,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.05em'}}>
             📍 Venue Details (Room / Floor / Wing)
           </div>
@@ -277,19 +304,20 @@ export default function AdminDashboard() {
               <div key={key}>
                 <label style={{fontSize:'0.72rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--muted)',display:'block',marginBottom:4}}>{label}</label>
                 <input type="text" value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))}
-                  style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid var(--line)',fontFamily:'var(--font-sans)',fontSize:'0.88rem',outline:'none',boxSizing:'border-box'}} />
+                  style={{...inputStyle,fontSize:'0.88rem'}} />
               </div>
             ))}
           </div>
 
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:18}}>
             <input type="checkbox" id="ext" checked={form.open_to_external}
-              onChange={e=>setForm(f=>({...f,open_to_external:e.target.checked}))} />
-            <label htmlFor="ext" style={{fontSize:'0.88rem'}}>Open to external/visiting colleges</label>
+              onChange={e=>setForm(f=>({...f,open_to_external:e.target.checked}))}
+              style={{accentColor:'var(--brand)',width:16,height:16}} />
+            <label htmlFor="ext" style={{fontSize:'0.88rem',color:'var(--ink)'}}>Open to external/visiting colleges</label>
           </div>
 
           <button onClick={submitEvent} disabled={submitting}
-            style={{width:'100%',padding:'13px',borderRadius:999,background:'var(--brand)',fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.95rem',color:'#fff'}}>
+            style={{width:'100%',padding:'13px',borderRadius:999,background:'var(--brand)',fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.95rem',color:'#fff',cursor:'pointer'}}>
             {submitting ? 'Submitting…' : 'Submit Event (pending verification)'}
           </button>
         </div>

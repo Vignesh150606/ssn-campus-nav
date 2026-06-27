@@ -1,17 +1,21 @@
 /**
  * ChatbotWidget — Phase 1 "AI Campus Copilot" UI.
  *
- * A small floating button (bottom-right) that opens a bottom-sheet chat
- * panel. The map stays visible behind it. All the actual "what does the
- * user want" / "where is that" work happens in copilotEngine.js — this
- * file is purely presentation + wiring to the navigation actions Home.jsx
- * already has (preview route / start navigation / view event details).
+ * Phase 1.1 polish:
+ *   Task 4  — FAB repositioned above My Location button (done via CSS).
+ *   Task 5  — Only one close button (header); FAB hidden when sheet is open.
+ *   Task 6  — Auto-focus on open, improved placeholder, better UX.
+ *   Task 7  — Rich welcome screen with onboarding content.
+ *   Task 8  — 4 starter suggestion chips.
+ *   Task 9  — Typing animation (already in CSS; kept as-is).
+ *   Task 10 — Smooth open/close animation, chip/button feedback.
  */
 import { useEffect, useRef, useState } from 'react'
 import { runTurn } from './copilotEngine'
 
+// Task 8 — exactly four high-value quick suggestions
 const STARTER_PROMPTS = [
-  'Where is the library?',
+  'Where is the Library?',
   "What's happening today?",
   "I'm hungry",
   'EEE 302',
@@ -73,6 +77,30 @@ function ChatCard({ card, onPreview, onStart, onDetails }) {
   )
 }
 
+// Task 7 — Rich onboarding welcome screen
+function WelcomeScreen({ onSend }) {
+  return (
+    <div className="copilot-welcome">
+      <div className="copilot-welcome-icon">🧭</div>
+      <div className="copilot-welcome-title">Welcome to SSN Campus Copilot</div>
+      <div className="copilot-welcome-subtitle">I can help you:</div>
+      <div className="copilot-welcome-features">
+        <div className="copilot-welcome-feature"><span>📍</span> Find Buildings</div>
+        <div className="copilot-welcome-feature"><span>🏫</span> Find Classrooms</div>
+        <div className="copilot-welcome-feature"><span>🎉</span> Discover Today's Events</div>
+        <div className="copilot-welcome-feature"><span>🍽️</span> Find Nearby Facilities</div>
+        <div className="copilot-welcome-feature"><span>🗺️</span> Start Navigation</div>
+      </div>
+      <div className="copilot-welcome-hint">Try asking:</div>
+      <div className="copilot-starters">
+        {STARTER_PROMPTS.map((p, i) => (
+          <button key={i} className="copilot-chip" onClick={() => onSend(p)}>{p}</button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function ChatbotWidget({
   locations,
   position,
@@ -84,21 +112,29 @@ export default function ChatbotWidget({
 }) {
   const [open, setOpen] = useState(false)
   const [hasUnread, setHasUnread] = useState(false)
-  const [messages, setMessages] = useState([
-    { role: 'assistant', text: "Hi! I'm the SSN Campus Copilot. Ask me about a building, department, classroom, event, or nearby facility." },
-  ])
+  const [messages, setMessages] = useState([])   // Task 7: start empty, show welcome screen instead
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const stateRef = useRef({})
   const listRef = useRef(null)
+  const inputRef = useRef(null)
   const lastArrivedRef = useRef(null)
 
+  // Auto-scroll to bottom
   useEffect(() => {
-    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight
+    if (listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight
+    }
   }, [messages, open])
 
-  // Smart suggestions: when the user arrives at a destination, offer
-  // relevant nearby facilities without taking over the screen.
+  // Task 6 — Auto-focus input when sheet opens
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 120)
+    }
+  }, [open])
+
+  // Smart arrival suggestion
   useEffect(() => {
     if (arrivedLocationId && arrivedLocationId !== lastArrivedRef.current) {
       lastArrivedRef.current = arrivedLocationId
@@ -118,6 +154,8 @@ export default function ChatbotWidget({
       return !o
     })
   }
+
+  const isWelcomeScreen = messages.length === 0
 
   async function send(text) {
     const trimmed = (text || '').trim()
@@ -190,15 +228,17 @@ export default function ChatbotWidget({
 
   return (
     <>
-      <button
-        className={`copilot-fab ${hasUnread ? 'copilot-fab-unread' : ''}`}
-        onClick={toggleOpen}
-        aria-label={open ? 'Close campus assistant' : 'Open campus assistant'}
-        aria-expanded={open}
-      >
-        {open ? '✕' : '💬'}
-        {hasUnread && !open && <span className="copilot-fab-dot" />}
-      </button>
+      {/* Task 5 — FAB only shown when closed (no duplicate close button) */}
+      {!open && (
+        <button
+          className={`copilot-fab ${hasUnread ? 'copilot-fab-unread' : ''}`}
+          onClick={toggleOpen}
+          aria-label="Open campus assistant"
+        >
+          💬
+          {hasUnread && <span className="copilot-fab-dot" />}
+        </button>
+      )}
 
       {open && (
         <div className="copilot-sheet" role="dialog" aria-label="Campus Copilot chat">
@@ -207,13 +247,21 @@ export default function ChatbotWidget({
               <span className="copilot-sheet-avatar">🧭</span>
               <div>
                 <div className="copilot-sheet-title-text">Campus Copilot</div>
-                <div className="copilot-sheet-subtitle">Ask about buildings, events, or facilities</div>
+                <div className="copilot-sheet-subtitle">
+                  {busy ? 'Thinking…' : 'Ask about buildings, events, or facilities'}
+                </div>
               </div>
             </div>
+            {/* Task 5 — single close button, in the header */}
             <button className="copilot-sheet-close" onClick={() => setOpen(false)} aria-label="Close">✕</button>
           </div>
 
           <div className="copilot-sheet-messages" ref={listRef}>
+            {/* Task 7 — Welcome screen when no messages yet */}
+            {isWelcomeScreen && !busy && (
+              <WelcomeScreen onSend={send} />
+            )}
+
             {messages.map((m, i) => (
               <div key={i} className={`copilot-msg copilot-msg-${m.role}`}>
                 {m.role === 'assistant' && <span className="copilot-msg-avatar">{initials('SC')}</span>}
@@ -236,35 +284,40 @@ export default function ChatbotWidget({
                 </div>
               </div>
             ))}
+
+            {/* Task 9 — Typing indicator while processing */}
             {busy && (
-              <div className="copilot-msg copilot-msg-assistant">
+              <div className="copilot-msg copilot-msg-assistant copilot-msg-typing-row">
                 <span className="copilot-msg-avatar">{initials('SC')}</span>
                 <div className="copilot-msg-bubble copilot-msg-typing"><span /><span /><span /></div>
               </div>
             )}
           </div>
 
-          {messages.length <= 1 && (
-            <div className="copilot-starters">
-              {STARTER_PROMPTS.map((p, i) => (
-                <button key={i} className="copilot-chip" onClick={() => send(p)}>{p}</button>
-              ))}
-            </div>
-          )}
-
+          {/* Task 6 — Input always at bottom, auto-focused */}
           <form
             className="copilot-sheet-input-row"
             onSubmit={e => { e.preventDefault(); send(input) }}
           >
             <input
+              ref={inputRef}
               type="text"
               value={input}
               onChange={e => setInput(e.target.value)}
-              placeholder="Ask about campus…"
+              placeholder="Ask about buildings, classrooms, events or facilities…"
               className="copilot-input"
               disabled={busy}
+              autoComplete="off"
+              enterKeyHint="send"
             />
-            <button type="submit" className="copilot-send-btn" disabled={busy || !input.trim()} aria-label="Send">➤</button>
+            <button
+              type="submit"
+              className={`copilot-send-btn ${(!busy && input.trim()) ? 'copilot-send-btn-active' : ''}`}
+              disabled={busy || !input.trim()}
+              aria-label="Send"
+            >
+              ➤
+            </button>
           </form>
         </div>
       )}
