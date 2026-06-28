@@ -3,7 +3,7 @@ uvicorn[standard]==0.30.6
 qrcode[pil]==7.4.2
 
 # Phase 3 — Supabase production backend
-supabase>=2.6.0,<3.0.0
+supabase==2.18.1
 python-dotenv==1.0.1
 PyJWT==2.9.0
 passlib[bcrypt]==1.7.4
