@@ -3451,3 +3451,128 @@ select:-webkit-autofill {
   .arrival-btn { padding: 11px; font-size: 0.83rem; }
   .arrival-venue-events { padding: 8px 10px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PHASE 4A — Premium Google Maps Navigation Experience
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Navigation compass (heading-up indicator + north-up toggle) ─────────── */
+.nav-compass {
+  position: fixed;
+  top: calc(var(--header-h) + 116px); /* just below the instruction card */
+  right: 14px;
+  z-index: 810;
+  width: 46px;
+  height: 52px;
+  border-radius: 12px;
+  background: var(--surface-translucent);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 4px 4px;
+  cursor: pointer;
+  animation: fade-in 0.25s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.nav-compass:active {
+  transform: scale(0.92);
+  box-shadow: var(--shadow-sm);
+}
+.nav-compass-n {
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #E53E3E;
+  line-height: 1;
+}
+
+/* ── Recenter button — premium redesign ────────────────────────────────────── */
+.recenter-btn {
+  position: fixed;
+  bottom: 100px;
+  right: 14px;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 68px;
+  height: 58px;
+  padding: 8px 12px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1.5px solid var(--brand);
+  box-shadow: 0 4px 20px rgba(37,99,235,0.22), var(--shadow-sm);
+  cursor: pointer;
+  animation: fade-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.recenter-btn:active {
+  transform: scale(0.93);
+  box-shadow: 0 2px 10px rgba(37,99,235,0.18);
+}
+.recenter-icon {
+  font-size: 1.3rem;
+  color: var(--brand);
+  line-height: 1;
+}
+.recenter-label {
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--brand);
+  white-space: nowrap;
+}
+
+/* ── Safe-area overrides for nav-compass ───────────────────────────────────── */
+@supports (padding: env(safe-area-inset-top)) {
+  .nav-compass {
+    top: calc(var(--header-h) + env(safe-area-inset-top, 0px) + 116px);
+  }
+}
+
+/* ── Smooth map tile rendering during rotation ────────────────────────────── */
+.leaflet-container {
+  /* Ensure crisp edges during CSS rotation (leaflet-rotate applies its own) */
+  will-change: transform;
+}
+
+/* ── Route lines: remove the dashed overlay that was part of old style ─────── */
+/* (Phase 4A uses solid continuous lines with glow instead of dashes) */
+
+/* ── Heading-up: keep zoom controls readable ─────────────────────────────── */
+/* leaflet-rotate counter-rotates the controls automatically via the
+   rotate-pane architecture — no additional CSS override needed */
+
+/* ── Recenter button safe-area ────────────────────────────────────────────── */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .recenter-btn {
+    bottom: max(100px, calc(84px + env(safe-area-inset-bottom, 0px)));
+  }
+}
+
+/* ── Mobile sizing ────────────────────────────────────────────────────────── */
+@media (max-width: 430px) {
+  .nav-compass {
+    width: 42px;
+    height: 48px;
+    right: 12px;
+  }
+  .recenter-btn {
+    right: 12px;
+    min-width: 60px;
+    height: 54px;
+  }
+  .recenter-label {
+    font-size: 0.58rem;
+  }
+}

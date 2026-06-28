@@ -12,6 +12,7 @@
   "dependencies": {
     "@react-google-maps/api": "^2.20.8",
     "leaflet": "^1.9.4",
+    "leaflet-rotate": "^0.2.8",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-leaflet": "^5.0.0",

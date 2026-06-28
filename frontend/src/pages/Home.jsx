@@ -4,6 +4,9 @@
  * Phase 1:  Active Navigation Mode (hides browse UI, shows nav UI)
  * Phase 3:  Professional turn-by-turn instruction card at top
  * Phase 4:  Smart user marker with heading (via MapView userHeading)
+ * Phase 4A: Premium Google Maps navigation experience:
+ *           True heading-up, lower-third camera, smart zoom, premium marker,
+ *           premium route, navigation compass, follow mode, recenter button
  * Phase 5:  Navigation bottom sheet (collapsed: dist+ETA, expanded: details)
  * Phase 6:  Exit Navigation button (bottom-left)
  * Phase 7:  Arrival overlay with Done/Navigate Again/Share
@@ -19,12 +22,14 @@ import LocationCard from '../components/LocationCard'
 import RoutePreviewPanel from '../components/RoutePreviewPanel'
 import NearbyFacilities from '../components/NearbyFacilities'
 import CompassWidget from '../components/CompassWidget'
+import NavCompass from '../components/NavCompass'
 import VoiceSettingsPanel from '../components/VoiceSettingsPanel'
 import ChatbotWidget from '../copilot/ChatbotWidget'
 import { getLocations, searchLocations, getRoute, getRouteFromCoords, getRoadSegments, getEvents } from '../api'
 import { useLocationContext } from '../context/LocationContext'
 import { useVoiceGuidance } from '../hooks/useVoiceGuidance'
 import { useCompassHeading } from '../hooks/useCompassHeading'
+import { useNavCamera } from '../hooks/useNavCamera'
 import { landmarksAlongPath } from '../utils/facilities'
 import { computeUpcomingTurn, haversine } from '../utils/geo'
 
@@ -111,6 +116,10 @@ export default function Home() {
   const [arrivalEvents, setArrivalEvents]         = useState([])
   // Phase 14: Auto-follow / recenter
   const [userManuallyPanned, setUserManuallyPanned] = useState(false)
+  // Phase 4A: heading-up navigation mode (true = map rotates with user direction)
+  const [headingUp, setHeadingUp] = useState(true)
+  // Phase 4A: current map bearing reported by NavigationController
+  const [currentBearing, setCurrentBearing] = useState(0)
 
   const {
     position, accuracy, acquiringGps, tracking, error: gpsError,
@@ -125,8 +134,13 @@ export default function Home() {
 
   const voice = useVoiceGuidance({ tracking, hasRoute, remainingDist, remainingPath, offRoute })
 
-  // Phase 4: compass heading for the user marker arrow
-  const { heading } = useCompassHeading(navMode && tracking)
+  // Phase 4 + 4A: compass heading + premium smoothing
+  const { heading: rawHeading } = useCompassHeading(navMode && tracking)
+  // Phase 4A: smooth the raw heading → two outputs:
+  //   smoothedHeading: fine-grained, used for the user marker arrow
+  //   mapHeading:      coarser, used for map rotation to avoid micro-oscillations
+  const navCameraActive = navMode && tracking && !acquiringGps
+  const { smoothedHeading, mapHeading } = useNavCamera(rawHeading, navCameraActive)
 
   // Reset voice dedup on recalculation
   const prevRecalcVersionRef = useRef(recalcVersion)
@@ -288,6 +302,8 @@ export default function Home() {
     setNavSheetExpanded(false)
     setArrived(false)
     setUserManuallyPanned(false)
+    // Phase 4A: start in heading-up mode
+    setHeadingUp(true)
   }
 
   // Campus Copilot (Phase 1): start navigation directly from a chat card,
@@ -319,6 +335,8 @@ export default function Home() {
       setNavSheetExpanded(false)
       setArrived(false)
       setUserManuallyPanned(false)
+      // Phase 4A: start in heading-up mode
+      setHeadingUp(true)
       if (eventInfo) setNavEventInfo(eventInfo)
     } catch (e) {
       setRouteError(e.message)
@@ -348,21 +366,17 @@ export default function Home() {
     setUserManuallyPanned(false)
     setNavEventInfo(null)
     setArrivalEvents([])
-  }
-
-  function handleToggleTracking() {
-    if (tracking) {
-      stopTracking(); setFollowUser(false); voice.cancel()
-    } else {
-      startTracking()
-      if (routePath) setFollowUser(true)
-    }
+    // Phase 4A: reset heading-up on exit
+    setHeadingUp(false)
+    setCurrentBearing(0)
   }
 
   // Phase 14: recenter map on user
   const handleRecenter = useCallback(() => {
     setFollowUser(true)
     setUserManuallyPanned(false)
+    // Phase 4A: restore heading-up when recentering
+    setHeadingUp(true)
   }, [])
 
   // Phase 14: user manually dragged — disable follow
@@ -372,6 +386,27 @@ export default function Home() {
       setUserManuallyPanned(true)
     }
   }, [navMode])
+
+  // Phase 4A: compass tap handlers
+  const handleNorthUp = useCallback(() => {
+    setHeadingUp(false)
+    setCurrentBearing(0)
+  }, [])
+
+  const handleHeadingUp = useCallback(() => {
+    setHeadingUp(true)
+    setFollowUser(true)
+    setUserManuallyPanned(false)
+  }, [])
+
+  function handleToggleTracking() {
+    if (tracking) {
+      stopTracking(); setFollowUser(false); voice.cancel()
+    } else {
+      startTracking()
+      if (routePath) setFollowUser(true)
+    }
+  }
 
   // Phase 7: Navigate Again
   function handleNavigateAgain() {
@@ -414,8 +449,14 @@ export default function Home() {
           followUser={followUser}
           zoom={17}
           previewTrigger={previewTrigger}
-          userHeading={navMode && !acquiringGps ? heading : null}
+          userHeading={navMode && !acquiringGps ? smoothedHeading : null}
+          mapHeading={navMode && !acquiringGps ? mapHeading : null}
+          headingUp={navMode && headingUp}
+          nextTurnDist={navMode ? nextTurn?.distanceM ?? null : null}
+          remainingDist={navMode ? remainingDist : null}
+          recalcVersion={recalcVersion}
           onMapDrag={handleMapDrag}
+          onRotationChange={setCurrentBearing}
         />
       </div>
 
@@ -555,10 +596,19 @@ export default function Home() {
             ✕ Exit
           </button>
 
-          {/* Phase 14 — Recenter button (shows when user pans manually) */}
+          {/* Phase 4A — Navigation compass (shows when map is rotated away from North) */}
+          <NavCompass
+            mapHeading={currentBearing}
+            headingUp={headingUp}
+            onNorthUp={handleNorthUp}
+            onHeadingUp={handleHeadingUp}
+          />
+
+          {/* Phase 14 / 4A — Recenter button (shows when user pans manually) */}
           {userManuallyPanned && (
-            <button className="recenter-btn" onClick={handleRecenter} aria-label="Recenter map">
-              ⌖
+            <button className="recenter-btn" onClick={handleRecenter} aria-label="Resume navigation follow">
+              <span className="recenter-icon">⊙</span>
+              <span className="recenter-label">Re-center</span>
             </button>
           )}
 
