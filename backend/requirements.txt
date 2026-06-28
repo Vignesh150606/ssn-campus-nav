@@ -1,3 +1,11 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 qrcode[pil]==7.4.2
+
+# Phase 3 — Supabase production backend
+supabase>=2.6.0,<3.0.0
+python-dotenv==1.0.1
+PyJWT==2.9.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.0
+python-multipart==0.0.9

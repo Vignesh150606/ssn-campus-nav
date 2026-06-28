@@ -4,12 +4,30 @@ import { CATEGORY_META, FEST_META } from '../constants'
 
 const STATUS_COLOR = { verified:'#2E9E5B', pending:'#E07414', rejected:'#D7263D' }
 
-async function adminFetch(path, method='GET', body=null, secret) {
-  const sep = path.includes('?') ? '&' : '?'
-  const res = await fetch(`${API_BASE}${path}${sep}secret=${encodeURIComponent(secret)}`, {
+// Phase 3 — JWT bearer auth (replaces the old shared `?secret=` query param).
+async function adminFetch(path, method='GET', body=null, token) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {}
+  if (body) headers['Content-Type'] = 'application/json'
+  const res = await fetch(`${API_BASE}${path}`, {
     method,
-    headers: body ? {'Content-Type':'application/json'} : {},
+    headers,
     body: body ? JSON.stringify(body) : null,
+  })
+  if (!res.ok) { const d = await res.json().catch(()=>({})); throw new Error(d.detail||`Error ${res.status}`) }
+  return res.json()
+}
+
+// Phase 3 — multipart upload straight to Supabase Storage. Separate from
+// adminFetch because the browser needs to set its own multipart
+// Content-Type (with boundary) — never set that header manually.
+async function adminUpload(path, file, token, extraFields = {}) {
+  const fd = new FormData()
+  fd.append('file', file)
+  Object.entries(extraFields).forEach(([k, v]) => fd.append(k, v))
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
   })
   if (!res.ok) { const d = await res.json().catch(()=>({})); throw new Error(d.detail||`Error ${res.status}`) }
   return res.json()
@@ -87,8 +105,12 @@ const selectStyle = {
   background:'var(--surface)',
 }
 
+const TOKEN_STORAGE_KEY = 'ssn_admin_token_v1'
+
 export default function AdminDashboard() {
-  const [secret, setSecret]   = useState('')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [token, setToken]     = useState(() => sessionStorage.getItem(TOKEN_STORAGE_KEY) || '')
   const [authed, setAuthed]   = useState(false)
   const [events, setEvents]   = useState([])
   const [segments, setSegments] = useState([])
@@ -103,17 +125,38 @@ export default function AdminDashboard() {
     setTimeout(()=>{ setError(null); setMsg(null) }, 4000)
   }
 
+  // Phase 3 — if a JWT from a previous session is still in sessionStorage,
+  // try it once on mount instead of forcing a fresh login every refresh.
+  useEffect(() => {
+    if (!token) return
+    adminFetch('/api/admin/events', 'GET', null, token)
+      .then(data => {
+        setEvents(data); setAuthed(true)
+        fetch(`${API_BASE}/api/road-segments`).then(r=>r.json()).then(setSegments)
+      })
+      .catch(() => { sessionStorage.removeItem(TOKEN_STORAGE_KEY); setToken('') })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function login() {
     try {
-      const data = await adminFetch('/api/admin/events','GET',null,secret)
-      setEvents(data); setAuthed(true)
+      const data = await adminFetch('/api/admin/login', 'POST', { username, password })
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, data.access_token)
+      setToken(data.access_token)
+      const events = await adminFetch('/api/admin/events', 'GET', null, data.access_token)
+      setEvents(events); setAuthed(true)
       fetch(`${API_BASE}/api/road-segments`).then(r=>r.json()).then(setSegments)
     } catch(e) { flash(e.message,true) }
   }
 
+  function logout() {
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY)
+    setToken(''); setAuthed(false)
+  }
+
   async function reload() {
     try {
-      const data = await adminFetch('/api/admin/events','GET',null,secret)
+      const data = await adminFetch('/api/admin/events','GET',null,token)
       setEvents(data)
     } catch(e) { flash(e.message,true) }
   }
@@ -125,7 +168,7 @@ export default function AdminDashboard() {
 
   async function action(path, method='PATCH') {
     try {
-      const res = await adminFetch(path, method, null, secret)
+      const res = await adminFetch(path, method, null, token)
       flash(res.message)
       reload()
       // Task 2 — broadcast to EventsList + Copilot that a new event is approved
@@ -136,10 +179,19 @@ export default function AdminDashboard() {
     catch(e) { flash(e.message,true) }
   }
 
+  async function uploadImage(eventId, file, isPoster=false) {
+    try {
+      await adminUpload(`/api/admin/events/${eventId}/images`, file, token, isPoster ? { is_poster: 'true' } : {})
+      flash(isPoster ? 'Poster uploaded.' : 'Photo uploaded.')
+      reload()
+    } catch(e) { flash(e.message,true) }
+  }
+
+
   async function toggleSegment(seg) {
     const endpoint = seg.closed ? 'open' : 'close'
     try {
-      const res = await adminFetch(`/api/admin/road-segments/${seg.id}/${endpoint}`,'PATCH',null,secret)
+      const res = await adminFetch(`/api/admin/road-segments/${seg.id}/${endpoint}`,'PATCH',null,token)
       flash(res.message); reloadSegments()
     } catch(e) { flash(e.message,true) }
   }
@@ -157,7 +209,7 @@ export default function AdminDashboard() {
         floor:        form.floor        || null,
         wing:         form.wing         || null,
       }
-      const res = await adminFetch('/api/admin/events','POST',payload,secret)
+      const res = await adminFetch('/api/admin/events','POST',payload,token)
       flash(`Submitted! ID: ${res.event_id}`); setForm(BLANK_FORM); setTab('events'); reload()
     } catch(e) { flash(e.message,true) }
     finally { setSubmitting(false) }
@@ -169,8 +221,12 @@ export default function AdminDashboard() {
     <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',gap:14,padding:24}}>
       <div style={{fontFamily:'var(--font-display)',fontSize:'1.3rem',fontWeight:700}}>Admin Login</div>
       {/* Task 3 — dark mode safe input */}
-      <input type="password" placeholder="Admin secret" value={secret}
-        onChange={e=>setSecret(e.target.value)} onKeyDown={e=>e.key==='Enter'&&login()}
+      <input type="text" placeholder="Username" value={username} autoComplete="username"
+        onChange={e=>setUsername(e.target.value)} onKeyDown={e=>e.key==='Enter'&&login()}
+        className="admin-input"
+        style={{...inputStyle, width:260}} />
+      <input type="password" placeholder="Password" value={password} autoComplete="current-password"
+        onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&login()}
         className="admin-input"
         style={{...inputStyle, width:260}} />
       <button onClick={login} style={{background:'var(--brand)',color:'#fff',padding:'10px 28px',borderRadius:999,fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.9rem'}}>Sign in</button>
@@ -193,6 +249,7 @@ export default function AdminDashboard() {
         <div style={{flex:1}}/>
         {msg   && <span style={{fontSize:'0.8rem',color:'#2E9E5B',alignSelf:'center'}}>{msg}</span>}
         {error && <span style={{fontSize:'0.8rem',color:'#D7263D',alignSelf:'center'}}>{error}</span>}
+        <button onClick={logout} style={{...pill,background:'transparent',border:'1px solid var(--line)',color:'var(--muted)'}}>Sign out</button>
       </div>
 
       {/* Events list */}
@@ -228,6 +285,19 @@ export default function AdminDashboard() {
                   style={{...pill,background:'var(--canvas)',border:'1px solid var(--line)',color:'var(--ink)'}}>Preview →</a>
                 <a href={`${API_BASE}/api/events/${e.id}/qr`} target="_blank" rel="noreferrer"
                   style={{...pill,background:'var(--canvas)',border:'1px solid var(--line)',color:'var(--ink)'}}>QR ↓</a>
+                {/* Phase 3 — upload straight to Supabase Storage; the resulting
+                    URL is stored the same way a pasted poster_url/photo_urls
+                    URL always was, so EventPage rendering needs no changes. */}
+                <label style={{...pill,background:'var(--canvas)',border:'1px solid var(--line)',color:'var(--ink)',cursor:'pointer'}}>
+                  🖼 Set Poster
+                  <input type="file" accept="image/*" style={{display:'none'}}
+                    onChange={ev=>{ const f=ev.target.files[0]; ev.target.value=''; if(f) uploadImage(e.id, f, true) }} />
+                </label>
+                <label style={{...pill,background:'var(--canvas)',border:'1px solid var(--line)',color:'var(--ink)',cursor:'pointer'}}>
+                  📷 Add Photo
+                  <input type="file" accept="image/*" style={{display:'none'}}
+                    onChange={ev=>{ const f=ev.target.files[0]; ev.target.value=''; if(f) uploadImage(e.id, f, false) }} />
+                </label>
               </div>
             </div>
           ))}

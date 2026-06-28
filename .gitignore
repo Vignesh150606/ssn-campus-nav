@@ -7,7 +7,23 @@ backend/.venv/
 frontend/node_modules/
 frontend/dist/
 frontend/dev-dist/
+
+## Secrets — never commit real credentials (Phase 3 / Supabase)
+## (.env.example files are intentionally NOT ignored — they're templates)
+.env
+.env.local
+.env.production
+.env.development
+backend/.env
+backend/.env.local
+backend/.env.production
+backend/.env.development
 frontend/.env
+frontend/.env.local
+frontend/.env.production
+frontend/.env.development
+*.pem
+*.key
 
 ## OS / editor
 .DS_Store

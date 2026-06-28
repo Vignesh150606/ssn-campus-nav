@@ -1,5 +1,15 @@
 # SSN Campus Navigator
 
+> **Production backend migration:** this app now runs on Supabase
+> (Postgres + Storage) instead of local JSON files for events/locations/road
+> closures, with real per-admin login. See **[SUPABASE_MIGRATION.md](./SUPABASE_MIGRATION.md)**
+> for the full setup + deployment guide. Everything below describes the
+> original JSON-file version and is kept for local-dev/reference; the JSON
+> files in `backend/data/` are now only used as the source for the one-time
+> migration script (`backend/migrate_to_supabase.py`) and as the seed data
+> `utils/router.py` builds its graph from — they are no longer written to at
+> runtime.
+
 A smart campus navigation web app for **SSN College of Engineering, Chennai** —
 built around a real use case: helping visitors from other colleges find their
 way to fest events (Invente / Instincts) by scanning a QR code.
@@ -17,7 +27,7 @@ gate to the venue on the campus map.
 |----------|------|
 | Frontend | React + Vite, React Router, Leaflet / react-leaflet, vite-plugin-pwa |
 | Backend  | FastAPI (Python) |
-| Data     | JSON files (locations + events) — easy to edit, swappable for a real DB later |
+| Data     | Supabase (Postgres + Storage) — see SUPABASE_MIGRATION.md. Local JSON files remain only as migration seed data. |
 | Maps     | OpenStreetMap tiles (free, no API key) |
 | QR codes | `qrcode` Python library, generated per event |
 

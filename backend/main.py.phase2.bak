@@ -1,44 +1,23 @@
 """
-SSN Campus Navigator - Backend API (Phase 3 — Supabase production backend)
+SSN Campus Navigator - Backend API (Phase 2 & 3)
 
 Run locally:
     pip install -r requirements.txt --break-system-packages
-    cp .env.example .env   # fill in SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / JWT_SECRET
     uvicorn main:app --reload
 
 Interactive API docs available at http://127.0.0.1:8000/docs
-
-Phase 3 notes
--------------
-Every endpoint below has the *same* path, method, and response shape it
-had in Phase 2. What changed underneath is the data source: locations,
-events, and road-segment open/closed state now live in Supabase Postgres
-(+ Storage for uploaded event images) instead of local JSON files. All of
-that lives in data_access.py / db.py / auth.py — see SUPABASE_MIGRATION.md
-for the full write-up of what moved and, just as importantly, what
-deliberately did NOT move (the walkway routing graph + Dijkstra in
-utils/router.py, and the Campus Copilot NLU engine in utils/copilot.py
-are both untouched).
-
-Admin auth changed from a single shared `?secret=` query param to real
-per-admin accounts (bcrypt password hash in the `admins` table + a JWT
-issued by POST /api/admin/login). Every /api/admin/* route now requires
-`Authorization: Bearer <token>` instead of `?secret=`.
 """
 
-import os
+import json
 import math
+import os
 from typing import List, Optional
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 
-import data_access
-from auth import authenticate_admin, create_access_token, get_current_admin
-from db import SupabaseUnavailableError
 from utils.qr_generator import generate_event_qr
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -48,7 +27,7 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 app = FastAPI(
     title="SSN Campus Navigator API",
     description="Backend for the Smart Campus Navigation System (SSN College of Engineering)",
-    version="0.3.0",
+    version="0.1.0",
 )
 
 # Allow the frontend (Vite dev server, or any device scanning a QR code) to call this API.
@@ -61,31 +40,14 @@ app.add_middleware(
 )
 
 
-@app.exception_handler(SupabaseUnavailableError)
-def _supabase_unavailable_handler(request: Request, exc: SupabaseUnavailableError):
-    """Database/storage unreachable — a clean 503 instead of a raw 500."""
-    return JSONResponse(
-        status_code=503,
-        content={"detail": "Service temporarily unavailable (database connection issue). Please try again shortly."},
-    )
-
-
-@app.on_event("startup")
-def _on_startup():
-    """Refresh the road-segments JSON mirror from Supabase at boot.
-
-    utils/router.py is untouched and reads road_segments.json straight off
-    disk for the closure-penalty logic in Dijkstra. Supabase is the real
-    source of truth for open/closed state now, so we resync the mirror file
-    here — this is what makes road closures survive a Render redeploy
-    (which wipes local disk) without touching router.py at all.
-    """
-    data_access.sync_road_segments_cache()
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def load_json(filename: str):
+    with open(os.path.join(DATA_DIR, filename), "r", encoding="utf-8") as f:
+        return json.load(f)
+
 
 def haversine_meters(lat1, lng1, lat2, lng2) -> float:
     """Great-circle distance between two points, in meters."""
@@ -105,21 +67,33 @@ def haversine_meters(lat1, lng1, lat2, lng2) -> float:
 def list_locations(category: Optional[str] = None):
     """List all campus locations, optionally filtered by category
     (academic, hostel, sports, dining, library, auditorium, admin, gate, parking, medical)."""
-    return data_access.get_locations(category)
+    locations = load_json("locations.json")
+    if category:
+        locations = [l for l in locations if l["category"].lower() == category.lower()]
+    return locations
 
 
 @app.get("/api/locations/search")
 def search_locations(q: str = Query(..., min_length=1, description="Search text")):
     """Search locations by name, department or category (for the search bar / autocomplete)."""
-    return data_access.search_locations(q)
+    locations = load_json("locations.json")
+    q_lower = q.lower()
+    results = [
+        l for l in locations
+        if q_lower in l["name"].lower()
+        or q_lower in (l.get("department") or "").lower()
+        or q_lower in l["category"].lower()
+    ]
+    return results
 
 
 @app.get("/api/locations/{location_id}")
 def get_location(location_id: str):
-    loc = data_access.get_location(location_id)
-    if not loc:
-        raise HTTPException(status_code=404, detail=f"Location '{location_id}' not found")
-    return loc
+    locations = load_json("locations.json")
+    for l in locations:
+        if l["id"] == location_id:
+            return l
+    raise HTTPException(status_code=404, detail=f"Location '{location_id}' not found")
 
 
 # ---------------------------------------------------------------------------
@@ -129,31 +103,52 @@ def get_location(location_id: str):
 @app.get("/api/events")
 def list_events(fest: Optional[str] = None, date: Optional[str] = None):
     """List fest events, each enriched with its venue's coordinates.
-    Optionally filter by fest name (e.g. 'Invente') or date (YYYY-MM-DD).
-    Only verified events are returned — same as Phase 2."""
-    return data_access.list_public_events(fest=fest, date=date)
+    Optionally filter by fest name (e.g. 'Invente') or date (YYYY-MM-DD)."""
+    events = load_json("events.json")
+    locations = {l["id"]: l for l in load_json("locations.json")}
+
+    # Only show verified events to the public
+    events = [e for e in events if e.get("status", "verified") == "verified"]
+    if fest:
+        events = [e for e in events if e["fest"].lower() == fest.lower()]
+    if date:
+        events = [e for e in events if e["date"] == date]
+
+    for e in events:
+        loc = locations.get(e["location_id"])
+        if loc:
+            e["location"] = {
+                "id": loc["id"],
+                "name": loc["name"],
+                "lat": loc["lat"],
+                "lng": loc["lng"],
+            }
+    return events
 
 
 @app.get("/api/events/{event_id}")
 def get_event(event_id: str):
     """Get full details for one event, including its venue location.
     This is the data that powers the page a fest visitor lands on after scanning a QR code."""
-    event = data_access.get_event(event_id)
-    if not event:
-        raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
-    return event
+    events = load_json("events.json")
+    locations = {l["id"]: l for l in load_json("locations.json")}
+
+    for e in events:
+        if e["id"] == event_id:
+            loc = locations.get(e["location_id"])
+            if loc:
+                e["location"] = loc
+            return e
+    raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
 
 
 @app.get("/api/events/{event_id}/qr")
 def get_event_qr(event_id: str):
     """Return a PNG QR code that links directly to this event's page.
     Print this on posters/flyers so visitors from other colleges can scan -> open the
-    app (PWA) -> see the event -> tap 'Get Directions'.
-
-    QR PNGs are still generated on local disk and regenerated on demand if
-    missing (e.g. after a redeploy) — they're deterministic from event_id,
-    so this self-heals without needing Supabase Storage."""
-    if not data_access.event_exists(event_id):
+    app (PWA) -> see the event -> tap 'Get Directions'."""
+    events = load_json("events.json")
+    if not any(e["id"] == event_id for e in events):
         raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
 
     path = os.path.join(STATIC_DIR, "qr", f"{event_id}.png")
@@ -165,7 +160,7 @@ def get_event_qr(event_id: str):
 from utils.router import find_route as _find_route, find_route_from_point as _find_route_from_point
 
 # ---------------------------------------------------------------------------
-# Routing (Dijkstra over the walkway graph — untouched in this migration)
+# Routing (Phase 5 — real walkway graph via Dijkstra)
 # ---------------------------------------------------------------------------
 
 @app.get("/api/route")
@@ -185,9 +180,10 @@ def get_route(
       nearest walkway node — used for automatic recalculation while a user
       is actively navigating and has drifted off the original route.
     """
-    b = data_access.get_location(to_id)
-    if not b:
+    locations = {l["id"]: l for l in load_json("locations.json")}
+    if to_id not in locations:
         raise HTTPException(status_code=404, detail=f"Unknown to_id '{to_id}'")
+    b = locations[to_id]
 
     using_coords = from_lat is not None and from_lng is not None
 
@@ -199,9 +195,9 @@ def get_route(
             result = _find_route_from_point(from_lat, from_lng, to_id)
             from_payload = {"id": None, "name": "Current location", "lat": from_lat, "lng": from_lng}
         else:
-            a = data_access.get_location(from_id)
-            if not a:
+            if from_id not in locations:
                 raise HTTPException(status_code=404, detail=f"Unknown from_id '{from_id}'")
+            a = locations[from_id]
             result = _find_route(from_id, to_id)
             from_payload = {"id": a["id"], "name": a["name"], "lat": a["lat"], "lng": a["lng"]}
     except ValueError as e:
@@ -239,35 +235,32 @@ def root():
             "/api/events/{id}",
             "/api/events/{id}/qr",
             "/api/route?from_id=&to_id=",
-            "/api/admin/login",
         ],
     }
 
 
 # ---------------------------------------------------------------------------
-# Admin — login + event management (add / verify / reject / delete / images)
-# Protected by a JWT issued from POST /api/admin/login (see auth.py).
+# Admin — event management (add / verify / reject)
+# Protected by a simple secret key set via ADMIN_SECRET env var.
+# In production swap this for proper JWT auth.
 # ---------------------------------------------------------------------------
 
-class AdminLoginRequest(BaseModel):
-    username: str
-    password: str
+import uuid
+from datetime import datetime
+from pydantic import BaseModel
+
+ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "ssnadmin123")  # change before deploying
 
 
-@app.post("/api/admin/login")
-def admin_login(payload: AdminLoginRequest):
-    """Authenticate an admin and issue a JWT.
-    Send the returned access_token back as `Authorization: Bearer <token>`
-    on every other /api/admin/* request."""
-    admin = authenticate_admin(payload.username, payload.password)
-    token = create_access_token(admin["id"], admin["username"], admin["role"])
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "expires_in_hours": int(os.environ.get("JWT_EXPIRES_HOURS", "12")),
-        "username": admin["username"],
-        "role": admin["role"],
-    }
+def check_admin(secret: str):
+    if secret != ADMIN_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid admin secret")
+
+
+def save_events(events: list):
+    with open(os.path.join(DATA_DIR, "events.json"), "w", encoding="utf-8") as f:
+        json.dump(events, f, indent=2, ensure_ascii=False)
+        f.write("\n")
 
 
 class EventCreate(BaseModel):
@@ -291,52 +284,93 @@ class EventCreate(BaseModel):
     building: Optional[str] = None           # e.g. "EEE Block"
     room_number: Optional[str] = None        # e.g. "EEE-302"
     floor: Optional[str] = None              # e.g. "3rd Floor"
-    wing: Optional[str] = None               # e.g. "Left Wing"
+    wing: Optional[str] = None               # e.g. "Left Wing" 
 
 
 @app.post("/api/admin/events")
-def create_event(payload: EventCreate, admin: dict = Depends(get_current_admin)):
+def create_event(payload: EventCreate, secret: str = Query(...)):
     """
-    Protected — submit a new event for the fest.
+    Dev/organiser endpoint — submit a new event for the fest.
     Status will be 'pending' until an admin verifies it via PATCH.
     The event will NOT appear on the public /api/events list until verified.
     """
-    try:
-        event_id = data_access.create_event(payload.model_dump(), created_by_admin_id=admin["sub"])
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    check_admin(secret)
 
+    # Verify location exists
+    locations = {l["id"]: l for l in load_json("locations.json")}
+    if payload.location_id not in locations:
+        raise HTTPException(
+            status_code=400,
+            detail=f"location_id '{payload.location_id}' not found. "
+                   f"Valid ids: {list(locations.keys())}",
+        )
+
+    events = load_json("events.json")
+    slug = payload.name.lower().replace(" ", "-").replace("/", "-")[:40]
+    event_id = f"{slug}-{uuid.uuid4().hex[:6]}"
+
+    new_event = {
+        "id": event_id,
+        **payload.model_dump(),
+        "status": "pending",
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    events.append(new_event)
+    save_events(events)
     generate_event_qr(event_id)
+
     return {"message": "Event submitted — pending verification.", "event_id": event_id}
 
 
 @app.patch("/api/admin/events/{event_id}/verify")
-def verify_event(event_id: str, admin: dict = Depends(get_current_admin)):
+def verify_event(event_id: str, secret: str = Query(...)):
     """Mark an event as verified — it will now appear on the public schedule."""
-    if not data_access.verify_event(event_id):
-        raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
-    return {"message": f"Event '{event_id}' verified and now public."}
+    check_admin(secret)
+    events = load_json("events.json")
+    for e in events:
+        if e["id"] == event_id:
+            e["status"] = "verified"
+            save_events(events)
+            return {"message": f"Event '{event_id}' verified and now public."}
+    raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
 
 
 @app.patch("/api/admin/events/{event_id}/reject")
-def reject_event(event_id: str, reason: str = "", admin: dict = Depends(get_current_admin)):
+def reject_event(event_id: str, secret: str = Query(...), reason: str = ""):
     """Reject / hide an event from the public schedule."""
-    if not data_access.reject_event(event_id, reason):
-        raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
-    return {"message": f"Event '{event_id}' rejected."}
+    check_admin(secret)
+    events = load_json("events.json")
+    for e in events:
+        if e["id"] == event_id:
+            e["status"] = "rejected"
+            e["reject_reason"] = reason
+            save_events(events)
+            return {"message": f"Event '{event_id}' rejected."}
+    raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
 
 
 @app.get("/api/admin/events")
-def list_all_events_admin(admin: dict = Depends(get_current_admin)):
+def list_all_events_admin(secret: str = Query(...)):
     """List ALL events including pending and rejected — for the admin dashboard."""
-    return data_access.list_all_events_admin()
+    check_admin(secret)
+    events = load_json("events.json")
+    locations = {l["id"]: l for l in load_json("locations.json")}
+    for e in events:
+        loc = locations.get(e["location_id"])
+        if loc:
+            e["location"] = {"id": loc["id"], "name": loc["name"], "lat": loc["lat"], "lng": loc["lng"]}
+    return events
 
 
 @app.delete("/api/admin/events/{event_id}")
-def delete_event(event_id: str, admin: dict = Depends(get_current_admin)):
-    """Permanently delete an event (its images are removed too, via cascade)."""
-    if not data_access.delete_event(event_id):
+def delete_event(event_id: str, secret: str = Query(...)):
+    """Permanently delete an event."""
+    check_admin(secret)
+    events = load_json("events.json")
+    filtered = [e for e in events if e["id"] != event_id]
+    if len(filtered) == len(events):
         raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
+    save_events(filtered)
     # Remove QR code if it exists
     qr_path = os.path.join(STATIC_DIR, "qr", f"{event_id}.png")
     if os.path.exists(qr_path):
@@ -344,75 +378,64 @@ def delete_event(event_id: str, admin: dict = Depends(get_current_admin)):
     return {"message": f"Event '{event_id}' deleted."}
 
 
-@app.post("/api/admin/events/{event_id}/images")
-async def upload_event_image(
-    event_id: str,
-    file: UploadFile = File(...),
-    is_poster: bool = Form(False),
-    admin: dict = Depends(get_current_admin),
-):
-    """New in Phase 3 — uploads an image file to Supabase Storage and returns
-    its public URL. The admin dashboard drops that URL straight into the
-    existing poster_url / photo_urls text field, so event creation/edit
-    itself is completely unchanged; this just gives that field a real
-    "Upload" option alongside pasting an external URL."""
-    if not data_access.event_exists(event_id):
-        raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
-
-    content = await file.read()
-    try:
-        public_url, storage_path = data_access.upload_event_image_file(
-            event_id,
-            file.filename or "image",
-            content,
-            file.content_type or "application/octet-stream",
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    data_access.add_event_image(event_id, public_url, storage_path, is_poster)
-    return {"url": public_url, "is_poster": is_poster}
-
-
 # ---------------------------------------------------------------------------
 # Road segments — admin can close/open segments for construction etc.
 # ---------------------------------------------------------------------------
 
+SEG_PATH = os.path.join(DATA_DIR, "road_segments.json")
+
+def load_segments():
+    with open(SEG_PATH) as f:
+        return json.load(f)
+
+def save_segments(segs):
+    with open(SEG_PATH, 'w') as f:
+        json.dump(segs, f, indent=2)
+
+
 @app.get("/api/road-segments")
 def get_road_segments():
     """Public — list all road segments and their open/closed status."""
-    return data_access.get_road_segments()
+    return load_segments()
 
 
 @app.patch("/api/admin/road-segments/{seg_id}/close")
-def close_segment(seg_id: str, admin: dict = Depends(get_current_admin)):
+def close_segment(seg_id: str, secret: str = Query(...)):
     """Admin — mark a road segment as closed (construction, event, etc.)."""
-    seg = data_access.set_segment_closed(seg_id, True)
-    if not seg:
-        raise HTTPException(status_code=404, detail=f"Segment '{seg_id}' not found")
-    return {"message": f"Segment '{seg['name']}' closed. Routes will avoid this road."}
+    check_admin(secret)
+    segs = load_segments()
+    for s in segs:
+        if s['id'] == seg_id:
+            s['closed'] = True
+            save_segments(segs)
+            return {"message": f"Segment '{s['name']}' closed. Routes will avoid this road."}
+    raise HTTPException(status_code=404, detail=f"Segment '{seg_id}' not found")
 
 
 @app.patch("/api/admin/road-segments/{seg_id}/open")
-def open_segment(seg_id: str, admin: dict = Depends(get_current_admin)):
+def open_segment(seg_id: str, secret: str = Query(...)):
     """Admin — reopen a previously closed road segment."""
-    seg = data_access.set_segment_closed(seg_id, False)
-    if not seg:
-        raise HTTPException(status_code=404, detail=f"Segment '{seg_id}' not found")
-    return {"message": f"Segment '{seg['name']}' reopened."}
+    check_admin(secret)
+    segs = load_segments()
+    for s in segs:
+        if s['id'] == seg_id:
+            s['closed'] = False
+            save_segments(segs)
+            return {"message": f"Segment '{s['name']}' reopened."}
+    raise HTTPException(status_code=404, detail=f"Segment '{seg_id}' not found")
 
 
 # ---------------------------------------------------------------------------
-# Campus Copilot — text understanding only.
+# Campus Copilot (Phase 1) — text understanding only.
 #
 # This endpoint classifies the message and resolves any building/department
-# it names against the *existing* venues data. It does not know about
+# it names against the *existing* locations.json. It does not know about
 # the caller's GPS position and does not duplicate the routing, events, or
 # nearby-facility logic that already exists elsewhere — the frontend uses
 # the existing /api/locations, /api/events, /api/route etc. (and the
 # existing utils/facilities.js helpers) to act on whatever this returns.
-# See utils/copilot.py for the engine itself — it is unmodified by this
-# migration; only where main.py gets the `locations` list from changed.
+# See utils/copilot.py for the engine itself and why it's rule-based rather
+# than a live LLM call.
 # ---------------------------------------------------------------------------
 from utils import copilot as _copilot
 
@@ -427,6 +450,6 @@ def copilot_chat(body: CopilotChatRequest):
     """Public — classify one chatbot message. Stateless: the caller (the
     frontend) is responsible for holding conversation state and deciding
     what to do with the returned intent/entities."""
-    locations = data_access.get_locations()
+    locations = load_json("locations.json")
     result = _copilot.classify(body.message, locations, body.context)
     return result
