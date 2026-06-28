@@ -21,7 +21,7 @@ import NearbyFacilities from '../components/NearbyFacilities'
 import CompassWidget from '../components/CompassWidget'
 import VoiceSettingsPanel from '../components/VoiceSettingsPanel'
 import ChatbotWidget from '../copilot/ChatbotWidget'
-import { getLocations, searchLocations, getRoute, getRouteFromCoords, getRoadSegments } from '../api'
+import { getLocations, searchLocations, getRoute, getRouteFromCoords, getRoadSegments, getEvents } from '../api'
 import { useLocationContext } from '../context/LocationContext'
 import { useVoiceGuidance } from '../hooks/useVoiceGuidance'
 import { useCompassHeading } from '../hooks/useCompassHeading'
@@ -105,9 +105,11 @@ export default function Home() {
   const [navEventInfo, setNavEventInfo]           = useState(null)  // {room,floor,wing,building}
   // ── Phase 5: Bottom sheet expansion ────────────────────────────────────
   const [navSheetExpanded, setNavSheetExpanded]   = useState(false)
-  // ── Phase 7: Arrival overlay ────────────────────────────────────────────
+  // Phase 7: Arrival overlay
   const [arrived, setArrived]                     = useState(false)
-  // ── Phase 14: Auto-follow / recenter ───────────────────────────────────
+  // Phase 2: Events happening at the arrival venue
+  const [arrivalEvents, setArrivalEvents]         = useState([])
+  // Phase 14: Auto-follow / recenter
   const [userManuallyPanned, setUserManuallyPanned] = useState(false)
 
   const {
@@ -182,6 +184,21 @@ export default function Home() {
       }
     }
   }, [navMode, arrived, remainingDist, arrivalRadius, voice])
+
+  // Phase 2: fetch events at the arrived venue
+  useEffect(() => {
+    if (!arrived || !previewLoc?.id) { setArrivalEvents([]); return }
+    const today = new Date().toISOString().slice(0, 10)
+    const now   = `${String(new Date().getHours()).padStart(2,'0')}:${String(new Date().getMinutes()).padStart(2,'0')}`
+    getEvents().then(evs => {
+      const venue = evs.filter(e =>
+        e.location?.id === previewLoc.id &&
+        e.date === today &&
+        e.start_time <= now && now <= e.end_time
+      )
+      setArrivalEvents(venue)
+    }).catch(() => {})
+  }, [arrived, previewLoc])
 
   // Authoritative route display
   const displayRoutePath = (hasRoute && fullPath) ? fullPath : routePath
@@ -330,6 +347,7 @@ export default function Home() {
     setNavSheetExpanded(false)
     setUserManuallyPanned(false)
     setNavEventInfo(null)
+    setArrivalEvents([])
   }
 
   function handleToggleTracking() {
@@ -678,10 +696,34 @@ export default function Home() {
               </div>
             )}
 
+            {/* Phase 2: Events happening at this venue right now */}
+            {arrivalEvents.length > 0 && (
+              <div className="arrival-venue-events">
+                <div className="arrival-venue-events-title">
+                  🎉 {arrivalEvents.length === 1 ? 'Event happening here now' : 'Events happening here now'}
+                </div>
+                {arrivalEvents.map(ev => (
+                  <div key={ev.id} className="arrival-venue-event-row">
+                    <div className="arrival-venue-event-name">{ev.name}</div>
+                    <div className="arrival-venue-event-time">{ev.start_time}–{ev.end_time}</div>
+                    <button
+                      className="arrival-venue-event-btn"
+                      onClick={() => navigate(`/event/${ev.id}`)}
+                    >
+                      Details
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="arrival-actions">
               <button className="arrival-btn primary" onClick={handleClear}>Done</button>
               <button className="arrival-btn secondary" onClick={handleNavigateAgain}>
                 Navigate Again
+              </button>
+              <button className="arrival-btn secondary" onClick={handleClear}>
+                🔍 Go Somewhere Else
               </button>
               <button className="arrival-btn secondary" onClick={handleShareLocation}>
                 Share Location
@@ -703,6 +745,7 @@ export default function Home() {
           onPreviewRoute={handleDirections}
           onStartNavigation={startNavigationFromCopilot}
           onViewEventDetails={(eventId) => navigate(`/event/${eventId}`)}
+          onCancelNavigation={handleClear}
         />
       </div>
     </div>

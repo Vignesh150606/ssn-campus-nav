@@ -3255,3 +3255,199 @@ select:-webkit-autofill {
     padding-bottom: max(80px, calc(60px + env(safe-area-inset-bottom, 0px)));
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   PHASE 2 — Campus Copilot Intelligence & Event Experience
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── P25: FAB stack above browse bottom sheet ──────────────────────────── */
+.home:not(.nav-mode) .copilot-fab-stack {
+  bottom: calc(38% + 14px);
+}
+.home.nav-mode .copilot-fab-stack {
+  bottom: max(80px, calc(64px + env(safe-area-inset-bottom, 0px)));
+}
+/* Also push zoom controls up to match in browse mode */
+.home:not(.nav-mode) .leaflet-container .leaflet-top.leaflet-left {
+  bottom: calc(38% + 70px);
+}
+
+/* ── P27: Copilot sheet — keyboard-safe flex layout ───────────────────── */
+.copilot-sheet {
+  max-height: 72dvh;   /* dynamic viewport height shrinks with keyboard */
+  display: flex;
+  flex-direction: column;
+}
+.copilot-sheet-messages {
+  flex: 1;
+  min-height: 0;       /* required for flex child to scroll */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.copilot-sheet-input-row {
+  flex-shrink: 0;      /* never squash the input row */
+}
+
+/* ── P20: Compact welcome screen ──────────────────────────────────────── */
+.copilot-welcome {
+  padding: 20px 16px 8px;
+  text-align: center;
+}
+.copilot-welcome-icon { font-size: 2rem; margin-bottom: 6px; }
+.copilot-welcome-title { font-size: 1.1rem; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+.copilot-welcome-subtitle { font-size: 0.8rem; color: var(--muted); margin-bottom: 14px; }
+.copilot-starters { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+
+/* ── P19: Suggestion chips ─────────────────────────────────────────────── */
+.copilot-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding-left: 2px;
+}
+.copilot-suggestion-chip {
+  font-size: 0.76rem;
+  padding: 5px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--brand);
+  background: transparent;
+  color: var(--brand);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.copilot-suggestion-chip:hover,
+.copilot-suggestion-chip:active {
+  background: var(--brand);
+  color: #fff;
+}
+
+/* ── Event card: status badge + ETA ───────────────────────────────────── */
+.copilot-card-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border-radius: 20px;
+  padding: 2px 8px;
+  margin-bottom: 4px;
+}
+.copilot-card-eta {
+  font-size: 0.74rem;
+  color: var(--brand);
+  font-weight: 600;
+  margin: 2px 0 4px;
+}
+
+/* ── P21: Arrival venue events ──────────────────────────────────────────── */
+.arrival-venue-events {
+  background: rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 10px 0 6px;
+  text-align: left;
+}
+.arrival-venue-events-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.9);
+  margin-bottom: 8px;
+}
+.arrival-venue-event-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(255,255,255,0.12);
+}
+.arrival-venue-event-row:first-of-type { border-top: none; }
+.arrival-venue-event-name {
+  flex: 1;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.arrival-venue-event-time {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.7);
+  white-space: nowrap;
+}
+.arrival-venue-event-btn {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.arrival-venue-event-btn:active { opacity: 0.75; }
+
+/* ── P10/P23: Nearby events on EventPage ─────────────────────────────── */
+.nearby-event-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  text-decoration: none;
+  color: inherit;
+  transition: opacity 0.15s;
+}
+.nearby-event-row:first-of-type { border-top: none; }
+.nearby-event-row:active { opacity: 0.6; }
+.nearby-event-tag {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #fff;
+  border-radius: 6px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+.nearby-event-info { flex: 1; min-width: 0; }
+.nearby-event-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nearby-event-meta {
+  font-size: 0.74rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.nearby-event-arrow {
+  font-size: 1.2rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+/* ── P30: Info card polish ──────────────────────────────────────────────── */
+.copilot-card-info {
+  background: color-mix(in srgb, var(--brand) 8%, var(--surface));
+  border-left: 3px solid var(--brand);
+}
+.copilot-card-info .copilot-card-title {
+  color: var(--brand);
+}
+.copilot-card-info .copilot-card-desc {
+  white-space: pre-line;
+  line-height: 1.55;
+}
+
+/* ── P28: Safe-area on arrival card buttons ─────────────────────────────── */
+@media (max-width: 430px) {
+  .arrival-actions { gap: 7px; }
+  .arrival-btn { padding: 11px; font-size: 0.83rem; }
+  .arrival-venue-events { padding: 8px 10px; }
+}

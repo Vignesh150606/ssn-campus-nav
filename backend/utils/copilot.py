@@ -106,10 +106,44 @@ NEED_ALIASES_DIRECT = {
 
 GREETING_PHRASES = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening', 'yo', 'sup', 'hai']
 
-EVENT_NOW_PHRASES = ['happening now', 'going on now', 'right now', 'currently on', 'live now', 'now?']
-EVENT_TODAY_PHRASES = ["today's events", 'today events', 'events today', 'what is today']
+EVENT_NOW_PHRASES = ['happening now', 'going on now', 'right now', 'currently on', 'live now', 'now?', 'what is happening']
+EVENT_TODAY_PHRASES = ["today's events", 'today events', 'events today', 'what is today', "show today's events", 'show today events']
 EVENT_UPCOMING_PHRASES = ['upcoming', 'coming up', 'next event', 'future events', 'what is next']
 EVENT_GENERIC_PHRASES = ['events', 'event', 'fest schedule', 'schedule', 'whats on', "what's on"]
+
+# Phase 2 — new intent phrase lists
+EVENT_NEAR_ME_PHRASES = ['events near me', 'events nearby', 'nearby events', 'what events are near me',
+                          'events close to me', 'events around me', 'events around here']
+EVENT_SOON_PHRASES    = ['next 30 minutes', 'starting soon', 'starts in 30', 'beginning soon',
+                          'about to start', 'in 30 min', 'in half an hour', 'what starts in',
+                          'starts soon', 'starting in', 'beginning in']
+NEARBY_SEARCH_PHRASES = ["what's near me", "what is near me", "what's nearby", "what's around me",
+                          "what's close to me", "near me", "nearby places", "what's around",
+                          "show me nearby", "what is around me", "show nearby"]
+CANCEL_NAV_PHRASES    = ['cancel navigation', 'stop navigation', 'exit navigation',
+                          'cancel route', 'stop route', 'end navigation', 'stop directions']
+
+INFO_QUERY_PREFIXES   = ['tell me about', 'info about', 'information about', 'describe', 'what can you tell me about']
+
+# Distance query regex — e.g. "how far is Library from ECE", "distance from X to Y"
+_DIST_RE = re.compile(
+    r'(?:how far is|how far from|how far are)\s+(.+?)\s+(?:from|to|and)\s+(.+?)$'
+    r'|(?:distance|how long|how far)\s+(?:from|between)\s+(.+?)\s+(?:to|and)\s+(.+?)$',
+    re.IGNORECASE
+)
+
+def _parse_distance_query(text: str):
+    """Returns (from_str, to_str) or None."""
+    m = _DIST_RE.search(text)
+    if not m:
+        return None
+    groups = [g.strip() for g in m.groups() if g is not None]
+    if len(groups) < 2:
+        return None
+    return groups[0], groups[1]
+
+def _is_info_query(text: str) -> bool:
+    return any(text.startswith(p) for p in INFO_QUERY_PREFIXES)
 
 FOLLOWUP_NAVIGATE_PHRASES = ['take me there', 'navigate', 'navigate there', 'start navigation',
                               'go there', 'lets go', "let's go", 'start', 'go now', 'directions']
@@ -161,6 +195,7 @@ _COMMAND_PREFIXES = [
     'take me to', 'navigate me to', 'navigate to', 'directions to', 'how do i get to',
     'how do i reach', 'where is', "where's", 'where is the', 'show me', 'find', 'go to',
     'i want to go to', 'i need to go to', 'i need', 'i want',
+    'tell me about', 'info about', 'information about', 'describe', 'what can you tell me about',
 ]
 
 
@@ -388,49 +423,73 @@ def classify(message: str, locations: list, context: Optional[dict] = None) -> d
     if need_hit:
         return need_hit
 
-    # 5) Explicit command + named entity ("navigate to X", "directions to
-    #    X", "where is X", "take me to X"). Checked before the generic
-    #    follow-up keyword scan below so "navigate to IT Block" resolves
-    #    to IT Block rather than being swallowed by the bare word
-    #    "navigate" (a follow-up trigger when said with no target at all).
+    # 5) Phase 2 — Event near me.
+    if _phrase_hit(text, EVENT_NEAR_ME_PHRASES):
+        return _result('event_near_me', raw, text, reply="Here are the events nearest to you.")
+
+    # 6) Phase 2 — Events starting soon (within 30 minutes).
+    if _phrase_hit(text, EVENT_SOON_PHRASES) or ('start' in text and ('30' in text or 'soon' in text) and 'event' in text):
+        return _result('event_upcoming_30', raw, text, reply="Here's what's starting soon.")
+
+    # 7) Phase 2 — Nearby search.
+    if _phrase_hit(text, NEARBY_SEARCH_PHRASES) or text.strip() in ('near me', 'nearby'):
+        return _result('nearby_search', raw, text, reply="Here's what's around you.")
+
+    # 8) Phase 2 — Distance query ("how far is Library from ECE?").
+    dist_parts = _parse_distance_query(text)
+    if dist_parts:
+        from_q, to_q = dist_parts
+        from_matches = resolve_locations(from_q, locations)
+        to_matches   = resolve_locations(to_q, locations)
+        if from_matches and to_matches:
+            return _result('distance_query', raw, text,
+                           reply=f"Calculating distance between {from_matches[0]['name']} and {to_matches[0]['name']}...",
+                           resolved_from=from_matches, resolved_to=to_matches)
+        return _result('distance_query', raw, text,
+                       reply="I couldn't identify both locations. Try: 'How far is Library from ECE Block?'",
+                       resolved_from=from_matches, resolved_to=to_matches)
+
+    # 9) Explicit command + named entity ("navigate to X", "tell me about X", etc.)
     prefix_stripped, found_prefix = strip_command_phrases(text)
+    info_mode = _is_info_query(text)
     if found_prefix and prefix_stripped and prefix_stripped not in AMBIGUOUS_BARE_TOKENS:
         matches = resolve_locations(prefix_stripped, locations)
         if matches and matches[0]['score'] >= 0.65:
             top = matches[0]
+            reply = (f"Here's info about {top['name']}." if info_mode
+                     else f"{top['name']} — here's the info and a route.")
             return _result('building_finder', raw, text,
-                            reply=f"{top['name']} — here's the info and a route.",
-                            resolved_locations=matches)
+                            reply=reply,
+                            resolved_locations=matches,
+                            info_mode=info_mode)
 
-    # 6) Events.
+    # 10) Events.
     event_intent = _classify_event(text)
     if event_intent:
         return event_intent
 
-    # 7) Current location.
+    # 11) Current location.
     if _phrase_hit(text, CURRENT_LOCATION_PHRASES) or _best_alias_score(text, CURRENT_LOCATION_PHRASES) > 0.82:
         return _result('current_location', raw, text,
                         reply="Here's where you are right now.")
 
-    # 8) Follow-ups. By this point any message with a clearly-named,
-    #    resolvable destination has already returned above, so a bare
-    #    "navigate" / "start" / "how long" here really is a contextual
-    #    follow-up referring to whatever the conversation was last about.
+    # 12) Follow-ups (contextual navigate/preview/eta/cancel).
     followup = _classify_followup(text)
     if followup:
         return followup
 
-    # 9) Fall back to a generic building/department match (handles bare
-    #    names like "library" or "EEE" with no command verb at all).
+    # 13) Fallback: generic building/department match (bare names like "library", "EEE").
     bare_query, _ = strip_command_phrases(text)
+    info_mode2 = _is_info_query(text)
     matches = resolve_locations(bare_query, locations) if bare_query not in AMBIGUOUS_BARE_TOKENS else []
     if matches:
         top = matches[0]
+        reply = (f"Here's info about {top['name']}." if info_mode2
+                 else f"{top['name']} — here's the info and a route.")
         return _result('building_finder', raw, text,
-                        reply=f"{top['name']} — here's the info and a route.",
-                        resolved_locations=matches)
+                        reply=reply, resolved_locations=matches, info_mode=info_mode2)
 
-    # 10) Genuinely unmatched — decide out_of_scope vs unknown.
+    # 14) Genuinely unmatched.
     if any(k in text for k in CAMPUS_KEYWORDS):
         return _result('unknown', raw, text,
                         reply="I couldn't quite place that. I can help with buildings, departments, "
@@ -495,6 +554,9 @@ def _classify_followup(text: str):
         return _result('follow_up_preview', text, text, reply="Previewing the route…")
     if _phrase_hit(text, FOLLOWUP_DETAILS_PHRASES):
         return _result('follow_up_details', text, text, reply="Here are the details…")
+    # Phase 2 — cancel navigation (checked before bare "navigate" so "cancel navigation" wins)
+    if _phrase_hit(text, CANCEL_NAV_PHRASES):
+        return _result('follow_up_cancel_nav', text, text, reply="Navigation stopped.")
     if _phrase_hit(text, FOLLOWUP_NAVIGATE_PHRASES):
         return _result('follow_up_navigate', text, text, reply="Starting navigation…")
     return None
@@ -509,7 +571,10 @@ def _result(intent, raw, normalized, reply, **extra):
         'need_type': None,
         'direct_location_id': None,
         'resolved_locations': [],
+        'resolved_from': [],   # Phase 2: distance_query from-location
+        'resolved_to': [],     # Phase 2: distance_query to-location
         'classroom': None,
+        'info_mode': False,    # Phase 2: "tell me about X" vs "navigate to X"
     }
     out.update(extra)
     return out

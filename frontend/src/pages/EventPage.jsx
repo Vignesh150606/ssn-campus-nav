@@ -81,6 +81,7 @@ export default function EventPage() {
   const [routeError,    setRouteError]    = useState(null)
   const [previewOpen,   setPreviewOpen]   = useState(false)
   const [lightboxIdx,   setLightboxIdx]   = useState(null)
+  const [nearbyEvents,  setNearbyEvents]  = useState([])
 
   const {
     setRoute, start: startTracking, tracking, position,
@@ -94,8 +95,24 @@ export default function EventPage() {
   useEffect(() => {
     setEvent(null); setLoadError(null)
     setRoutePreview(null); setPreviewOpen(false)
+    setNearbyEvents([])
     getEvent(eventId).then(setEvent).catch(e => setLoadError(e.message))
   }, [eventId])
+
+  // Phase 2 — load same-day events within 300m of this venue
+  useEffect(() => {
+    if (!event?.location) return
+    const today = new Date().toISOString().slice(0, 10)
+    import('../api').then(({ getEvents }) =>
+      getEvents().then(evs => {
+        const nearby = evs
+          .filter(e => e.id !== event.id && e.date === today && e.location)
+          .filter(e => haversine(event.location.lat, event.location.lng, e.location.lat, e.location.lng) < 300)
+          .slice(0, 4)
+        setNearbyEvents(nearby)
+      }).catch(() => {})
+    )
+  }, [event])
 
   // ── Route preview (Phase 8) ────────────────────────────────────────────
   const handleGetDirections = useCallback(async () => {
@@ -381,6 +398,26 @@ export default function EventPage() {
             className="event-qr-img"
           />
         </div>
+
+        {/* Phase 2 — Nearby events (same-day, within 300m) */}
+        {nearbyEvents.length > 0 && (
+          <div className="event-card">
+            <div className="event-card-title">Nearby Events Today</div>
+            {nearbyEvents.map(ev => {
+              const f = FEST_META?.[ev.fest] || { label: ev.fest, color: '#6B7280' }
+              return (
+                <Link key={ev.id} to={`/event/${ev.id}`} className="nearby-event-row">
+                  <span className="nearby-event-tag" style={{ background: f.color }}>{f.label}</span>
+                  <div className="nearby-event-info">
+                    <div className="nearby-event-name">{ev.name}</div>
+                    <div className="nearby-event-meta">{ev.location?.name} · {ev.start_time}–{ev.end_time}</div>
+                  </div>
+                  <span className="nearby-event-arrow">›</span>
+                </Link>
+              )
+            })}
+          </div>
+        )}
 
         {/* Back link */}
         <div style={{ textAlign: 'center', padding: '8px 0 32px' }}>
