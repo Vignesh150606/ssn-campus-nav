@@ -5,7 +5,7 @@ qrcode[pil]==7.4.2
 # Phase 3 — Supabase production backend
 supabase==2.18.1
 python-dotenv==1.0.1
-PyJWT==2.9.0
+PyJWT==2.10.1
 passlib[bcrypt]==1.7.4
 bcrypt==4.2.0
 python-multipart==0.0.9
