@@ -51,15 +51,20 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Phase 4A.1: removed the previous NetworkFirst rule for `/api/*`.
+        // Events/admin/route data already has its own freshness logic in
+        // the app (EventsList's localStorage cache + 20s poll, BootGate's
+        // health gate, etc.) — having the service worker *also* cache
+        // those same responses meant two independent caches could disagree
+        // about what's "current", and a stale/erroring SW cache entry
+        // would silently win on the very first load of a session, only
+        // clearing once something (a reload) forced the SW to revalidate.
+        // That matches "fest/event/admin only show data after one refresh"
+        // exactly. Map tiles are static images and have no such conflict,
+        // so CacheFirst stays for those.
+        clientsClaim: true,
+        skipWaiting: true,
         runtimeCaching: [
-          {
-            urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
-            },
-          },
           {
             urlPattern: ({ url }) => url.hostname.includes('tile.openstreetmap.org'),
             handler: 'CacheFirst',

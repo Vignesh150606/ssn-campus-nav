@@ -92,12 +92,36 @@ export default function EventPage() {
     tracking, hasRoute, remainingDist, remainingPath, offRoute,
   })
 
+  // Phase 4A.1 fix: a single failed getEvent() used to be permanent — the
+  // only way to recover was to leave this page and come back (effectively
+  // the same as a manual refresh), which is exactly the "event only shows
+  // up after a refresh" symptom. EventsList already self-heals via a 20s
+  // poll; this gives EventPage the equivalent — a couple of automatic
+  // retries with backoff, plus a manual Retry button as a fallback below.
+  const [retryAttempt, setRetryAttempt] = useState(0)
   useEffect(() => {
+    let cancelled = false
+    let retryTimer = null
     setEvent(null); setLoadError(null)
     setRoutePreview(null); setPreviewOpen(false)
     setNearbyEvents([])
-    getEvent(eventId).then(setEvent).catch(e => setLoadError(e.message))
-  }, [eventId])
+
+    function load(attempt) {
+      getEvent(eventId)
+        .then((data) => { if (!cancelled) setEvent(data) })
+        .catch((e) => {
+          if (cancelled) return
+          if (attempt < 2) {
+            retryTimer = setTimeout(() => load(attempt + 1), 1500 * (attempt + 1))
+          } else {
+            setLoadError(e.message)
+          }
+        })
+    }
+    load(0)
+
+    return () => { cancelled = true; clearTimeout(retryTimer) }
+  }, [eventId, retryAttempt])
 
   // Phase 2 — load same-day events within 300m of this venue
   useEffect(() => {
@@ -161,7 +185,15 @@ export default function EventPage() {
   if (loadError) return (
     <div className="event-page-v2" style={{ padding: 24, textAlign: 'center' }}>
       <div className="state-message" style={{ marginBottom: 16 }}>{loadError}</div>
-      <Link to="/events" className="event-back-link">← Back to Events</Link>
+      <button
+        type="button"
+        className="event-nav-btn primary"
+        style={{ marginBottom: 14 }}
+        onClick={() => { setLoadError(null); setRetryAttempt((a) => a + 1) }}
+      >
+        Retry
+      </button>
+      <div><Link to="/events" className="event-back-link">← Back to Events</Link></div>
     </div>
   )
   if (!event) return (
