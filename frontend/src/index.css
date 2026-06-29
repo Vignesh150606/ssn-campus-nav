@@ -1913,27 +1913,10 @@ input, select, textarea { font-family: inherit; color: inherit; }
   box-shadow: 0 2px 10px rgba(220,38,38,0.4);
 }
 
-/* ── Phase 14: Recenter button ── */
-.recenter-btn {
-  position: fixed;
-  bottom: 100px;
-  right: 14px;
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: var(--surface);
-  border: 1.5px solid var(--line-strong);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.18);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.35rem;
-  z-index: 900;
-  cursor: pointer;
-  animation: fade-in 0.2s ease;
-  transition: transform 0.15s ease;
-}
-.recenter-btn:active { transform: scale(0.92); }
+/* ── Phase 14: Recenter button ──
+   Superseded by the Phase 4A "premium redesign" rule further down this
+   file (search PHASE 4A). Kept this section header as a pointer instead
+   of leaving a second, competing `.recenter-btn` rule here. ── */
 
 /* ── Phase 5: Navigation bottom sheet ── */
 .nav-bottom-sheet {
@@ -2523,12 +2506,9 @@ input, select, textarea { font-family: inherit; color: inherit; }
     font-size: 0.85rem;
   }
 
-  .recenter-btn {
-    width: 52px;
-    height: 52px;
-    bottom: 92px;
-    font-size: 1.4rem;
-  }
+  /* .recenter-btn mobile sizing now lives in the PHASE 4A section below,
+     alongside its desktop rule — keeping one definition instead of two
+     competing ones at this same breakpoint. */
 
   .nav-bottom-sheet { border-radius: 18px 18px 0 0; }
 
@@ -3553,12 +3533,9 @@ select:-webkit-autofill {
 /* leaflet-rotate counter-rotates the controls automatically via the
    rotate-pane architecture — no additional CSS override needed */
 
-/* ── Recenter button safe-area ────────────────────────────────────────────── */
-@supports (padding: env(safe-area-inset-bottom)) {
-  .recenter-btn {
-    bottom: max(100px, calc(84px + env(safe-area-inset-bottom, 0px)));
-  }
-}
+/* ── Recenter button safe-area — already handled by the P9 @supports
+   block earlier in this file (identical bottom value); not repeated here
+   to avoid two rules drifting out of sync. ── */
 
 /* ── Mobile sizing ────────────────────────────────────────────────────────── */
 @media (max-width: 430px) {
