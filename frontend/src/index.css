@@ -942,6 +942,7 @@ input, select, textarea { font-family: inherit; color: inherit; }
   max-width: 720px;
   margin: 0 auto;
   padding: 24px 16px max(80px, calc(60px + env(safe-area-inset-bottom, 0px)));
+  animation: fade-in 0.25s ease;
 }
 .schedule-heading {
   font-family: var(--font-display);
@@ -3553,3 +3554,78 @@ select:-webkit-autofill {
     font-size: 0.58rem;
   }
 }
+
+/* =====================================================================
+   PHASE 4A.1 — Boot gate (startup / retry screen)
+   Shown until the backend + Supabase are confirmed reachable. Reuses the
+   .brand-mark visual language (gradient square + notch) at a larger size
+   instead of a separate image asset, so it stays theme-aware for free.
+===================================================================== */
+.boot-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 32px;
+  background: var(--canvas);
+  color: var(--ink);
+  text-align: center;
+  animation: fade-in 0.2s ease;
+}
+.boot-gate-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-strong) 100%);
+  box-shadow: 0 10px 30px -8px var(--brand-soft), inset 0 1px 0 rgba(255,255,255,0.3);
+  position: relative;
+}
+.boot-gate-mark::after {
+  content: '';
+  position: absolute;
+  inset: 16px;
+  border: 3px solid rgba(255,255,255,0.95);
+  border-radius: 3px;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  transform: rotate(45deg);
+}
+.boot-gate-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+}
+.boot-gate-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--line-strong);
+  border-top-color: var(--brand);
+  animation: spin 0.8s linear infinite;
+}
+.boot-gate-message {
+  font-size: 0.92rem;
+  color: var(--muted);
+  max-width: 320px;
+  line-height: 1.5;
+}
+.boot-gate-message-error {
+  color: var(--danger);
+}
+.boot-gate-retry-btn {
+  background: var(--brand);
+  color: #fff;
+  padding: 10px 28px;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.boot-gate-retry-btn:active { transform: scale(0.96); }
+

@@ -6,6 +6,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#15192B" />
     <meta name="description" content="Find your way around SSN College of Engineering — buildings, departments and fest events, with walking directions." />
+    <!--
+      Phase 4A.1 — theme is normally applied by App.jsx's useTheme() effect,
+      which only runs after React mounts. That left a brief window on every
+      load where the page painted with light-mode CSS regardless of the
+      user's actual preference, then snapped to dark a moment later. This
+      script runs synchronously during head parsing, before anything is
+      painted, so the correct theme is already on <html> for the very
+      first frame. It intentionally mirrors useTheme()'s own logic exactly
+      (stored preference > system preference) so the two never disagree.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('ssn-theme');
+          var theme = (stored === 'light' || stored === 'dark')
+            ? stored
+            : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) { /* localStorage unavailable (privacy mode) — light default is safe */ }
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">

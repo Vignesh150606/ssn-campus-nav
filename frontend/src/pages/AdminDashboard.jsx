@@ -8,12 +8,28 @@ const STATUS_COLOR = { verified:'#2E9E5B', pending:'#E07414', rejected:'#D7263D'
 async function adminFetch(path, method='GET', body=null, token) {
   const headers = token ? { Authorization: `Bearer ${token}` } : {}
   if (body) headers['Content-Type'] = 'application/json'
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : null,
-  })
-  if (!res.ok) { const d = await res.json().catch(()=>({})); throw new Error(d.detail||`Error ${res.status}`) }
+  let res
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : null,
+    })
+  } catch (networkErr) {
+    // Backend unreachable (cold start, offline, DNS, etc.) — distinct from
+    // an authenticated-but-rejected response, so callers can tell the two
+    // apart instead of treating "server didn't answer" the same as
+    // "your session is invalid".
+    const err = new Error('Could not reach the server. Please check your connection and try again.')
+    err.status = 0
+    throw err
+  }
+  if (!res.ok) {
+    const d = await res.json().catch(()=>({}))
+    const err = new Error(d.detail||`Error ${res.status}`)
+    err.status = res.status
+    throw err
+  }
   return res.json()
 }
 
@@ -112,6 +128,13 @@ export default function AdminDashboard() {
   const [password, setPassword] = useState('')
   const [token, setToken]     = useState(() => sessionStorage.getItem(TOKEN_STORAGE_KEY) || '')
   const [authed, setAuthed]   = useState(false)
+  // Phase 4A.1 — true while we're verifying a stored token on mount, so the
+  // login form doesn't flash for an already-signed-in admin (previously
+  // there was no loading state here at all: the dashboard rendered the
+  // login form first, then swapped to the real dashboard once the token
+  // check resolved — a blank-feeling flicker on every refresh, worse on a
+  // slow/cold backend).
+  const [checkingSession, setCheckingSession] = useState(() => !!sessionStorage.getItem(TOKEN_STORAGE_KEY))
   const [events, setEvents]   = useState([])
   const [segments, setSegments] = useState([])
   const [error, setError]     = useState(null)
@@ -128,13 +151,30 @@ export default function AdminDashboard() {
   // Phase 3 — if a JWT from a previous session is still in sessionStorage,
   // try it once on mount instead of forcing a fresh login every refresh.
   useEffect(() => {
-    if (!token) return
+    if (!token) { setCheckingSession(false); return }
+    let cancelled = false
     adminFetch('/api/admin/events', 'GET', null, token)
       .then(data => {
+        if (cancelled) return
         setEvents(data); setAuthed(true)
-        fetch(`${API_BASE}/api/road-segments`).then(r=>r.json()).then(setSegments)
+        fetch(`${API_BASE}/api/road-segments`).then(r=>r.json()).then((s) => { if (!cancelled) setSegments(s) })
       })
-      .catch(() => { sessionStorage.removeItem(TOKEN_STORAGE_KEY); setToken('') })
+      .catch((e) => {
+        if (cancelled) return
+        // Phase 4A.1 fix: only treat this as "your session is invalid" on a
+        // real 401/403 from the server. A network/cold-start failure
+        // (status 0, or no status at all) means we simply couldn't ask —
+        // wiping a perfectly good token in that case used to force a
+        // needless re-login the moment Render's free tier was asleep.
+        if (e.status === 401 || e.status === 403) {
+          sessionStorage.removeItem(TOKEN_STORAGE_KEY)
+          setToken('')
+        } else {
+          flash('Could not verify your session — please retry or sign in again.', true)
+        }
+      })
+      .finally(() => { if (!cancelled) setCheckingSession(false) })
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -216,6 +256,13 @@ export default function AdminDashboard() {
   }
 
   const pill = {padding:'6px 14px',borderRadius:999,fontFamily:'var(--font-display)',fontWeight:600,fontSize:'0.78rem',cursor:'pointer'}
+
+  if (checkingSession) return (
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',gap:14,padding:24}}>
+      <div className="boot-gate-spinner" aria-hidden="true" />
+      <div style={{fontFamily:'var(--font-sans)',fontSize:'0.9rem',color:'var(--muted)'}}>Checking session…</div>
+    </div>
+  )
 
   if (!authed) return (
     <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',gap:14,padding:24}}>

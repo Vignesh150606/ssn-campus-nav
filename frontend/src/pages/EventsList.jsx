@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getEvents } from '../api'
 import { FEST_META } from '../constants'
+import { SkeletonScheduleList } from '../components/Skeleton'
 
 const POLL_INTERVAL_MS = 20_000  // re-fetch every 20 s so new approved events appear
 
@@ -49,33 +50,41 @@ export default function EventsList() {
   const [error, setError] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
 
-  const fetchEvents = useCallback(() => {
-    getEvents()
-      .then(data => {
-        setEvents(data)
-        setError(null)
-        setLastUpdated(Date.now())
-        saveEventsCache(data)   // persist for cold-start recovery
-      })
-      .catch(e => {
-        // API failed — keep showing whatever we already have (cache or prior fetch).
-        // Only surface the error if we have nothing at all to show.
-        setError(prev => {
-          setEvents(cur => {
-            if (!cur || cur.length === 0) {
-              // nothing to show — surface the error
-              // (setError handled below via the outer return)
-              return cur
-            }
-            return cur   // keep showing stale data silently
-          })
-          return (events == null || events?.length === 0) ? e.message : null
-        })
-      })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
   useEffect(() => {
-    // If we already have cache, it's already in state — fetch fresh in background
+    // Phase 4A.1 fix: fetchEvents now lives entirely inside this effect
+    // instead of a useCallback with an empty dependency array. The old
+    // version's catch handler decided which error to show by reading the
+    // outer `events` variable — a closure frozen at the very first render
+    // — instead of the actual current state, which on a fresh visit (no
+    // cache yet) is always `null` even after a later fetch succeeds. That
+    // combined with a slow/cold backend is what produced "blank/stuck on
+    // first load, fine after a refresh": the dashboard wasn't reading its
+    // own latest state. `cancelled` also guards against a fetch resolving
+    // after this page has been navigated away from.
+    let cancelled = false
+
+    function fetchEvents() {
+      getEvents()
+        .then((data) => {
+          if (cancelled) return
+          setEvents(data)
+          setError(null)
+          setLastUpdated(Date.now())
+          saveEventsCache(data)
+        })
+        .catch((e) => {
+          if (cancelled) return
+          // API failed — keep showing whatever's already on screen (cache
+          // or a prior successful fetch) and only surface the error if
+          // there's genuinely nothing to show. `cur` is the real current
+          // state, read through the updater so it's never stale.
+          setEvents((cur) => {
+            setError(!cur || cur.length === 0 ? e.message : null)
+            return cur
+          })
+        })
+    }
+
     fetchEvents()
     const interval = setInterval(fetchEvents, POLL_INTERVAL_MS)
 
@@ -84,15 +93,25 @@ export default function EventsList() {
     window.addEventListener('campus:eventApproved', handleAdminApproval)
 
     return () => {
+      cancelled = true
       clearInterval(interval)
       window.removeEventListener('campus:eventApproved', handleAdminApproval)
     }
-  }, [fetchEvents])
+  }, [])
 
   if (error && (!events || events.length === 0)) {
     return <div className="state-message">{error}</div>
   }
-  if (!events) return <div className="state-message">Loading schedule…</div>
+  if (!events) {
+    return (
+      <div className="schedule-scroll-container">
+        <div className="schedule-page">
+          <h1 className="schedule-heading">Fest Schedule</h1>
+          <SkeletonScheduleList />
+        </div>
+      </div>
+    )
+  }
 
   return (
     // P2 — .schedule-scroll-container gives this page its own overflow-y: auto

@@ -431,6 +431,21 @@ def get_road_segments() -> List[dict]:
     return _wrap(_run)
 
 
+def health_check() -> None:
+    """Lightweight Supabase liveness probe for the frontend boot screen.
+
+    Raises SupabaseUnavailableError (the route layer turns that into a
+    clean 503) if the database can't be reached right now; returns
+    silently on success. Deliberately the cheapest possible round trip —
+    one row, one column, no joins — so it's safe to poll frequently while
+    the frontend is waiting for a Render cold start to finish."""
+    def _run():
+        client = get_client()
+        client.table("venues").select("id").limit(1).execute()
+
+    _wrap(_run)
+
+
 def sync_road_segments_cache() -> None:
     """Rebuild the local JSON mirror from Supabase. Call on backend startup
     and after every segment mutation. Never raises — if Supabase is briefly

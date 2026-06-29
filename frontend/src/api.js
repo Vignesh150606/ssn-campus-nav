@@ -62,4 +62,23 @@ export function eventQrUrl(id) {
   return `${API_BASE}/api/events/${id}/qr`
 }
 
+/** Phase 4A.1 — used by the startup boot screen to detect when the
+ *  backend (Render free-tier cold start can take 20-50s) and Supabase
+ *  are both reachable. Deliberately never throws — a failed/timed-out
+ *  check just means "not ready yet", which the caller polls again for.
+ *  `timeoutMs` bounds a single attempt so one slow request can't hang
+ *  the whole retry loop. */
+export async function checkHealth(timeoutMs = 8000) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(`${API_BASE}/api/health`, { signal: controller.signal })
+    return res.ok
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export { API_BASE }

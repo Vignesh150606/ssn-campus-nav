@@ -240,8 +240,22 @@ def root():
             "/api/events/{id}/qr",
             "/api/route?from_id=&to_id=",
             "/api/admin/login",
+            "/api/health",
         ],
     }
+
+
+@app.get("/api/health")
+def health():
+    """Phase 4A.1 — polled by the frontend's startup screen to detect when
+    the backend has finished waking up after a Render free-tier cold
+    start. Confirms both that this process is up *and* that Supabase is
+    actually reachable, since "the API responded" and "the API can serve
+    real data" are different things on a cold start. Returns 200 only
+    when both are true; the SupabaseUnavailableError handler above turns
+    a DB hiccup into a clean 503 rather than a raw 500."""
+    data_access.health_check()
+    return {"status": "ok"}
 
 
 # ---------------------------------------------------------------------------
