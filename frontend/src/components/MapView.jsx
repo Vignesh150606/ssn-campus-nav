@@ -72,7 +72,14 @@ function markerIcon(category, isDestination) {
   if (isDestination) {
     return L.divIcon({
       className: '',
-      html: `<svg width="32" height="40" viewBox="0 0 32 40" xmlns="http://www.w3.org/2000/svg">
+      html: `<div style="position:relative;width:32px;height:40px">
+        <div style="position:absolute;left:50%;bottom:1px;
+          width:18px;height:18px;border-radius:50%;
+          transform:translateX(-50%);
+          background:${color};opacity:0.28;
+          animation:dest-pulse 2.2s ease-out infinite"></div>
+        <svg width="32" height="40" viewBox="0 0 32 40" xmlns="http://www.w3.org/2000/svg"
+          style="position:relative">
         <defs>
           <filter id="pin-shadow" x="-30%" y="-10%" width="160%" height="140%">
             <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="rgba(0,0,0,0.35)"/>
@@ -83,7 +90,8 @@ function markerIcon(category, isDestination) {
             fill="${color}" stroke="white" stroke-width="2"/>
         </g>
         <circle cx="16" cy="14" r="5.5" fill="white" opacity="0.95"/>
-      </svg>`,
+        </svg>
+      </div>`,
       iconSize: [32, 40],
       iconAnchor: [16, 40],
     })
@@ -478,6 +486,23 @@ export default function MapView({
             color: '#1967D2',
             weight: 18,
             opacity: 0.14,
+            lineCap: 'round',
+            lineJoin: 'round',
+          }}
+        />
+      )}
+
+      {/* Remaining route — white casing (Google Maps style outline that
+          gives the blue centreline definition against busy tile colours).
+          Sits between the soft glow and the main line; purely cosmetic,
+          does not touch routing/positions. */}
+      {remainingPath?.length >= 2 && (
+        <Polyline
+          positions={remainingPath.map(p => [p.lat, p.lng])}
+          pathOptions={{
+            color: '#FFFFFF',
+            weight: 11,
+            opacity: 0.9,
             lineCap: 'round',
             lineJoin: 'round',
           }}
