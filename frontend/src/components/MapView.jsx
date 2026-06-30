@@ -25,6 +25,41 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { CATEGORY_META } from '../constants'
 
+// Root-cause hardening (post-4A crash fix): leaflet-rotate's own patches to
+// L.Marker, L.GridLayer, L.Popup, L.Tooltip and L.SVG/L.Canvas (Renderer)
+// all read/write `el._leaflet_pos` via L.DomUtil.getPosition/setPosition
+// without checking that `el` is defined first — confirmed by reading the
+// plugin's source directly (e.g. its GridLayer.getEvents() reads
+// `this._map._rotate` with no null-check on `this._map`, and several
+// layers read `getPosition(this._container)`/`getPosition(marker._icon)`
+// the same way). In a single-page app, these can fire from a throttled
+// callback (leaflet-rotate throttles GridLayer's 'rotate' → tile reposition)
+// that lands a tick *after* React/react-leaflet has already torn the map
+// down and removed those DOM elements — at which point the element is
+// undefined and the read throws, crashing whatever happens to be mounted
+// at that moment (which looked, from the outside, like an unrelated page
+// being "randomly blank").
+//
+// Rather than patch the library in node_modules (lost on every reinstall)
+// or chase every individual call site across 5+ files, this wraps the two
+// shared primitives every one of those call sites funnels through, so an
+// undefined element becomes a safe no-op instead of a thrown TypeError —
+// closing the entire class of bug at its root, regardless of which layer
+// type triggers it. This runs once, at module load, after the imports
+// above have finished executing (leaflet-rotate's own monkey-patch of
+// these same two functions has already applied by this point, so this
+// wraps ITS versions, not the original Leaflet ones).
+const _getPosition = L.DomUtil.getPosition
+const _setPosition = L.DomUtil.setPosition
+L.DomUtil.getPosition = function (el) {
+  if (!el) return new L.Point(0, 0)
+  return _getPosition.call(this, el)
+}
+L.DomUtil.setPosition = function (el, ...rest) {
+  if (!el) return
+  return _setPosition.call(this, el, ...rest)
+}
+
 export const CAMPUS_CENTER = [12.7510, 80.1970]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -171,20 +206,35 @@ function NavigationController({
   const map = useMap()
   const lastPosRef    = useRef(null)
   const zoomTimerRef  = useRef(null)
+  const fitTimerRef   = useRef(null)
   const prevRecalcRef = useRef(recalcVersion ?? 0)
+
+  // Root-cause fix (post-4A): `map.remove()` (called by MapContainer's own
+  // unmount effect) sets `_mapPane` to null among other teardown steps, but
+  // doesn't synchronously cancel everything leaflet-rotate has scheduled —
+  // notably its GridLayer patch throttles tile repositioning off the
+  // map's 'rotate' event. If anything here calls `map.setBearing()` (which
+  // fires 'rotate') during or near unmount, that throttled tile callback
+  // can fire AFTER the map/tiles are gone, reading a removed tile's
+  // internal position field and throwing — which, because it happens
+  // inside a React effect, takes the whole tree down via the nearest
+  // error boundary instead of staying a contained map-internal error.
+  // `isMapAlive()` is the standard Leaflet idiom for "has .remove() been
+  // called on this instance" and guards every map mutation below.
+  const isMapAlive = useCallback(() => !!map && !!map._mapPane, [map])
 
   // ── Helper: set bearing + notify parent ────────────────────────────
   const applyBearing = useCallback((deg) => {
-    if (!map._rotate) return   // leaflet-rotate not initialised (safety)
+    if (!isMapAlive() || !map._rotate) return
     map.setBearing(deg)
     onRotationChange?.(deg)
-  }, [map, onRotationChange])
+  }, [map, isMapAlive, onRotationChange])
 
   const resetBearing = useCallback(() => {
-    if (!map._rotate) return
+    if (!isMapAlive() || !map._rotate) return
     map.setBearing(0)
     onRotationChange?.(0)
-  }, [map, onRotationChange])
+  }, [map, isMapAlive, onRotationChange])
 
   // ── Heading-up rotation ────────────────────────────────────────────
   // headingUp=false → always reset to North
@@ -201,7 +251,7 @@ function NavigationController({
 
   // ── Camera follow + look-ahead (lower-third positioning) ───────────
   useEffect(() => {
-    if (!followUser || !userPosition) return
+    if (!followUser || !userPosition || !isMapAlive()) return
 
     const { lat, lng } = userPosition
 
@@ -243,7 +293,7 @@ function NavigationController({
   // Only changes near turns, near destination, or after rerouting.
   // Never oscillates — guarded by threshold + debounce.
   useEffect(() => {
-    if (!followUser) return
+    if (!followUser || !isMapAlive()) return
 
     let target = ZOOM_WALK
     if      (remainingDist != null && remainingDist < DEST_ZOOM_M) target = ZOOM_CLOSE
@@ -254,9 +304,12 @@ function NavigationController({
 
     if (zoomTimerRef.current) clearTimeout(zoomTimerRef.current)
     zoomTimerRef.current = setTimeout(() => {
+      // Guard again: this fires after a 300ms delay, during which the
+      // component may have unmounted (e.g. user navigated away).
+      if (!isMapAlive()) return
       map.setZoom(target, { animate: true })
     }, 300)
-  }, [remainingDist, nextTurnDist, followUser, map])
+  }, [remainingDist, nextTurnDist, followUser, map, isMapAlive])
 
   // ── Fit-bounds after route recalculation ──────────────────────────
   useEffect(() => {
@@ -264,21 +317,29 @@ function NavigationController({
     if (rv <= 0 || rv === prevRecalcRef.current) return
     prevRecalcRef.current = rv
     if (!routePath?.length) return
-    setTimeout(() => {
+    fitTimerRef.current = setTimeout(() => {
+      if (!isMapAlive()) return
       try {
         const bounds = L.latLngBounds(routePath.map(p => [p.lat, p.lng]))
         map.fitBounds(bounds, { padding: [60, 80], animate: true })
       } catch { /* ignore edge-case bound errors */ }
     }, 600)
-  }, [recalcVersion, routePath, map])
+    return () => { if (fitTimerRef.current) clearTimeout(fitTimerRef.current) }
+  }, [recalcVersion, routePath, map, isMapAlive])
 
   // ── Cleanup ────────────────────────────────────────────────────────
+  // Deliberately does NOT call resetBearing()/setBearing() here. The map
+  // is being torn down (MapContainer's own unmount effect calls
+  // map.remove() right around this same point) — there is nothing to
+  // visually "reset" on a map instance that's about to be destroyed, and
+  // calling setBearing() this late is exactly what caused the crash
+  // described above. Only timers need clearing.
   useEffect(() => {
     return () => {
       if (zoomTimerRef.current) clearTimeout(zoomTimerRef.current)
-      resetBearing()
+      if (fitTimerRef.current) clearTimeout(fitTimerRef.current)
     }
-  }, [resetBearing])
+  }, [])
 
   return null
 }
