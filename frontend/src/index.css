@@ -942,10 +942,9 @@ input, select, textarea { font-family: inherit; color: inherit; }
   max-width: 720px;
   margin: 0 auto;
   padding: 24px 16px max(80px, calc(60px + env(safe-area-inset-bottom, 0px)));
-  /* No fade-in: the page was previously invisible (opacity:0) for 250ms on
-     every mount — the root cause of "blank white/black on first visit". The
-     skeleton loading cards are now the visual transition; no extra animation
-     needed here. Only the actual event cards get a subtle entrance. */
+  /* No fade-in here: that animation starts at opacity:0, meaning the page
+     (skeleton included) was invisible for the first 250ms of every single
+     mount. Card-level entrance animation below replaces this. */
 }
 .schedule-heading {
   font-family: var(--font-display);
@@ -962,11 +961,6 @@ input, select, textarea { font-family: inherit; color: inherit; }
   border-radius: var(--radius-md);
   margin-bottom: 10px;
   transition: border-color 0.15s ease;
-  animation: card-in 0.2s ease both;
-}
-@keyframes card-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
 }
 .schedule-card:hover { border-color: var(--line-strong); }
 .fest-tag {
@@ -1027,17 +1021,18 @@ input, select, textarea { font-family: inherit; color: inherit; }
 
 /* ---------- Admin dashboard (preserved layout) ---------- */
 .admin-page { max-width: 960px; margin: 0 auto; padding: 24px 16px 60px; }
-/* admin-fullpage: used for the session-check spinner and the login form.
-   Uses align-self:stretch + flex:1 so it fills app-main reliably without
-   needing height:100% (which can resolve to 0 during the first paint when
-   the parent flex-item height is not yet settled). */
+/* admin-fullpage: avoids height:100% on a plain block child — percentage
+   heights on non-flex elements only resolve against a containing block
+   with a "definite" height, and depending on layout timing that can
+   briefly compute to 0. flex:1 + align-self:stretch are flex properties
+   that don't have this ambiguity. */
 .admin-fullpage {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  align-self: stretch;
   flex: 1;
+  align-self: stretch;
   min-height: 0;
   gap: 14px;
   padding: 24px;
@@ -1271,21 +1266,20 @@ input, select, textarea { font-family: inherit; color: inherit; }
 }
 .skeleton {
   display: inline-block;
-  /* Solid fallback: visible in every browser regardless of color-mix support.
-     Without this, browsers that can't parse color-mix() inside linear-gradient()
-     treat the entire background value as invalid → transparent element → the
-     skeleton cards look completely blank (white or black depending on theme). */
+  /* Solid fallback first: per CSS spec, if a browser can't parse color-mix()
+     inside linear-gradient(), the ENTIRE background value below is invalid
+     and discarded — making this element fully transparent. This line
+     guarantees a visible grey block in every browser regardless of
+     color-mix support; the gradient below is progressive enhancement only. */
   background: var(--ring);
-  /* Progressive enhancement: shimmer for browsers that support color-mix */
   background: linear-gradient(
     90deg,
     var(--ring) 0%,
-    color-mix(in oklab, var(--ring) 30%, var(--surface)) 50%,
+    color-mix(in oklab, var(--ring) 50%, var(--surface)) 50%,
     var(--ring) 100%
   );
-  background-size: 400px 100%;
+  background-size: 200px 100%;
   background-repeat: no-repeat;
-  border-radius: 4px;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
 }
 .skeleton-route-preview {
@@ -2532,7 +2526,7 @@ input, select, textarea { font-family: inherit; color: inherit; }
   .nav-turn-label { font-size: 1rem; }
 
   .nav-exit-btn {
-    /* bottom is controlled by .home.nav-mode .nav-exit-btn (--sheet-h system) */
+    bottom: 88px;
     padding: 13px 18px;
     font-size: 0.85rem;
   }
@@ -3250,14 +3244,11 @@ select:-webkit-autofill {
   .nav-bottom-sheet {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
-  /* Exit + copilot FAB: sheet-h is set by JS; add safe-area gap on top */
-  .home.nav-mode .nav-exit-btn,
-  .home.nav-mode .copilot-fab-stack {
-    bottom: calc(var(--sheet-h, 90px) + 12px + env(safe-area-inset-bottom, 0px));
+  .nav-exit-btn {
+    bottom: max(96px, calc(80px + env(safe-area-inset-bottom, 0px)));
   }
-  /* Recenter stacks above the FAB */
-  .home.nav-mode .recenter-btn {
-    bottom: calc(var(--sheet-h, 90px) + 12px + 56px + 10px + env(safe-area-inset-bottom, 0px));
+  .recenter-btn {
+    bottom: max(100px, calc(84px + env(safe-area-inset-bottom, 0px)));
   }
   .copilot-sheet-input-row {
     padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
@@ -3274,26 +3265,12 @@ select:-webkit-autofill {
    PHASE 2 — Campus Copilot Intelligence & Event Experience
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── P25: FAB stack — dynamic position that tracks nav bottom sheet ─────── */
-/* Browse mode: above the route-preview sheet (38% from bottom) */
+/* ── P25: FAB stack above browse bottom sheet ──────────────────────────── */
 .home:not(.nav-mode) .copilot-fab-stack {
   bottom: calc(38% + 14px);
 }
-/* Nav mode: above the nav sheet, using --sheet-h set on .home by Home.jsx.
-   Transition matches the sheet's own 0.3s timing so they move together. */
 .home.nav-mode .copilot-fab-stack {
-  bottom: calc(var(--sheet-h, 90px) + 12px);
-  transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-/* Nav exit button tracks the sheet on the left side */
-.home.nav-mode .nav-exit-btn {
-  bottom: calc(var(--sheet-h, 90px) + 12px);
-  transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-/* Recenter: stacks above the Copilot FAB (56px FAB + 10px gap) on the right */
-.home.nav-mode .recenter-btn {
-  bottom: calc(var(--sheet-h, 90px) + 12px + 56px + 10px);
-  transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  bottom: max(80px, calc(64px + env(safe-area-inset-bottom, 0px)));
 }
 /* Also push zoom controls up to match in browse mode */
 .home:not(.nav-mode) .leaflet-container .leaflet-top.leaflet-left {
@@ -3522,12 +3499,9 @@ select:-webkit-autofill {
 }
 
 /* ── Recenter button — premium redesign ────────────────────────────────────── */
-/* Note: bottom positioning is handled by .home.nav-mode .recenter-btn rule
-   (in the Phase 2 section above) which uses --sheet-h so it tracks the
-   nav bottom sheet and never overlaps it. The rule here only sets the
-   visual styling (size, colours, shadow). */
 .recenter-btn {
   position: fixed;
+  bottom: 100px;
   right: 14px;
   z-index: 900;
   display: flex;
@@ -3544,7 +3518,7 @@ select:-webkit-autofill {
   box-shadow: 0 4px 20px rgba(37,99,235,0.22), var(--shadow-sm);
   cursor: pointer;
   animation: fade-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .recenter-btn:active {
   transform: scale(0.93);
