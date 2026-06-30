@@ -258,14 +258,17 @@ export default function AdminDashboard() {
   const pill = {padding:'6px 14px',borderRadius:999,fontFamily:'var(--font-display)',fontWeight:600,fontSize:'0.78rem',cursor:'pointer'}
 
   if (checkingSession) return (
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',gap:14,padding:24}}>
+    // admin-fullpage: flex column that fills app-main without relying on
+    // height:100% percentage resolution (which can miscalculate during the
+    // first paint when the parent flex item height isn't yet settled).
+    <div className="admin-fullpage">
       <div className="boot-gate-spinner" aria-hidden="true" />
       <div style={{fontFamily:'var(--font-sans)',fontSize:'0.9rem',color:'var(--muted)'}}>Checking session…</div>
     </div>
   )
 
   if (!authed) return (
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',gap:14,padding:24}}>
+    <div className="admin-fullpage">
       <div style={{fontFamily:'var(--font-display)',fontSize:'1.3rem',fontWeight:700}}>Admin Login</div>
       {/* Task 3 — dark mode safe input */}
       <input type="text" placeholder="Username" value={username} autoComplete="username"

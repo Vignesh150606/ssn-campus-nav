@@ -429,8 +429,16 @@ export default function Home() {
   }
 
   // ── Render ──────────────────────────────────────────────────────────────
+  // --sheet-h: tracks the nav bottom sheet height so all fixed floating
+  // buttons (exit, copilot FAB, recenter) can position themselves above it
+  // using CSS calc(). The CSS transition on those elements syncs with the
+  // sheet's own transition (0.3s cubic-bezier).
+  const sheetH = navMode ? (navSheetExpanded ? 320 : 90) : 0
   return (
-    <div className={`home${navMode ? ' nav-mode' : ''}`}>
+    <div
+      className={`home${navMode ? ' nav-mode' : ''}`}
+      style={{ '--sheet-h': `${sheetH}px` }}
+    >
 
       {/* Map — full-height in nav mode */}
       <div
