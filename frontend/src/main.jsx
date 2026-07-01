@@ -7,6 +7,7 @@ import Home from './pages/Home.jsx'
 import EventPage from './pages/EventPage.jsx'
 import EventsList from './pages/EventsList.jsx'
 import AdminDashboard from './pages/AdminDashboard.jsx'
+import LocationDeepLink from './pages/LocationDeepLink.jsx'
 import BootGate from './components/BootGate.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { LocationProvider } from './context/LocationProvider.jsx'
@@ -47,6 +48,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="/" element={<App />}>
                 <Route index element={<Home />} />
                 <Route path="event/:eventId" element={<EventPage />} />
+                <Route path="location/:locationId" element={<LocationDeepLink />} />
                 <Route path="events" element={<EventsList />} />
                 <Route path="admin" element={<AdminDashboard />} />
               </Route>

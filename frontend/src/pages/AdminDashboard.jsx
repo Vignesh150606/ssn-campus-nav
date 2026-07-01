@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { API_BASE } from '../api'
 import { CATEGORY_META, FEST_META } from '../constants'
 import { dlog, dwarn } from '../utils/debugLog'
+import PosterManager from '../components/PosterManager'
+import VenueMenuAdmin from '../components/VenueMenuAdmin'
 
 const STATUS_COLOR = { verified:'#2E9E5B', pending:'#E07414', rejected:'#D7263D' }
 
@@ -138,11 +140,14 @@ export default function AdminDashboard() {
   const [checkingSession, setCheckingSession] = useState(() => !!sessionStorage.getItem(TOKEN_STORAGE_KEY))
   const [events, setEvents]   = useState([])
   const [segments, setSegments] = useState([])
+  const [venues,   setVenues]   = useState([])
   const [error, setError]     = useState(null)
   const [msg, setMsg]         = useState(null)
   const [tab, setTab]         = useState('events')
   const [form, setForm]       = useState(BLANK_FORM)
   const [submitting, setSubmitting] = useState(false)
+  // Phase 4.2: which event card has its poster manager open
+  const [expandedEventId, setExpandedEventId] = useState(null)
 
   dlog('AdminDashboard/render', 'component body executing — token:', token ? '(present)' : '(none)', 'checkingSession:', checkingSession, 'authed:', authed)
 
@@ -166,6 +171,7 @@ export default function AdminDashboard() {
         dlog('AdminDashboard/fetch', `✅ session verified after ${ms}ms — ${data?.length ?? 0} events, setting authed=true`)
         setEvents(data); setAuthed(true)
         fetch(`${API_BASE}/api/road-segments`).then(r=>r.json()).then((s) => { if (!cancelled) setSegments(s) })
+        fetch(`${API_BASE}/api/locations`).then(r=>r.json()).then((v) => { if (!cancelled) setVenues(v) })
       })
       .catch((e) => {
         const ms = (performance.now() - startedAt).toFixed(0)
@@ -305,7 +311,7 @@ export default function AdminDashboard() {
     <div style={{height:'100%',overflow:'hidden',display:'flex',flexDirection:'column'}}>
       {/* Tab bar */}
       <div style={{display:'flex',gap:8,padding:'12px 16px',borderBottom:'1px solid var(--line)',flexShrink:0,flexWrap:'wrap'}}>
-        {[['events',`Events (${events.length})`],['roads','Road Closures'],['add','+ Add Event']].map(([t,label])=>(
+        {[['events',`Events (${events.length})`],['roads','Road Closures'],['menus','🍽 Menus'],['add','+ Add Event']].map(([t,label])=>(
           <button key={t} onClick={()=>setTab(t)} style={{...pill,
             background:tab===t?'var(--ink)':'transparent',
             color:tab===t?'var(--canvas)':'var(--ink)',
@@ -352,22 +358,38 @@ export default function AdminDashboard() {
                   style={{...pill,background:'var(--canvas)',border:'1px solid var(--line)',color:'var(--ink)'}}>Preview →</a>
                 <a href={`${API_BASE}/api/events/${e.id}/qr`} target="_blank" rel="noreferrer"
                   style={{...pill,background:'var(--canvas)',border:'1px solid var(--line)',color:'var(--ink)'}}>QR ↓</a>
-                {/* Phase 3 — upload straight to Supabase Storage; the resulting
-                    URL is stored the same way a pasted poster_url/photo_urls
-                    URL always was, so EventPage rendering needs no changes. */}
-                <label style={{...pill,background:'var(--canvas)',border:'1px solid var(--line)',color:'var(--ink)',cursor:'pointer'}}>
-                  🖼 Set Poster
-                  <input type="file" accept="image/*" style={{display:'none'}}
-                    onChange={ev=>{ const f=ev.target.files[0]; ev.target.value=''; if(f) uploadImage(e.id, f, true) }} />
-                </label>
-                <label style={{...pill,background:'var(--canvas)',border:'1px solid var(--line)',color:'var(--ink)',cursor:'pointer'}}>
-                  📷 Add Photo
-                  <input type="file" accept="image/*" style={{display:'none'}}
-                    onChange={ev=>{ const f=ev.target.files[0]; ev.target.value=''; if(f) uploadImage(e.id, f, false) }} />
-                </label>
+                {/* Phase 4.2 — replaced inline upload labels with proper PosterManager */}
+                <button
+                  onClick={()=>setExpandedEventId(prev => prev===e.id ? null : e.id)}
+                  style={{...pill,background:'var(--canvas)',border:'1px solid var(--line)',color:'var(--ink)'}}>
+                  {expandedEventId===e.id ? '▲ Hide Posters' : '🖼 Manage Posters'}
+                </button>
               </div>
+              {/* Phase 4.2 — expandable PosterManager panel per event */}
+              {expandedEventId===e.id && (
+                <div style={{marginTop:12,borderTop:'1px solid var(--line)',paddingTop:12}}>
+                  <PosterManager
+                    eventId={e.id}
+                    onUpdated={() => flash('Images updated.')}
+                  />
+                </div>
+              )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Food Court Menus tab */}
+      {tab==='menus' && (
+        <div style={{flex:1,overflowY:'auto',padding:'16px'}}>
+          <div style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:'1.05rem',marginBottom:6,color:'var(--ink)'}}>
+            Food Court Menus
+          </div>
+          <div style={{fontSize:'0.8rem',color:'var(--muted)',marginBottom:16,lineHeight:1.5}}>
+            Upload or replace the daily menu image for each food court.
+            Students see today's menu on the venue card and via Campus Copilot.
+          </div>
+          <VenueMenuAdmin venues={venues} />
         </div>
       )}
 

@@ -39,8 +39,9 @@ export default function App() {
     <div className="app-shell">
       <header className="app-header">
         <NavLink to="/" className="brand">
-          <span className="brand-mark" />
-          <span>SSN Navigator</span>
+          {/* Phase 4.2 — SSN branding: real logo in header */}
+          <img src="/ssn-logo.png" alt="SSN" className="brand-logo" />
+          <span>Campus Navigator</span>
         </NavLink>
         <nav>
           <NavLink to="/events">Fest Schedule</NavLink>

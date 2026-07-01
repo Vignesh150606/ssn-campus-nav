@@ -40,8 +40,8 @@ export default defineConfig({
         name: 'SSN Campus Navigator',
         short_name: 'SSN Navigator',
         description: 'Find buildings, departments and fest events at SSN College of Engineering, with walking directions.',
-        theme_color: '#15192B',
-        background_color: '#FBF8F2',
+        theme_color: '#003b7a',
+        background_color: '#003b7a',
         display: 'standalone',
         start_url: '/',
         icons: [

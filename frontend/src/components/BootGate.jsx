@@ -102,8 +102,14 @@ export default function BootGate({ children }) {
 
   return (
     <div className="boot-gate" role="status" aria-live="polite">
-      <div className="boot-gate-mark" aria-hidden="true" />
-      <div className="boot-gate-title">Starting SSN Campus Navigator…</div>
+      {/* Phase 4.2 — SSN branding: real logo replaces the placeholder square */}
+      <img
+        src="/ssn-logo.png"
+        alt="SSN College of Engineering"
+        className="boot-gate-logo"
+        aria-hidden="true"
+      />
+      <div className="boot-gate-title">SSN Campus Navigator</div>
 
       {!failed && (
         <>

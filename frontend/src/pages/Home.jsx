@@ -14,7 +14,7 @@
  * Phase 14: Auto-follow + Recenter button when user manually pans
  */
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation as useRouterLocation } from 'react-router-dom'
 import MapView from '../components/MapView'
 import SearchBar from '../components/SearchBar'
 import CategoryChips from '../components/CategoryChips'
@@ -30,6 +30,7 @@ import { useLocationContext } from '../context/LocationContext'
 import { useVoiceGuidance } from '../hooks/useVoiceGuidance'
 import { useCompassHeading } from '../hooks/useCompassHeading'
 import { useNavCamera } from '../hooks/useNavCamera'
+import { useElementHeightVar } from '../hooks/useElementHeightVar'
 import { landmarksAlongPath } from '../utils/facilities'
 import { computeUpcomingTurn, haversine } from '../utils/geo'
 
@@ -79,6 +80,7 @@ function nearestLandmarkToTurn(turnLat, turnLng, locations, excludeIds = []) {
 
 export default function Home() {
   const navigate = useNavigate()
+  const routerLocation = useRouterLocation()
   const [locations, setLocations]         = useState([])
   const [query, setQuery]                 = useState('')
   const [searchResults, setSearchResults] = useState(null)
@@ -120,6 +122,8 @@ export default function Home() {
   const [headingUp, setHeadingUp] = useState(true)
   // Phase 4A: current map bearing reported by NavigationController
   const [currentBearing, setCurrentBearing] = useState(0)
+  // Phase 4.2: clipboard feedback for share button (non-Web-Share browsers)
+  const [shareCopied, setShareCopied] = useState(false)
 
   const {
     position, accuracy, acquiringGps, tracking, error: gpsError,
@@ -133,6 +137,15 @@ export default function Home() {
   } = useLocationContext()
 
   const voice = useVoiceGuidance({ tracking, hasRoute, remainingDist, remainingPath, offRoute })
+
+  // Phase 4.2 — Priority 1: floating controls track the REAL rendered
+  // height of whichever bottom sheet is currently showing (browse results
+  // sheet, route preview sheet, or nav-mode sheet — collapsed/expanded),
+  // and the floating button stack's own height, instead of hardcoded
+  // pixel offsets that desync the moment the sheet's actual height
+  // changes. See useElementHeightVar for details.
+  const sheetHeightRef    = useElementHeightVar('--sheet-h')
+  const fabStackHeightRef = useElementHeightVar('--fab-stack-h')
 
   // Phase 4 + 4A: compass heading + premium smoothing
   const { heading: rawHeading } = useCompassHeading(navMode && tracking)
@@ -174,6 +187,24 @@ export default function Home() {
 
   useEffect(() => {
     getLocations().then(setLocations).catch(e => setLoadError(e.message))
+  }, [])
+
+  // Phase 4.2 — Priority 2: handle /location/:id deep links.
+  // LocationDeepLink.jsx fetches the location then navigates here with
+  // state.deepLinkLocation set. We pick it up once on mount and open
+  // the route preview sheet exactly as if the user tapped the card.
+  useEffect(() => {
+    const loc = routerLocation.state?.deepLinkLocation
+    if (loc && loc.id) {
+      // Clear the state so a back-navigation doesn't re-trigger this
+      window.history.replaceState({}, '')
+      // Wait for locations to load before calling handleDirections
+      // (handleDirections itself is stable; the locations list is used
+      //  for landmark labels but isn't required for the route fetch)
+      handleDirections(loc)
+    }
+  // Only run on mount — handleDirections is defined below but is stable
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -418,13 +449,28 @@ export default function Home() {
     }
   }
 
-  // Phase 7: Share Location (stub — copies venue name to clipboard)
+  // Phase 4.2 — Priority 2: Share deep link
+  // Generates a proper URL that opens the app directly to this destination.
   async function handleShareLocation() {
-    const text = destName || 'Campus location'
+    const loc = previewLoc
+    if (!loc?.id) return
+
+    const base = window.location.origin
+    const deepLink = `${base}/location/${loc.id}`
+    const shareTitle = loc.name
+    const shareText = `Navigate to ${loc.name} at SSN College of Engineering`
+
     try {
-      await navigator.share?.({ title: text, text: `Navigate to ${text} — SSN Campus` })
+      if (navigator.share) {
+        await navigator.share({ title: shareTitle, text: shareText, url: deepLink })
+      } else {
+        await navigator.clipboard.writeText(deepLink)
+        // Brief toast feedback — we'll use a simple state flag
+        setShareCopied(true)
+        setTimeout(() => setShareCopied(false), 2500)
+      }
     } catch {
-      try { await navigator.clipboard.writeText(text) } catch { /* clipboard unavailable */ }
+      // User cancelled share sheet — not an error
     }
   }
 
@@ -516,7 +562,7 @@ export default function Home() {
 
           {/* Bottom sheet */}
           {previewActive ? (
-            <div className="results-sheet preview-mode">
+            <div className="results-sheet preview-mode" ref={sheetHeightRef}>
               <div className="sheet-handle" />
               <RoutePreviewPanel
                 destination={previewLoc}
@@ -529,7 +575,7 @@ export default function Home() {
               />
             </div>
           ) : (
-            <div className={`results-sheet ${sheetEmpty ? 'empty' : ''}`}>
+            <div className={`results-sheet ${sheetEmpty ? 'empty' : ''}`} ref={sheetHeightRef}>
               <div className="sheet-handle" />
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'4px 18px 8px' }}>
                 <div className="sheet-title" style={{ padding:0 }}>
@@ -604,14 +650,6 @@ export default function Home() {
             onHeadingUp={handleHeadingUp}
           />
 
-          {/* Phase 14 / 4A — Recenter button (shows when user pans manually) */}
-          {userManuallyPanned && (
-            <button className="recenter-btn" onClick={handleRecenter} aria-label="Resume navigation follow">
-              <span className="recenter-icon">⊙</span>
-              <span className="recenter-label">Re-center</span>
-            </button>
-          )}
-
           {/* Phase 6 — Prominent off-route / recalculating banner */}
           {(offRoute || recalculating) && (
             <div className={`off-route-banner${recalculating ? ' recalculating' : ''}`}>
@@ -628,7 +666,7 @@ export default function Home() {
           )}
 
           {/* Phase 5 — Navigation bottom sheet */}
-          <div className={`nav-bottom-sheet ${navSheetExpanded ? 'expanded' : ''}`}>
+          <div className={`nav-bottom-sheet ${navSheetExpanded ? 'expanded' : ''}`} ref={sheetHeightRef}>
             <button
               className="nav-sheet-grip"
               onClick={() => setNavSheetExpanded(e => !e)}
@@ -776,7 +814,7 @@ export default function Home() {
                 🔍 Go Somewhere Else
               </button>
               <button className="arrival-btn secondary" onClick={handleShareLocation}>
-                Share Location
+                {shareCopied ? '✓ Link Copied!' : '↗ Share Location'}
               </button>
             </div>
           </div>
@@ -785,8 +823,17 @@ export default function Home() {
 
       <VoiceSettingsPanel voice={voice} open={voiceSettingsOpen} onClose={() => setVoiceSettingsOpen(false)} />
 
-      {/* Task 4 — FAB stack: Copilot only (My Location accessible via bottom sheet) */}
-      <div className="copilot-fab-stack">
+      {/* Phase 4.2 — Priority 1: single floating-control stack (right side).
+          Recenter + Campus Copilot now live in ONE flex column, anchored
+          to the live sheet height via --sheet-h, so they can never
+          collide and always move together as the sheet expands/collapses. */}
+      <div className="copilot-fab-stack" ref={fabStackHeightRef}>
+        {navMode && !arrived && userManuallyPanned && (
+          <button className="recenter-btn" onClick={handleRecenter} aria-label="Resume navigation follow">
+            <span className="recenter-icon">⊙</span>
+            <span className="recenter-label">Re-center</span>
+          </button>
+        )}
         <ChatbotWidget
           locations={locations}
           position={position}

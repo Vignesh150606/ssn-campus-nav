@@ -72,6 +72,18 @@ function ChatCard({ card, onPreview, onStart, onDetails }) {
   // Location card
   return (
     <div className="copilot-card copilot-card-location">
+      {/* Phase 4.2 — show today's menu thumbnail if this is a food venue */}
+      {card.menuImageUrl && (
+        <div className="copilot-card-menu-img-wrap">
+          <img
+            src={card.menuImageUrl}
+            alt="Today's menu"
+            className="copilot-card-menu-img"
+            loading="lazy"
+          />
+          <span className="copilot-card-menu-badge">🍽 Today's Menu</span>
+        </div>
+      )}
       <div className="copilot-card-body">
         <div className="copilot-card-title">{card.title}</div>
         {card.subtitle && <div className="copilot-card-subtitle">{card.subtitle}</div>}

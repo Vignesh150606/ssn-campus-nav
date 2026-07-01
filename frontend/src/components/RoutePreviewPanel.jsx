@@ -10,6 +10,7 @@
  * when there's only one route, but the plumbing exists.
  */
 import { SkeletonRoutePreview } from './Skeleton'
+import VenueMenuCard from './VenueMenuCard'
 
 function formatDistance(m) {
   if (m == null) return '—'
@@ -78,6 +79,11 @@ export default function RoutePreviewPanel({
                 {active.landmarks.map(l => <li key={l.id}>{l.name}</li>)}
               </ul>
             </div>
+          )}
+
+          {/* Phase 4.2 — show today's menu for food/dining venues */}
+          {['food', 'dining'].includes(destination?.category) && (
+            <VenueMenuCard venueId={destination.id} venueName={destination.name} />
           )}
 
           <div className="route-preview-actions">

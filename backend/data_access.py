@@ -478,3 +478,185 @@ def set_segment_closed(seg_id: str, closed: bool) -> Optional[dict]:
         sync_road_segments_cache()
         return _segment_row_to_legacy_shape(row)
     return None
+
+
+# ---------------------------------------------------------------------------
+# Venue menus  (Phase 4.2 — Food Court Menu)
+# ---------------------------------------------------------------------------
+
+MENU_IMAGES_BUCKET = "venue-menus"
+_MENU_COLUMNS = "id, venue_id, date, image_url, storage_path, description, created_at"
+
+
+def get_menu(venue_id: str, date: Optional[str] = None) -> Optional[dict]:
+    """Return today's (or a specific date's) menu for a venue, or None."""
+    def _run():
+        client = get_client()
+        target_date = date or datetime.now(timezone.utc).date().isoformat()
+        result = (
+            client.table("venue_menus")
+            .select(_MENU_COLUMNS)
+            .eq("venue_id", venue_id)
+            .eq("date", target_date)
+            .limit(1)
+            .execute()
+        )
+        rows = result.data or []
+        return rows[0] if rows else None
+    return _wrap(_run)
+
+
+def list_menus(venue_id: str) -> List[dict]:
+    """List all menu rows for a venue (admin: see history)."""
+    def _run():
+        client = get_client()
+        result = (
+            client.table("venue_menus")
+            .select(_MENU_COLUMNS)
+            .eq("venue_id", venue_id)
+            .order("date", desc=True)
+            .execute()
+        )
+        return result.data or []
+    return _wrap(_run)
+
+
+def upsert_menu(venue_id: str, date: str, image_url: str,
+                storage_path: Optional[str], description: Optional[str],
+                created_by_admin_id: Optional[str]) -> dict:
+    """Insert or replace the menu for (venue_id, date). Returns the row."""
+    def _run():
+        client = get_client()
+        # Delete any existing Storage object for this slot before overwriting
+        existing = (
+            client.table("venue_menus")
+            .select("storage_path")
+            .eq("venue_id", venue_id)
+            .eq("date", date)
+            .limit(1)
+            .execute()
+        )
+        if existing.data and existing.data[0].get("storage_path"):
+            try:
+                client.storage.from_(MENU_IMAGES_BUCKET).remove([existing.data[0]["storage_path"]])
+            except Exception:
+                pass  # non-fatal: proceed with upsert even if old file stuck
+
+        result = (
+            client.table("venue_menus")
+            .upsert(
+                {
+                    "venue_id": venue_id,
+                    "date": date,
+                    "image_url": image_url,
+                    "storage_path": storage_path,
+                    "description": description,
+                    "created_by": created_by_admin_id,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                },
+                on_conflict="venue_id,date",
+            )
+            .execute()
+        )
+        return result.data[0] if result.data else {}
+    return _wrap(_run)
+
+
+def delete_menu(venue_id: str, date: str) -> bool:
+    """Delete the menu for (venue_id, date); also removes from Storage."""
+    def _run():
+        client = get_client()
+        existing = (
+            client.table("venue_menus")
+            .select("storage_path")
+            .eq("venue_id", venue_id)
+            .eq("date", date)
+            .limit(1)
+            .execute()
+        )
+        if existing.data and existing.data[0].get("storage_path"):
+            try:
+                client.storage.from_(MENU_IMAGES_BUCKET).remove([existing.data[0]["storage_path"]])
+            except Exception:
+                pass
+        result = (
+            client.table("venue_menus")
+            .delete()
+            .eq("venue_id", venue_id)
+            .eq("date", date)
+            .execute()
+        )
+        return bool(result.data)
+    return _wrap(_run)
+
+
+def upload_menu_image_file(venue_id: str, filename: str,
+                           content: bytes, content_type: str) -> tuple:
+    """Upload menu image to Supabase Storage; returns (public_url, storage_path)."""
+    if content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
+        raise ValueError(f"Unsupported image type '{content_type}'.")
+    if len(content) > MAX_IMAGE_BYTES:
+        raise ValueError(f"Image too large ({len(content)} bytes). Max {MAX_IMAGE_BYTES} bytes.")
+    def _run():
+        client = get_client()
+        safe_name = "".join(c for c in filename if c.isalnum() or c in "._-") or "menu"
+        storage_path = f"{venue_id}/{uuid.uuid4().hex}_{safe_name}"
+        client.storage.from_(MENU_IMAGES_BUCKET).upload(
+            storage_path, content, file_options={"content-type": content_type}
+        )
+        public = client.storage.from_(MENU_IMAGES_BUCKET).get_public_url(storage_path)
+        if isinstance(public, dict):
+            public_url = (public.get("publicUrl") or public.get("publicURL")
+                          or public.get("data", {}).get("publicUrl"))
+        else:
+            public_url = public
+        if not public_url:
+            raise SupabaseUnavailableError("Storage upload succeeded but no public URL returned.")
+        return public_url, storage_path
+    return _wrap(_run)
+
+
+# ---------------------------------------------------------------------------
+# Event image delete  (Phase 4.2 — poster management)
+# ---------------------------------------------------------------------------
+
+def delete_event_image(image_id: str, event_id: str) -> bool:
+    """Delete one event image row and remove its file from Storage (if any).
+    Returns True if a row was deleted, False if not found."""
+    def _run():
+        client = get_client()
+        # Fetch storage_path before deleting the row (cascade would wipe it)
+        existing = (
+            client.table("event_images")
+            .select("id, storage_path, is_poster")
+            .eq("id", image_id)
+            .eq("event_id", event_id)
+            .limit(1)
+            .execute()
+        )
+        if not existing.data:
+            return False
+        storage_path = existing.data[0].get("storage_path")
+        if storage_path:
+            try:
+                client.storage.from_(EVENT_IMAGES_BUCKET).remove([storage_path])
+            except Exception:
+                pass  # non-fatal: delete DB row even if Storage remove fails
+        result = client.table("event_images").delete().eq("id", image_id).execute()
+        return bool(result.data)
+    return _wrap(_run)
+
+
+def list_event_images(event_id: str) -> List[dict]:
+    """Return all image rows for an event, sorted by sort_order."""
+    def _run():
+        client = get_client()
+        result = (
+            client.table("event_images")
+            .select("id, url, is_poster, sort_order, created_at")
+            .eq("event_id", event_id)
+            .order("sort_order")
+            .execute()
+        )
+        return result.data or []
+    return _wrap(_run)

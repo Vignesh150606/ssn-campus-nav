@@ -58,6 +58,12 @@ export function getRoadSegments() {
   return getJSON('/api/road-segments')
 }
 
+/** Phase 4.2 — food court menu image for today (or a specific date). */
+export function getVenueMenu(venueId, date) {
+  const q = date ? `?date=${encodeURIComponent(date)}` : ''
+  return getJSON(`/api/locations/${encodeURIComponent(venueId)}/menu${q}`)
+}
+
 export function eventQrUrl(id) {
   return `${API_BASE}/api/events/${id}/qr`
 }

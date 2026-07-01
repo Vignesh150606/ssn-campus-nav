@@ -72,6 +72,13 @@ LOCATION_ALIASES = {
     'ssn-football-ground': ['football ground', 'football field'],
     'clock-tower':      ['clock tower', 'clocktower'],
     'ssn-fountain':     ['fountain', 'ssn fountain'],
+    # Phase 4.2 — food court aliases for menu queries
+    'main-canteen':     ['main canteen', 'canteen', 'main mess', 'main cafeteria'],
+    'food-rishabhs':    ["rishabh's", 'rishabhs', "rishabh's food court", 'rishabh food court'],
+    'food-snowcube':    ['snow cube', 'snowcube', 'snow cube cafe'],
+    'food-metro':       ['metro cafe', 'metro', 'metro coffee'],
+    'food-pr':          ['pr food court', 'pr', 'pr canteen'],
+    'food-aswins':      ["ashwin's", 'aswins', "ashwin's food court", 'ashwin food court'],
 }
 
 # Short department codes used specifically for classroom-code parsing
@@ -105,6 +112,15 @@ NEED_ALIASES_DIRECT = {
 }
 
 GREETING_PHRASES = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening', 'yo', 'sup', 'hai']
+
+# Phase 4.2 — menu intent phrases
+MENU_PHRASES = [
+    "what's today's menu", "today's menu", "todays menu", "show menu",
+    "what's on the menu", "what is on the menu", "menu today", "menu",
+    "what's available", "what is available", "what can i eat", "what food is available",
+    "show canteen menu", "show food court menu", "show main canteen menu",
+    "what's for lunch", "what's for dinner", "what's for breakfast",
+]
 
 EVENT_NOW_PHRASES = ['happening now', 'going on now', 'right now', 'currently on', 'live now', 'now?', 'what is happening']
 EVENT_TODAY_PHRASES = ["today's events", 'today events', 'events today', 'what is today', "show today's events", 'show today events']
@@ -176,7 +192,7 @@ CAMPUS_KEYWORDS = [
     'washroom', 'toilet', 'parking', 'hostel', 'library', 'auditorium', 'gate', 'college',
     'campus', 'class', 'classroom', 'lab', 'faculty', 'professor', 'admin', 'placement',
     'cdc', 'ground', 'sports', 'medical', 'clinic', 'hospital', 'tower', 'fountain', 'theatre',
-    'theater', 'hall', 'cafe', 'mess',
+    'theater', 'hall', 'cafe', 'mess', 'menu', 'lunch', 'dinner', 'breakfast',
 ]
 
 
@@ -414,6 +430,26 @@ def classify(message: str, locations: list, context: Optional[dict] = None) -> d
                         reply="I couldn't match that to a department I know. Try EEE, CSE, ECE, IT, "
                               "Mechanical, Civil, Biomedical, Admin or the Placement Cell (CDC).",
                         resolved_locations=[])
+
+    # 4a) Phase 4.2 — Menu query ("what's today's menu?", "show main canteen menu").
+    #     Check before generic need detection so "what food is available" → menu,
+    #     not just the dining need (which finds nearest food, not the menu image).
+    if _phrase_hit(text, MENU_PHRASES) or ('menu' in text):
+        # Does the query also name a specific venue?
+        bare, _ = strip_command_phrases(text)
+        bare_no_menu = re.sub(r'\bmenu\b|\btoday\b|\bshow\b|\bavailable\b', '', bare).strip()
+        venue_matches = resolve_locations(bare_no_menu, locations, cutoff=0.60) if bare_no_menu else []
+        if venue_matches:
+            top = venue_matches[0]
+            return _result('venue_menu', raw, text,
+                           reply=f"Here's today's menu at {top['name']}.",
+                           resolved_locations=venue_matches)
+        # Generic menu query — return all food venues
+        food_venues = [l for l in locations if l.get('category') in ('food', 'dining')]
+        fv_resolved = [{'id': l['id'], 'name': l['name'], 'score': 1.0} for l in food_venues]
+        return _result('venue_menu', raw, text,
+                       reply="Here are today's menus for SSN food courts.",
+                       resolved_locations=fv_resolved)
 
     # 4) "Need" detection (food/water/restroom/parking/medical/placement) —
     #    checked before generic command+entity resolution so "I need the

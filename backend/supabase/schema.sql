@@ -193,3 +193,34 @@ alter table road_segments   enable row level security;
 -- =============================================================================
 -- End of schema. Next: Storage bucket setup — see SUPABASE_MIGRATION.md Step 2.
 -- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- venue_menus  (Phase 4.2 — Food Court Menu feature)
+--
+-- One menu image per venue per day. Admins upload/replace/delete via the
+-- admin dashboard. Users see today's menu on the venue card or via Copilot.
+-- image_url always holds a usable public URL (Supabase Storage or external).
+-- storage_path is set only for Storage uploads so images can be deleted
+-- from the bucket when the menu row is deleted.
+-- -----------------------------------------------------------------------------
+create table if not exists venue_menus (
+    id           uuid primary key default gen_random_uuid(),
+    venue_id     text not null references venues(id) on delete cascade,
+    date         date not null default current_date,
+    image_url    text not null,
+    storage_path text,
+    description  text,
+    created_by   uuid references admins(id) on delete set null,
+    created_at   timestamptz not null default now(),
+    updated_at   timestamptz not null default now(),
+    -- One menu image per venue per day
+    unique (venue_id, date)
+);
+
+create index if not exists idx_venue_menus_venue_date on venue_menus (venue_id, date);
+
+drop trigger if exists trg_venue_menus_updated_at on venue_menus;
+create trigger trg_venue_menus_updated_at before update on venue_menus
+    for each row execute function set_updated_at();
+
+alter table venue_menus enable row level security;

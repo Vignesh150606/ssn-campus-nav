@@ -11,7 +11,7 @@
 import { copilotChat } from './copilotApi'
 import { haversine } from '../utils/geo'
 import { nearestWithFacility, nearestCanteen } from '../utils/facilities'
-import { getEvents, getRoute, getRouteFromCoords } from '../api'
+import { getEvents, getRoute, getRouteFromCoords, getVenueMenu } from '../api'
 
 const NEED_LABELS = {
   dining: 'somewhere to eat',
@@ -576,6 +576,43 @@ export async function runTurn(message, state, deps) {
     case 'follow_up_cancel_nav':
       outcome = await handleFollowUp(intent, state, locationsById, position)
       break
+
+    case 'venue_menu': {
+      // "What's today's menu?" / "Show Main Canteen menu."
+      const menuLocs = (result.resolved_locations || [])
+        .map(r => locationsById[r.id])
+        .filter(Boolean)
+        .filter(l => ['food','dining'].includes(l?.category))
+      if (menuLocs.length === 0) {
+        // Fall back to all food venues
+        const all = locations.filter(l => ['food','dining'].includes(l?.category))
+        outcome = {
+          replyText: all.length
+            ? `Here are today's menus for SSN food courts.`
+            : `I don't have any food courts on record.`,
+          cards: all.map(l => locationCard(l, { position })),
+          state: {},
+          suggestions: all.length ? ['Navigate to Main Canteen', 'Nearest canteen'] : [],
+        }
+      } else {
+        // Specific venue(s) requested — also attempt to fetch menu image
+        const cards = await Promise.all(menuLocs.map(async (l) => {
+          const base = locationCard(l, { position })
+          try {
+            const menu = await getVenueMenu(l.id)
+            if (menu?.image_url) base.menuImageUrl = menu.image_url
+          } catch { /* no menu today — card still shown without image */ }
+          return base
+        }))
+        outcome = {
+          replyText: result.reply || `Here's today's menu at ${menuLocs[0].name}.`,
+          cards,
+          state: { lastLocationId: menuLocs[0].id },
+          suggestions: ['Navigate there', 'Nearest canteen'],
+        }
+      }
+      break
+    }
 
     case 'greeting':
     case 'out_of_scope':

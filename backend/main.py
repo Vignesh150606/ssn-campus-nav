@@ -388,6 +388,22 @@ async def upload_event_image(
     return {"url": public_url, "is_poster": is_poster}
 
 
+@app.get("/api/admin/events/{event_id}/images")
+def list_event_images(event_id: str, admin: dict = Depends(get_current_admin)):
+    """Phase 4.2 — list all image rows for an event (for poster management UI)."""
+    if not data_access.event_exists(event_id):
+        raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
+    return data_access.list_event_images(event_id)
+
+
+@app.delete("/api/admin/events/{event_id}/images/{image_id}")
+def delete_event_image(event_id: str, image_id: str, admin: dict = Depends(get_current_admin)):
+    """Phase 4.2 — delete one image from an event (removes from Storage too)."""
+    if not data_access.delete_event_image(image_id, event_id):
+        raise HTTPException(status_code=404, detail="Image not found.")
+    return {"message": "Image deleted."}
+
+
 # ---------------------------------------------------------------------------
 # Road segments — admin can close/open segments for construction etc.
 # ---------------------------------------------------------------------------
@@ -414,6 +430,55 @@ def open_segment(seg_id: str, admin: dict = Depends(get_current_admin)):
     if not seg:
         raise HTTPException(status_code=404, detail=f"Segment '{seg_id}' not found")
     return {"message": f"Segment '{seg['name']}' reopened."}
+
+
+# ---------------------------------------------------------------------------
+# Venue menus — food court menu images (Phase 4.2)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/locations/{venue_id}/menu")
+def get_venue_menu(venue_id: str, date: Optional[str] = Query(None, description="YYYY-MM-DD, defaults to today")):
+    """Public — get today's menu image for a food court / dining venue."""
+    if not data_access.venue_exists(venue_id):
+        raise HTTPException(status_code=404, detail=f"Venue '{venue_id}' not found")
+    menu = data_access.get_menu(venue_id, date)
+    if not menu:
+        raise HTTPException(status_code=404, detail="No menu available for this venue today.")
+    return menu
+
+
+@app.post("/api/admin/locations/{venue_id}/menu")
+async def upload_venue_menu(
+    venue_id: str,
+    file: UploadFile = File(...),
+    date: str = Form(..., description="YYYY-MM-DD"),
+    description: Optional[str] = Form(None),
+    admin: dict = Depends(get_current_admin),
+):
+    """Admin — upload (or replace) the menu image for a venue on a specific date."""
+    if not data_access.venue_exists(venue_id):
+        raise HTTPException(status_code=404, detail=f"Venue '{venue_id}' not found")
+    content = await file.read()
+    try:
+        public_url, storage_path = data_access.upload_menu_image_file(
+            venue_id, file.filename or "menu", content, file.content_type or "image/jpeg"
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    menu = data_access.upsert_menu(venue_id, date, public_url, storage_path, description, admin["sub"])
+    return menu
+
+
+@app.delete("/api/admin/locations/{venue_id}/menu")
+def delete_venue_menu(
+    venue_id: str,
+    date: str = Query(..., description="YYYY-MM-DD"),
+    admin: dict = Depends(get_current_admin),
+):
+    """Admin — delete the menu for a venue on a specific date."""
+    if not data_access.delete_menu(venue_id, date):
+        raise HTTPException(status_code=404, detail="No menu found for that venue/date.")
+    return {"message": "Menu deleted."}
 
 
 # ---------------------------------------------------------------------------
