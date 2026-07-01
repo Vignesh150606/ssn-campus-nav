@@ -157,18 +157,18 @@ input, select, textarea { font-family: inherit; color: inherit; }
   letter-spacing: -0.01em;
   color: var(--ink);
 }
-/* Phase 4.2 — SSN logo in header */
+/* Phase 4.2 — SSN logo in header. Always original colours — no dark-mode
+   inversion. The brand blue reads clearly on both the light and dark header
+   background that --surface resolves to. */
 .brand-logo {
   height: 22px;
   width: auto;
   object-fit: contain;
   display: block;
-  /* Matches the SSN blue on light; invert on dark same as boot-gate-logo */
   filter: drop-shadow(0 1px 3px rgba(0,59,122,0.18));
 }
-[data-theme="dark"] .brand-logo {
-  filter: invert(1) hue-rotate(180deg) brightness(1.5);
-}
+/* No [data-theme="dark"] rule: SSN blue is the brand colour regardless of
+   the UI theme. Inverting it changes it to a non-brand colour. */
 .app-header nav { display: flex; gap: 4px; align-items: center; }
 .app-header nav a {
   font-size: 0.82rem;
@@ -3600,22 +3600,18 @@ select:-webkit-autofill {
   animation: fade-in 0.2s ease;
 }
 /* Phase 4.2 — SSN logo: replaces the old gradient-square placeholder.
-   Blue-on-white (SSN brand blue) on light canvas, inverted-brightness on
-   dark so the blue stays visible on a dark background. */
+   Always shown in its original SSN blue — never tinted or inverted.
+   The PNG has a transparent background; the drop-shadow gives it lift
+   on both light and dark canvases without changing the brand colour. */
 .boot-gate-logo {
   width: 140px;
   height: auto;
   object-fit: contain;
-  /* The logo PNG has a transparent background; apply a subtle drop-shadow
-     so it reads well on both light and dark canvas. */
   filter: drop-shadow(0 4px 18px rgba(0,59,122,0.22));
 }
-[data-theme="dark"] .boot-gate-logo {
-  /* Invert the blue to keep good contrast on the dark background.
-     100% invert flips it to orange; hue-rotate(180deg) brings it back to
-     a readable light-blue. Brightness boost keeps it from looking washed. */
-  filter: invert(1) hue-rotate(180deg) brightness(1.4) drop-shadow(0 4px 18px rgba(180,220,255,0.28));
-}
+/* No dark-mode override: the SSN blue on transparent always reads clearly
+   on the dark canvas (#15192B or similar) that --canvas resolves to in dark
+   mode. Inverting it produces an off-orange that is NOT the brand colour. */
 .boot-gate-title {
   font-family: var(--font-display);
   font-weight: 700;
@@ -3669,23 +3665,24 @@ select:-webkit-autofill {
 .venue-menu-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
   padding: 9px 12px 8px;
   border-bottom: 1px solid var(--line);
 }
 .venue-menu-label {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   color: var(--ink);
 }
-.venue-menu-desc {
-  font-size: 0.75rem;
-  color: var(--muted);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.venue-menu-open-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #2E9E5B;
+  background: rgba(46,158,91,0.1);
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
 }
 .venue-menu-thumb-btn {
   display: block;
@@ -3699,7 +3696,7 @@ select:-webkit-autofill {
 .venue-menu-thumb {
   display: block;
   width: 100%;
-  max-height: 180px;
+  max-height: 200px;
   object-fit: cover;
   object-position: top;
 }
@@ -3713,6 +3710,19 @@ select:-webkit-autofill {
   padding: 2px 7px;
   border-radius: 999px;
   pointer-events: none;
+}
+.venue-menu-desc-row {
+  padding: 8px 12px 0;
+}
+.venue-menu-desc-text {
+  font-size: 0.8rem;
+  color: var(--ink-2);
+  line-height: 1.45;
+}
+.venue-menu-updated {
+  padding: 4px 12px 10px;
+  font-size: 0.7rem;
+  color: var(--muted);
 }
 
 /* ── Shared lightbox (VenueMenuCard + PosterManager) ────────────────────── */

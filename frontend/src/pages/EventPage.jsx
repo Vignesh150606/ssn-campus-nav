@@ -423,6 +423,28 @@ export default function EventPage() {
             <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
               Scan to open event details
             </div>
+            {/* Phase 4.2.1 — deep link share button */}
+            <button
+              onClick={async () => {
+                const link = `${window.location.origin}/event/${event.id}`
+                try {
+                  if (navigator.share) {
+                    await navigator.share({ title: event.name, text: `Check out ${event.name} at SSN!`, url: link })
+                  } else {
+                    await navigator.clipboard.writeText(link)
+                    alert('Event link copied to clipboard!')
+                  }
+                } catch { /* user cancelled */ }
+              }}
+              style={{
+                marginTop: 10, padding: '7px 16px', borderRadius: 999,
+                background: 'var(--brand)', color: '#fff', border: 'none',
+                fontFamily: 'var(--font-display)', fontWeight: 600,
+                fontSize: '0.78rem', cursor: 'pointer',
+              }}
+            >
+              ↗ Share Event Link
+            </button>
           </div>
           <img
             src={eventQrUrl(event.id)}

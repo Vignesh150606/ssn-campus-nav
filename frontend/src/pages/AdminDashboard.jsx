@@ -257,6 +257,11 @@ export default function AdminDashboard() {
   }
 
   async function submitEvent() {
+    // Phase 4.2.1 — P1: validate required fields before hitting the API so
+    // admins get a clear error instead of a silent Supabase constraint failure.
+    const required = { 'Event name': form.name, 'Date': form.date, 'Start time': form.start_time, 'End time': form.end_time, 'Description': form.description }
+    const missing = Object.entries(required).filter(([, v]) => !v?.trim()).map(([k]) => k)
+    if (missing.length) { flash(`Please fill in: ${missing.join(', ')}`, true); return }
     setSubmitting(true)
     try {
       const payload = {
@@ -370,6 +375,7 @@ export default function AdminDashboard() {
                 <div style={{marginTop:12,borderTop:'1px solid var(--line)',paddingTop:12}}>
                   <PosterManager
                     eventId={e.id}
+                    token={token}
                     onUpdated={() => flash('Images updated.')}
                   />
                 </div>
@@ -389,7 +395,7 @@ export default function AdminDashboard() {
             Upload or replace the daily menu image for each food court.
             Students see today's menu on the venue card and via Campus Copilot.
           </div>
-          <VenueMenuAdmin venues={venues} />
+          <VenueMenuAdmin venues={venues} token={token} />
         </div>
       )}
 

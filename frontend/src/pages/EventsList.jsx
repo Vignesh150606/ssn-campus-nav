@@ -34,6 +34,44 @@ function saveEventsCache(events) {
   } catch { /* storage quota exceeded or private mode — silently ignore */ }
 }
 
+// Phase 4.2.1 — P1 fix: format a Supabase `date` column value for display.
+// Supabase returns `date` columns as "YYYY-MM-DD" strings via PostgREST.
+// We convert to "12 Sep 2026" for readability.
+function formatDate(raw) {
+  if (!raw) return '—'
+  try {
+    // Append T00:00:00 so Date() parses it as local midnight, not UTC midnight
+    // (which can shift the date by one day in UTC+5:30 zones)
+    const d = new Date(`${raw.slice(0, 10)}T00:00:00`)
+    if (isNaN(d.getTime())) return raw   // unparseable — show raw
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+  } catch {
+    return raw
+  }
+}
+
+// Format "HH:MM" or "HH:MM:SS" to "HH:MM AM/PM"
+function formatTime(raw) {
+  if (!raw) return ''
+  const m = /^(\d{1,2}):(\d{2})/.exec(raw)
+  if (!m) return raw
+  let h = parseInt(m[1], 10)
+  const min = m[2]
+  const ampm = h < 12 ? 'AM' : 'PM'
+  if (h === 0) h = 12
+  else if (h > 12) h -= 12
+  return `${h}:${min} ${ampm}`
+}
+
+// Format the time slot — "10:00 AM – 5:00 PM"
+function formatTimeRange(start, end) {
+  const s = formatTime(start)
+  const e = formatTime(end)
+  if (!s && !e) return '—'
+  if (!e) return s
+  return `${s} – ${e}`
+}
+
 // P8 — frontend display-name overrides (mirrors AdminDashboard LOCATION_DISPLAY_NAMES)
 const VENUE_NAME_OVERRIDES = {
   'tcs-auditorium': 'Main Auditorium',
@@ -161,11 +199,11 @@ export default function EventsList() {
                 </div>
                 <div>
                   <span className="meta-label">Date</span>
-                  {event.date}
+                  {formatDate(event.date)}
                 </div>
                 <div>
                   <span className="meta-label">Time</span>
-                  {event.start_time}
+                  {formatTimeRange(event.start_time, event.end_time)}
                 </div>
               </div>
             </Link>

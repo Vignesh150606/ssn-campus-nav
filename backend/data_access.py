@@ -485,7 +485,7 @@ def set_segment_closed(seg_id: str, closed: bool) -> Optional[dict]:
 # ---------------------------------------------------------------------------
 
 MENU_IMAGES_BUCKET = "venue-menus"
-_MENU_COLUMNS = "id, venue_id, date, image_url, storage_path, description, created_at"
+_MENU_COLUMNS = "id, venue_id, date, image_url, storage_path, description, created_at, updated_at"
 
 
 def get_menu(venue_id: str, date: Optional[str] = None) -> Optional[dict]:
