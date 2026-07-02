@@ -23,7 +23,7 @@ import RoutePreviewPanel from '../components/RoutePreviewPanel'
 import NearbyFacilities from '../components/NearbyFacilities'
 import CompassWidget from '../components/CompassWidget'
 import NavCompass from '../components/NavCompass'
-import VoiceSettingsPanel from '../components/VoiceSettingsPanel'
+import NavSettingsPanel from '../components/NavSettingsPanel'
 import ChatbotWidget from '../copilot/ChatbotWidget'
 import { getLocations, searchLocations, getRoute, getRouteFromCoords, getRoadSegments, getEvents } from '../api'
 import { useLocationContext } from '../context/LocationContext'
@@ -36,6 +36,7 @@ import { computeUpcomingTurn, computeAllTurns, haversine } from '../utils/geo'
 import { displayLocationName } from '../constants'
 import { useDraggableSheet } from '../hooks/useDraggableSheet'
 import VenueMenuCard from '../components/VenueMenuCard'
+import VenueMenuInline from '../components/VenueMenuInline'
 
 const SHEET_HEIGHT = 38
 const ENTRY_ID     = 'main-gate'
@@ -114,7 +115,16 @@ export default function Home() {
   const [previewTrigger, setPreviewTrigger] = useState(0)
 
   // Voice settings panel
-  const [voiceSettingsOpen, setVoiceSettingsOpen] = useState(false)
+  const [navSettingsOpen, setNavSettingsOpen] = useState(false)
+  // Priority 1 (Phase 4.2.4) — Navigation Settings. `headingUp` (declared
+  // further down, unchanged) doubles as "Rotate Map While Walking"; these
+  // three are new. All three are plain session-lifetime state per the
+  // spec ("persist during the current navigation session") — see
+  // NavSettingsPanel.jsx's header comment for why that doesn't need
+  // localStorage the way voice guidance does.
+  const [showCompass, setShowCompass]   = useState(false) // default OFF — "Compass hidden unless explicitly enabled"
+  const [autoRecenter, setAutoRecenter] = useState(true)
+  const [dynamicZoom, setDynamicZoom]   = useState(true)
 
   // ── Phase 1: Navigation mode state ─────────────────────────────────────
   const [navMode, setNavMode]                     = useState(false)
@@ -142,6 +152,10 @@ export default function Home() {
     arrivalRadius,
     start: startTracking, stop: stopTracking,
     setRoute, clearRoute: clearGpsRoute,
+    // Priority 2 (Phase 4.2.4) — GPS course-over-ground + speed, fed into
+    // useNavCamera below so it can prefer GPS course over the compass
+    // while walking, and freeze heading updates entirely while stationary.
+    speed, gpsCourse,
   } = useLocationContext()
 
   const voice = useVoiceGuidance({ tracking, hasRoute, remainingDist, remainingPath, offRoute })
@@ -178,8 +192,14 @@ export default function Home() {
   // needs a binary collapsed/expanded state, not three distinct tiers —
   // that keeps this a plain reuse of useDraggableSheet with zero changes
   // to the hook itself (Bug 3 says not to rebuild the draggable sheet).
+  // Priority 3 (Phase 4.2.3): collapsed peek bumped 132 → 160px — the old
+  // height was cramped even before Priority 9 added the inline food-menu
+  // line to this row; 160px gives both the dest/ETA/menu text stack and
+  // the Start Navigation button comfortable breathing room. Keep this in
+  // sync with the matching `calc(70vh - 160px)` fallback in index.css
+  // (.results-sheet.preview-mode) if it's ever changed again.
   const previewSheetPeeks = useMemo(() => ({
-    collapsed: 132,
+    collapsed: 160,
     half: Math.round(viewportH * 0.7),
     full: Math.round(viewportH * 0.7),
   }), [viewportH])
@@ -227,7 +247,7 @@ export default function Home() {
   //   smoothedHeading: fine-grained, used for the user marker arrow
   //   mapHeading:      coarser, used for map rotation to avoid micro-oscillations
   const navCameraActive = navMode && tracking && !acquiringGps
-  const { smoothedHeading, mapHeading } = useNavCamera(rawHeading, navCameraActive)
+  const { smoothedHeading, mapHeading } = useNavCamera(rawHeading, navCameraActive, { gpsCourse, speed })
 
   // Reset voice dedup on recalculation
   const prevRecalcVersionRef = useRef(recalcVersion)
@@ -248,7 +268,7 @@ export default function Home() {
   useEffect(() => {
     if (tracking && hasRoute) {
       setNavMode(true)
-      setFollowUser(true)
+      setFollowUser(autoRecenter)
       setTimeout(() => voiceRef.current?.announceNavigationStart(), 300)
     }
     // Phase 11: pick up room/floor/wing from EventPage navigation state
@@ -261,6 +281,21 @@ export default function Home() {
 
   useEffect(() => {
     getLocations().then(setLocations).catch(e => setLoadError(e.message))
+  }, [])
+
+  // Priority 1 (Phase 4.2.3): request GPS the moment the app launches,
+  // instead of waiting for the user to tap "My Location" or "Start
+  // Navigation". `startTracking` is a no-op-safe guard against
+  // double-starting a watchPosition() if tracking is already active from
+  // an earlier mount (LocationProvider lives above the router, so
+  // `tracking` survives navigating away from and back to Home). If the
+  // browser has no geolocation support or the user denies permission,
+  // `error` is set and every route calculation below already falls back
+  // to Main Gate on its own (see handleDirections/startNavigationFromCopilot's
+  // `tracking && position` checks) — no separate fallback needed here.
+  useEffect(() => {
+    if (!tracking) startTracking()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Phase 4.2 — Priority 2: handle /location/:id deep links.
@@ -419,7 +454,7 @@ export default function Home() {
     setRoute(routePath, previewLoc.lat, previewLoc.lng, previewLoc.id)
     voice.announceNavigationStart()
     if (!tracking) startTracking()
-    setFollowUser(true)
+    setFollowUser(autoRecenter)
     setPreviewActive(false)
     setPreviewRoutes(null)
     // Phase 1: enter navigation mode
@@ -452,7 +487,7 @@ export default function Home() {
       setRoute(r.path, loc.lat, loc.lng, loc.id)
       voice.announceNavigationStart()
       if (!tracking) startTracking()
-      setFollowUser(true)
+      setFollowUser(autoRecenter)
       setPreviewActive(false)
       setPreviewRoutes(null)
       setNavMode(true)
@@ -526,7 +561,7 @@ export default function Home() {
       stopTracking(); setFollowUser(false); voice.cancel()
     } else {
       startTracking()
-      if (routePath) setFollowUser(true)
+      if (routePath) setFollowUser(autoRecenter)
     }
   }
 
@@ -573,7 +608,23 @@ export default function Home() {
       {/* Map — full-height in nav mode */}
       <div
         className="map-layer"
-        style={{ bottom: navMode ? 0 : sheetEmpty ? 0 : `${SHEET_HEIGHT}%` }}
+        style={{
+          bottom: navMode
+            ? 0
+            // Priority 3 fix: the route-preview sheet is a floating overlay
+            // (position absolute, its own transform) whose visible height
+            // swings from 160px collapsed up to 70vh expanded — pinning the
+            // map to a flat 38% here left a gap between the map's clipped
+            // bottom edge and the sheet's actual top edge (an empty strip
+            // when collapsed) while also risking markers hiding behind the
+            // sheet when expanded. Tracking the SAME --sheet-h custom
+            // property the preview sheet already writes on every
+            // drag/snap frame (useDraggableSheet) keeps the map's visible
+            // area exactly matched to the sheet's real height at all times.
+            : previewActive
+              ? 'var(--sheet-h, 160px)'
+              : sheetEmpty ? 0 : `${SHEET_HEIGHT}%`
+        }}
       >
         <MapView
           locations={locations}
@@ -585,6 +636,7 @@ export default function Home() {
           userAccuracy={accuracy ?? 0}
           acquiringGps={!!acquiringGps}
           followUser={followUser}
+          dynamicZoom={dynamicZoom}
           zoom={17}
           previewTrigger={previewTrigger}
           userHeading={navMode && !acquiringGps ? smoothedHeading : null}
@@ -622,7 +674,7 @@ export default function Home() {
                 <span className="status-pill gps">
                   <span className="pulse-dot" />
                   {(() => {
-                    if (!accuracy)       return 'Searching GPS…'
+                    if (!accuracy)       return 'Obtaining your location…'
                     if (accuracy > 1000) return 'No GPS Signal'
                     if (accuracy > 150)  return `Low GPS ±${Math.round(accuracy)}m`
                     if (acquiringGps)    return `Waiting… ±${Math.round(accuracy)}m`
@@ -640,7 +692,7 @@ export default function Home() {
               )}
               {displayEta != null && <span className="status-pill">~{displayEta} min</span>}
               <button className="voice-settings-trigger status-pill"
-                onClick={() => setVoiceSettingsOpen(true)} aria-label="Voice settings">
+                onClick={() => setNavSettingsOpen(true)} aria-label="Navigation settings">
                 {voice.settings.enabled ? '🔊' : '🔇'}
               </button>
               {routePath && <button className="status-clear" onClick={handleClear}>✕</button>}
@@ -682,6 +734,11 @@ export default function Home() {
                       <div className="nav-dist-label" style={{ marginTop: 2 }}>
                         {previewRoutes[0].etaMinutes} min · {formatDist(previewRoutes[0].distanceM)}
                       </div>
+                    )}
+                    {/* Priority 9 — food court menu, visible immediately,
+                        no need to drag the sheet open to see it. */}
+                    {['food', 'dining'].includes(previewLoc?.category) && (
+                      <VenueMenuInline venueId={previewLoc.id} />
                     )}
                   </div>
                   <button
@@ -776,14 +833,19 @@ export default function Home() {
             ✕ Exit
           </button>
 
-          {/* Bug 6 — Heading-Up toggle. Always visible during navigation
-              (previously hid itself in North-Up mode, which was a dead
-              end with no way back except Recenter's old side effect). */}
-          <NavCompass
-            mapHeading={currentBearing}
-            headingUp={headingUp}
-            onToggle={handleToggleHeadingUp}
-          />
+          {/* Priority 1 (Phase 4.2.4) — Compass is now purely opt-in via
+              Navigation Settings (default OFF), decoupled from the
+              Rotate-Map-While-Walking preference it used to double as the
+              only control for. Tapping it (once shown) still flips
+              headingUp too, as a convenience — same shared state, not a
+              second source of truth. */}
+          {showCompass && (
+            <NavCompass
+              mapHeading={currentBearing}
+              headingUp={headingUp}
+              onToggle={handleToggleHeadingUp}
+            />
+          )}
 
           {/* Phase 6 — Prominent off-route / recalculating banner */}
           {(offRoute || recalculating) && (
@@ -879,8 +941,8 @@ export default function Home() {
 
                   <div style={{ marginTop:14, display:'flex', gap:8 }}>
                     <button className="voice-settings-trigger status-pill" style={{ flex:1, justifyContent:'center' }}
-                      onClick={() => setVoiceSettingsOpen(true)}>
-                      {voice.settings.enabled ? '🔊 Voice On' : '🔇 Voice Off'}
+                      onClick={() => setNavSettingsOpen(true)}>
+                      ⚙ Navigation Settings
                     </button>
                   </div>
                 </div>
@@ -1042,7 +1104,19 @@ export default function Home() {
         </div>
       )}
 
-      <VoiceSettingsPanel voice={voice} open={voiceSettingsOpen} onClose={() => setVoiceSettingsOpen(false)} />
+      <NavSettingsPanel
+        voice={voice}
+        open={navSettingsOpen}
+        onClose={() => setNavSettingsOpen(false)}
+        headingUp={headingUp}
+        onToggleHeadingUp={handleToggleHeadingUp}
+        showCompass={showCompass}
+        onToggleShowCompass={setShowCompass}
+        autoRecenter={autoRecenter}
+        onToggleAutoRecenter={setAutoRecenter}
+        dynamicZoom={dynamicZoom}
+        onToggleDynamicZoom={setDynamicZoom}
+      />
 
       {/* Phase 4.2 — Priority 1: single floating-control stack (right side).
           Recenter + Campus Copilot now live in ONE flex column, anchored

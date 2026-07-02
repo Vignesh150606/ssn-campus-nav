@@ -210,6 +210,17 @@ input, select, textarea { font-family: inherit; color: inherit; }
   z-index: 1;
 }
 .map-layer .leaflet-container { background: var(--canvas); }
+/* Priority 2 (Phase 4.2.4) — "Animated rotation". leaflet-rotate applies
+   bearing changes by writing a CSS transform straight onto this pane
+   (see setBearing() in leaflet-rotate/src/map/Map.js) with no animation
+   of its own — every heading-up update used to snap instantly. This pane
+   is ONLY repositioned by setBearing(), never by ordinary panning/zooming
+   (those move .leaflet-map-pane instead), so animating its transform here
+   can't add lag to dragging or zooming — it only smooths actual bearing
+   changes, which is exactly what should feel eased rather than instant. */
+.leaflet-rotate-pane {
+  transition: transform 0.3s ease-out;
+}
 .leaflet-control-zoom {
   border: none !important;
   box-shadow: var(--shadow-sm) !important;
@@ -236,12 +247,19 @@ input, select, textarea { font-family: inherit; color: inherit; }
    Phase 4.2: stacked dynamically above the floating-control column
    (--fab-stack-h) and the active sheet (--sheet-h) — see
    hooks/useElementHeightVar — instead of a hardcoded guess that drifted
-   out of sync whenever the sheet or stack's real height changed. */
+   out of sync whenever the sheet or stack's real height changed.
+   Priority 2 (Phase 4.2.3): the gap above the FAB stack was 26px — nearly
+   double the 14px gap .copilot-fab-stack itself uses above the sheet —
+   which left the zoom controls floating noticeably higher than the rest
+   of the right-side column, especially on Home where a tall browse sheet
+   pushes everything up further still. Matching that same 14px gap brings
+   it back down in line with the rest of the stack while still sitting
+   cleanly above the FAB column (never overlapping it). */
 .leaflet-container .leaflet-top.leaflet-left {
   top: auto !important;
   left: auto !important;
   right: 16px;
-  bottom: calc(var(--sheet-h, 0px) + var(--fab-stack-h, 56px) + 26px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--sheet-h, 0px) + var(--fab-stack-h, 56px) + 14px + env(safe-area-inset-bottom, 0px));
   transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 @media (max-width: 430px) {
@@ -361,7 +379,11 @@ input, select, textarea { font-family: inherit; color: inherit; }
   display: flex;
   flex-direction: column;
   will-change: transform;
-  transform: translate3d(0, calc(70vh - 132px), 0);
+  /* Priority 3: matches previewSheetPeeks.collapsed (160px) in Home.jsx —
+     this is only the same-paint-frame fallback before useDraggableSheet's
+     own mount effect takes over (see the comment on .nav-bottom-sheet
+     above), so it must stay in sync with that value. */
+  transform: translate3d(0, calc(70vh - 160px), 0);
 }
 .results-sheet.preview-mode.dragging .nav-sheet-scroll { pointer-events: none; }
 
@@ -374,6 +396,20 @@ input, select, textarea { font-family: inherit; color: inherit; }
   flex-shrink: 0;
 }
 .preview-collapsed-info { min-width: 0; flex: 1; }
+/* Priority 9 (Phase 4.2.3): compact "Today's Menu" line for food-court
+   destinations, shown right here in the always-visible collapsed row —
+   see VenueMenuInline.jsx. Truncates to one line; the full image/lightbox
+   view is still available by dragging the sheet up (VenueMenuCard). */
+.preview-menu-inline {
+  margin-top: 3px;
+  font-size: 0.78rem;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.preview-menu-inline.empty { color: var(--muted); }
+.preview-menu-inline.error { color: var(--danger); }
 .preview-collapsed-start-btn {
   flex-shrink: 0;
   background: var(--brand);
@@ -672,12 +708,19 @@ input, select, textarea { font-family: inherit; color: inherit; }
   box-shadow: 0 6px 16px -6px var(--brand-soft);
 }
 .route-preview-btn.primary:hover { background: var(--brand-strong); }
+/* Priority 3 (Phase 4.2.3): was `background: var(--ring)` — a ~6% tint
+   nearly invisible against the panel's own surface colour, which is what
+   made "Preview Route" hard to notice next to the solid blue "Start
+   Navigation" button. A solid dark fill gives it real contrast while
+   staying a clearly different (neutral ink, not brand blue) — and
+   visually lighter-weight via a softer shadow — secondary action. */
 .route-preview-btn.secondary {
-  background: var(--ring);
-  color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
   flex: 0 0 130px;
+  box-shadow: 0 4px 14px -6px rgba(0,0,0,0.3);
 }
-.route-preview-btn.secondary:hover { background: var(--line); }
+.route-preview-btn.secondary:hover { background: var(--ink-2); }
 
 /* ---------- Compass FAB ---------- */
 .compass-widget {
@@ -804,6 +847,16 @@ input, select, textarea { font-family: inherit; color: inherit; }
   font-weight: 500;
 }
 .voice-settings-row:last-of-type { border-bottom: none; }
+/* Phase 4.2.4 — divider label between the general nav-preference toggles
+   and the existing voice-guidance sub-controls in the unified panel. */
+.voice-settings-section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 14px 0 2px;
+}
 .voice-settings-row input[type="range"] {
   flex: 1;
   max-width: 60%;
@@ -2116,6 +2169,14 @@ html.nav-sheet-driving .leaflet-container .leaflet-top.leaflet-left {
 }
 html.nav-sheet-driving .nav-exit-btn {
   transition: transform 0.15s ease, box-shadow 0.15s ease; /* keep press feedback, drop the bottom lag */
+}
+/* Priority 3 (Phase 4.2.3): .map-layer now also tracks --sheet-h while the
+   route-preview sheet is driving (see Home.jsx), for the same reason as
+   the controls above — its own `transition: bottom 0.35s …` (used for the
+   coarse results/preview sheet height jumps) would otherwise visibly lag
+   one frame behind the sheet's per-frame drag/snap position. */
+html.nav-sheet-driving .map-layer {
+  transition: none;
 }
 
 .nav-bottom-expanded-content {

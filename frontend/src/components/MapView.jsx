@@ -204,6 +204,7 @@ function NavigationController({
   heading,          // smoothed map-rotation heading (degrees, null = no compass)
   headingUp,        // boolean — heading-up mode active
   followUser,       // boolean — camera should track user
+  dynamicZoom = true, // Priority 1 (Phase 4.2.4) — gate the smart-zoom effect below
   userPosition,     // {lat, lng} or null
   remainingDist,    // metres remaining to destination
   nextTurnDist,     // metres to the next turn
@@ -301,7 +302,7 @@ function NavigationController({
   // Only changes near turns, near destination, or after rerouting.
   // Never oscillates — guarded by threshold + debounce.
   useEffect(() => {
-    if (!followUser || !isMapAlive()) return
+    if (!followUser || !dynamicZoom || !isMapAlive()) return
 
     let target = ZOOM_WALK
     if      (remainingDist != null && remainingDist < DEST_ZOOM_M) target = ZOOM_CLOSE
@@ -317,7 +318,7 @@ function NavigationController({
       if (!isMapAlive()) return
       map.setZoom(target, { animate: true })
     }, 300)
-  }, [remainingDist, nextTurnDist, followUser, map, isMapAlive])
+  }, [remainingDist, nextTurnDist, followUser, dynamicZoom, map, isMapAlive])
 
   // ── Fit-bounds after route recalculation ──────────────────────────
   useEffect(() => {
@@ -416,6 +417,8 @@ export default function MapView({
   userAccuracy,
   acquiringGps,
   followUser,
+  /** Priority 1 (Phase 4.2.4): Navigation Settings — Dynamic Zoom toggle */
+  dynamicZoom = true,
   previewTrigger,
   /** Phase 4A: smoothed heading for the user marker arrow */
   userHeading = null,
@@ -558,6 +561,7 @@ export default function MapView({
         heading={mapHeading}
         headingUp={headingUp}
         followUser={followUser}
+        dynamicZoom={dynamicZoom}
         userPosition={
           userPosition
             ? { lat: userPosition[0], lng: userPosition[1] }

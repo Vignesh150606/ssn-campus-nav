@@ -33,8 +33,27 @@ if ('serviceWorker' in navigator) {
   // already loaded but BEFORE the user navigates to Fest Schedule/Admin,
   // every fetch from that point on is answered by the service worker
   // instead of going straight to the network.
+  // Priority 7 (Phase 4.2.3) — Admin login intermittently failing on one
+  // Android Chrome profile (but not friends' phones, incognito, or
+  // desktop) is the textbook signature of a profile stuck several
+  // versions behind on its installed service worker: an "Add to Home
+  // Screen" PWA window is kept alive by Android in the background far
+  // longer than a normal tab, so `clientsClaim`/`skipWaiting` (see
+  // vite.config.js) never get the chance to finish handing control to
+  // the new SW — the page keeps running whatever old SW/cached bundle it
+  // booted with, indefinitely, until something forces a full reload.
+  // Every other environment in the report (friends' phones, incognito,
+  // desktop) simply never accumulated that stale state. The standard,
+  // Workbox-recommended fix: reload exactly once the moment a NEW worker
+  // actually takes control, so a stuck profile self-heals on its next
+  // visit instead of silently running stale code forever. `refreshing`
+  // guards against a reload loop if this fires more than once.
+  let refreshing = false
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     dlog('SW', '⚠ controllerchange fired — a service worker just took control of this page without a reload. New controller:', navigator.serviceWorker.controller)
+    if (refreshing) return
+    refreshing = true
+    window.location.reload()
   })
 }
 

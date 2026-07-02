@@ -66,6 +66,15 @@ const GPS_POSITION_MAX_AGE_MS = 30000
 const RECALC_COOLDOWN_MS = 4000      // Phase 2: 3-5 second cooldown per spec
 const RECALC_MIN_REMAINING_M = 15    // don't bother rerouting if basically already there
 
+// Priority 2 (Phase 4.2.4) — Geolocation's `coords.heading` (course over
+// ground) is only meaningful once you're actually moving; standing still
+// it's frequently null or wildly noisy. ~1.1 m/s is a slow-walk pace —
+// comfortably below normal walking speed (~1.4 m/s) so it engages
+// promptly on setting off, but well above GPS jitter noise while
+// stationary (a stationary phone can show spurious "drift" of a few
+// cm/s between fixes, never sustained above this).
+const GPS_COURSE_MIN_SPEED_MS = 1.1
+
 function isDevModeAvailable() {
   if (import.meta.env.VITE_DEV_MODE === 'true') return true
   if (typeof window !== 'undefined') {
@@ -79,6 +88,13 @@ export function LocationProvider({ children }) {
   // --- Public, pre-existing state (unchanged shape from useUserLocation) ---
   const [position, setPosition]           = useState(null)
   const [accuracy, setAccuracy]            = useState(null)
+  // Priority 2 (Phase 4.2.4) — Geolocation API's own speed/course-over-
+  // ground, previously read from watchPosition() but discarded entirely.
+  // useNavCamera prefers `gpsCourse` over the magnetometer while walking
+  // (far more stable at walking pace than a phone's compass), falling
+  // back to the compass when stationary or course is unavailable.
+  const [speed, setSpeed]                 = useState(null)   // m/s, null = unknown
+  const [gpsCourse, setGpsCourse]         = useState(null)   // degrees 0-360, null = not moving fast enough to trust it
   // Phase 9 (Q7): dynamic arrival radius — max(15m, GPS_accuracy)
   const [arrivalRadius, setArrivalRadius]  = useState(20)
   const [acquiringGps, setAcquiringGps]     = useState(false) // true until first accurate fix
@@ -185,7 +201,7 @@ export function LocationProvider({ children }) {
   // Shared processing pipeline — both real and simulated positions land
   // here. This is identical to the old useUserLocation's onPosition().
   // ---------------------------------------------------------------------
-  const processPosition = useCallback((lat, lng, acc) => {
+  const processPosition = useCallback((lat, lng, acc, speedMS = null, courseDeg = null) => {
     const accuracyM = acc ?? null
     const now = Date.now()
 
@@ -236,6 +252,17 @@ export function LocationProvider({ children }) {
     setPosition({ lat, lng })
     setAccuracy(accuracyM)
     setAcquiringGps(isAcquiring)
+
+    // Priority 2 — only trust course-over-ground while actually walking;
+    // a valid-looking `heading` at near-zero speed is usually stale/noise
+    // from the last time the device was moving, not a real bearing.
+    setSpeed(speedMS)
+    setGpsCourse(
+      speedMS != null && speedMS > GPS_COURSE_MIN_SPEED_MS &&
+      courseDeg != null && !Number.isNaN(courseDeg)
+        ? courseDeg
+        : null
+    )
 
     if (!routeRef.current?.length) return
 
@@ -311,7 +338,7 @@ export function LocationProvider({ children }) {
     bestAccuracyRef.current   = null      // reset best-accuracy tracking
     lastPositionAtRef.current = null
     watchId.current = navigator.geolocation.watchPosition(
-      (pos) => processPosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
+      (pos) => processPosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.speed, pos.coords.heading),
       (err) => { setError(`GPS: ${err.message}`); setTracking(false) },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
     )
@@ -519,6 +546,9 @@ export function LocationProvider({ children }) {
     remainingPath, remainingDist, liveEta,
     guidance, offRoute,
     start, stop, setRoute, clearRoute,
+    // Priority 2 (Phase 4.2.4) — GPS course-over-ground + speed for the
+    // heading-fusion hook (useNavCamera)
+    speed, gpsCourse,
 
     // Feature 1 — automatic recalculation
     fullPath, fullDistance, fullEta,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { API_BASE } from '../api'
 import { CATEGORY_META, FEST_META, LOCATION_NAME_OVERRIDES, displayLocationName } from '../constants'
 import { dlog, dwarn } from '../utils/debugLog'
@@ -129,8 +129,8 @@ const selectStyle = {
 const TOKEN_STORAGE_KEY = 'ssn_admin_token_v1'
 
 export default function AdminDashboard() {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
+  const usernameRef = useRef(null)
+  const passwordRef = useRef(null)
   const [token, setToken]     = useState(() => sessionStorage.getItem(TOKEN_STORAGE_KEY) || '')
   const [authed, setAuthed]   = useState(false)
   // Phase 4A.1 — true while we're verifying a stored token on mount, so the
@@ -201,8 +201,14 @@ export default function AdminDashboard() {
   }, [])
 
   async function login() {
+    // Priority 5 — read the live DOM value via ref, not React state. See the
+    // note above the refs: this is what actually fixes the profile-specific
+    // autofill failure (state can be stale/blank even when the field is
+    // visibly filled).
+    const usernameVal = usernameRef.current?.value.trim() ?? ''
+    const passwordVal = passwordRef.current?.value ?? ''
     try {
-      const data = await adminFetch('/api/admin/login', 'POST', { username, password })
+      const data = await adminFetch('/api/admin/login', 'POST', { username: usernameVal, password: passwordVal })
       sessionStorage.setItem(TOKEN_STORAGE_KEY, data.access_token)
       setToken(data.access_token)
       const events = await adminFetch('/api/admin/events', 'GET', null, data.access_token)
@@ -214,6 +220,33 @@ export default function AdminDashboard() {
   function logout() {
     sessionStorage.removeItem(TOKEN_STORAGE_KEY)
     setToken(''); setAuthed(false)
+  }
+
+  // Priority 7 (Phase 4.2.3) — manual escape hatch for the "admin login
+  // fails only on this one Android Chrome profile" report. main.jsx's
+  // controllerchange listener now force-reloads once a *new* service
+  // worker takes over, but that only helps once Chrome has actually
+  // finished installing/activating the new one — a profile that's badly
+  // stuck (e.g. an installed PWA window Android never lets fully close)
+  // may need a harder nudge. This clears every layer called out in the
+  // investigation checklist — Service Worker registrations, the Cache
+  // Storage entries Workbox created, and this tab's own token/session
+  // state — then reloads straight from the network.
+  async function hardResetAndRetry() {
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(regs.map(r => r.unregister()))
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys()
+        await Promise.all(keys.map(k => caches.delete(k)))
+      }
+    } catch {
+      // best-effort — fall through to reload regardless
+    }
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY)
+    window.location.reload()
   }
 
   async function reload() {
@@ -299,16 +332,22 @@ export default function AdminDashboard() {
     <div className="admin-fullpage">
       <div style={{fontFamily:'var(--font-display)',fontSize:'1.3rem',fontWeight:700}}>Admin Login</div>
       {/* Task 3 — dark mode safe input */}
-      <input type="text" placeholder="Username" value={username} autoComplete="username"
-        onChange={e=>setUsername(e.target.value)} onKeyDown={e=>e.key==='Enter'&&login()}
+      <input type="text" placeholder="Username" defaultValue="" autoComplete="username"
+        ref={usernameRef} onKeyDown={e=>e.key==='Enter'&&login()}
         className="admin-input"
         style={{...inputStyle, width:260}} />
-      <input type="password" placeholder="Password" value={password} autoComplete="current-password"
-        onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&login()}
+      <input type="password" placeholder="Password" defaultValue="" autoComplete="current-password"
+        ref={passwordRef} onKeyDown={e=>e.key==='Enter'&&login()}
         className="admin-input"
         style={{...inputStyle, width:260}} />
       <button onClick={login} style={{background:'var(--brand)',color:'#fff',padding:'10px 28px',borderRadius:999,fontFamily:'var(--font-display)',fontWeight:700,fontSize:'0.9rem'}}>Sign in</button>
       {error && <div style={{color:'#D7263D',fontSize:'0.85rem'}}>{error}</div>}
+      {/* Priority 7 — recovery path for a profile stuck on a stale
+          service worker / cached bundle (see hardResetAndRetry above). */}
+      <button onClick={hardResetAndRetry}
+        style={{background:'transparent',border:'none',color:'var(--muted)',fontSize:'0.78rem',textDecoration:'underline',cursor:'pointer',marginTop:2}}>
+        Trouble logging in? Clear cached data &amp; retry
+      </button>
     </div>
   )}
 
