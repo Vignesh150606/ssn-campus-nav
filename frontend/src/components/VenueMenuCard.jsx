@@ -27,20 +27,45 @@ function formatUpdatedAt(raw) {
 }
 
 export default function VenueMenuCard({ venueId, venueName }) {
-  const [menu,    setMenu]    = useState(null)   // null=loading, false=not available, obj=loaded
+  const [menu,    setMenu]    = useState(null)   // null=loading, false=not available, 'error'=backend failure, obj=loaded
+  const [errorMsg, setErrorMsg] = useState(null)
   const [open,    setOpen]    = useState(false)  // lightbox
 
   useEffect(() => {
     if (!venueId) return
     let cancelled = false
+    setMenu(null)
+    setErrorMsg(null)
     getVenueMenu(venueId)
       .then((m) => { if (!cancelled) setMenu(m) })
-      .catch(() => { if (!cancelled) setMenu(false) })
+      .catch((err) => {
+        if (cancelled) return
+        if (err.status === 404) {
+          setMenu(false) // genuinely no menu uploaded today — not an error
+        } else {
+          // A real backend/DB failure (e.g. 503) must stay visible, not get
+          // silently disguised as "no menu today" — that's exactly the kind
+          // of masked error this phase's Bug 1 fix is about.
+          setMenu('error')
+          setErrorMsg(err.message || 'Could not load the menu right now.')
+        }
+      })
     return () => { cancelled = true }
   }, [venueId])
 
   // Still loading — show nothing (parent already renders its own skeleton/loading state)
   if (menu === null) return null
+
+  if (menu === 'error') {
+    return (
+      <div className="venue-menu-card">
+        <div className="venue-menu-header">
+          <span className="venue-menu-label">🍽 Today&apos;s Menu</span>
+        </div>
+        <div className="venue-menu-empty venue-menu-error">⚠️ {errorMsg}</div>
+      </div>
+    )
+  }
 
   // Priority 3 fix: a food/dining venue's preview must always surface a menu
   // section — either the real menu or an explicit "no menu" empty state —

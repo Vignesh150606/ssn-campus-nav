@@ -623,8 +623,12 @@ export async function runTurn(message, state, deps) {
             } else {
               base.noMenuToday = true
             }
-          } catch {
-            base.noMenuToday = true   // 404 / no menu today — card still shown, flagged
+          } catch (err) {
+            if (err.status === 404) {
+              base.noMenuToday = true   // genuinely no menu today — card still shown, flagged
+            } else {
+              base.menuError = true     // real backend failure — must not be shown as "no menu"
+            }
           }
           return base
         }))
@@ -633,9 +637,12 @@ export async function runTurn(message, state, deps) {
         // can't be trusted once we actually know whether a menu exists, so
         // build the reply from the fetched data instead of the canned text.
         const withMenu = cards.filter(c => c.menuImageUrl)
+        const withError = cards.filter(c => c.menuError)
         const replyText = withMenu.length
           ? `Here's today's menu at ${withMenu[0].title}.`
-          : `No menu uploaded for today at ${menuLocs.map(l => displayLocationName(l)).join(', ')}.`
+          : withError.length
+            ? `I couldn't load the menu right now — the menu service seems to be having an issue. Try again in a bit.`
+            : `No menu uploaded for today at ${menuLocs.map(l => displayLocationName(l)).join(', ')}.`
         outcome = {
           replyText,
           cards,

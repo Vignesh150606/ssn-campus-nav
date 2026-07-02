@@ -172,18 +172,40 @@ export default function Home() {
     if (navMode) navSheet.snapToTier('collapsed')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navMode])
-  // While the nav sheet is mounted, it is the sole writer of --sheet-h,
-  // updating it every animation frame (drag + snap). The floating controls
-  // that read --sheet-h (copilot-fab-stack, zoom control) have their own
-  // CSS `transition: bottom …` tuned for the OTHER sheets, which update
-  // --sheet-h in sparse discrete jumps rather than every frame. Left on,
-  // that transition would fight our per-frame writes and visibly lag
-  // behind the sheet instead of moving with "the same animation curve" —
-  // so it's disabled for exactly as long as the nav sheet owns the var.
+
+  // Bug 7 — Route Preview Panel: same idea, reused rather than rebuilt.
+  // 'half' and 'full' are pinned to the same peek since this panel only
+  // needs a binary collapsed/expanded state, not three distinct tiers —
+  // that keeps this a plain reuse of useDraggableSheet with zero changes
+  // to the hook itself (Bug 3 says not to rebuild the draggable sheet).
+  const previewSheetPeeks = useMemo(() => ({
+    collapsed: 132,
+    half: Math.round(viewportH * 0.7),
+    full: Math.round(viewportH * 0.7),
+  }), [viewportH])
+  const previewSheet = useDraggableSheet(previewSheetPeeks, 'collapsed')
+  // Every new route preview starts collapsed (peek) so the map — and the
+  // route "Preview Route" just zoomed to — stays the primary focus; the
+  // user can drag it up for landmarks/menu/etc. Never remembers the
+  // previous preview's expanded height.
   useEffect(() => {
-    document.documentElement.classList.toggle('nav-sheet-driving', navMode)
+    if (previewActive) previewSheet.snapToTier('collapsed')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewActive, previewLoc])
+  // While either the nav sheet or the route-preview sheet is mounted, it
+  // is the sole writer of --sheet-h, updating it every animation frame
+  // (drag + snap). The floating controls that read --sheet-h
+  // (copilot-fab-stack, zoom control) have their own CSS `transition:
+  // bottom …` tuned for the OTHER sheets, which update --sheet-h in
+  // sparse discrete jumps rather than every frame. Left on, that
+  // transition would fight our per-frame writes and visibly lag behind
+  // the sheet instead of moving with "the same animation curve" — so
+  // it's disabled for exactly as long as one of these two sheets (which
+  // are mutually exclusive — never both mounted at once) owns the var.
+  useEffect(() => {
+    document.documentElement.classList.toggle('nav-sheet-driving', navMode || previewActive)
     return () => document.documentElement.classList.remove('nav-sheet-driving')
-  }, [navMode])
+  }, [navMode, previewActive])
 
   // Phase 4.2 — Priority 1: floating controls track the REAL rendered
   // height of whichever bottom sheet is currently showing (browse results
@@ -194,8 +216,13 @@ export default function Home() {
   const sheetHeightRef    = useElementHeightVar('--sheet-h')
   const fabStackHeightRef = useElementHeightVar('--fab-stack-h')
 
-  // Phase 4 + 4A: compass heading + premium smoothing
-  const { heading: rawHeading } = useCompassHeading(navMode && tracking)
+  // Phase 4 + 4A: compass heading + premium smoothing.
+  // Bug 6 fix: also gated on `headingUp` — when the user has explicitly
+  // turned Heading-Up off, the device orientation sensor listener detaches
+  // entirely (useCompassHeading's `active` flag), not just its effect on
+  // the map. Re-enabling the toggle reattaches it, same as it already does
+  // when navMode/tracking toggle.
+  const { heading: rawHeading } = useCompassHeading(navMode && tracking && headingUp)
   // Phase 4A: smooth the raw heading → two outputs:
   //   smoothedHeading: fine-grained, used for the user marker arrow
   //   mapHeading:      coarser, used for map rotation to avoid micro-oscillations
@@ -383,6 +410,7 @@ export default function Home() {
 
   function handlePreviewRoute() {
     setPreviewTrigger(t => t + 1)
+    previewSheet.snapToTier('collapsed')
   }
 
   function handleStartNavigation() {
@@ -465,12 +493,13 @@ export default function Home() {
     setCurrentBearing(0)
   }
 
-  // Phase 14: recenter map on user
+  // Phase 14: recenter map on user.
+  // Bug 6 fix: this used to also force headingUp back on, silently
+  // overriding a user who'd deliberately switched to North-Up — Recenter
+  // now only ever moves the camera, never touches the heading preference.
   const handleRecenter = useCallback(() => {
     setFollowUser(true)
     setUserManuallyPanned(false)
-    // Phase 4A: restore heading-up when recentering
-    setHeadingUp(true)
   }, [])
 
   // Phase 14: user manually dragged — disable follow
@@ -481,16 +510,15 @@ export default function Home() {
     }
   }, [navMode])
 
-  // Phase 4A: compass tap handlers
-  const handleNorthUp = useCallback(() => {
-    setHeadingUp(false)
-    setCurrentBearing(0)
-  }, [])
-
-  const handleHeadingUp = useCallback(() => {
-    setHeadingUp(true)
-    setFollowUser(true)
-    setUserManuallyPanned(false)
+  // Bug 6: Heading-Up is now a simple, explicit user toggle — one
+  // handler that flips the preference. Recenter (above) never calls this.
+  const handleToggleHeadingUp = useCallback(() => {
+    setHeadingUp(h => {
+      const next = !h
+      if (next) { setFollowUser(true); setUserManuallyPanned(false) }
+      else { setCurrentBearing(0) }
+      return next
+    })
   }, [])
 
   function handleToggleTracking() {
@@ -626,17 +654,59 @@ export default function Home() {
 
           {/* Bottom sheet */}
           {previewActive ? (
-            <div className="results-sheet preview-mode" ref={sheetHeightRef}>
-              <div className="sheet-handle" />
-              <RoutePreviewPanel
-                destination={previewLoc}
-                routes={previewRoutes}
-                loading={previewLoading}
-                error={previewError}
-                onPreview={handlePreviewRoute}
-                onStart={handleStartNavigation}
-                onCancel={handleCancelPreview}
-              />
+            <div
+              className={`results-sheet preview-mode tier-${previewSheet.tier}${previewSheet.dragging ? ' dragging' : ''}`}
+              ref={previewSheet.sheetRef}
+            >
+              <button
+                className="nav-sheet-grip"
+                onPointerDown={previewSheet.onPointerDown}
+                onClick={() => previewSheet.snapToTier(previewSheet.tier === 'collapsed' ? 'half' : 'collapsed')}
+                aria-label="Drag or tap to resize route preview"
+              >
+                <div className="sheet-handle" />
+              </button>
+
+              {/* Bug 7 — always-visible collapsed row: Destination, ETA,
+                  Distance, and a large Start Navigation button anchored to
+                  the right. Only shown while collapsed — once expanded,
+                  RoutePreviewPanel's own header/stats/actions cover the
+                  same ground, so this doesn't duplicate it. */}
+              {previewSheet.tier === 'collapsed' && (
+                <div className="preview-collapsed-row">
+                  <div className="preview-collapsed-info">
+                    <div className="route-preview-dest" style={{ fontSize:'0.95rem' }}>
+                      {previewLoc ? displayLocationName(previewLoc) : '—'}
+                    </div>
+                    {previewRoutes?.[0] && (
+                      <div className="nav-dist-label" style={{ marginTop: 2 }}>
+                        {previewRoutes[0].etaMinutes} min · {formatDist(previewRoutes[0].distanceM)}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    className="preview-collapsed-start-btn"
+                    onClick={handleStartNavigation}
+                    disabled={!previewRoutes?.[0] || previewLoading}
+                  >
+                    Start Navigation
+                  </button>
+                </div>
+              )}
+
+              {(previewSheet.tier === 'half' || previewSheet.tier === 'full') && (
+                <div className="nav-sheet-scroll">
+                  <RoutePreviewPanel
+                    destination={previewLoc}
+                    routes={previewRoutes}
+                    loading={previewLoading}
+                    error={previewError}
+                    onPreview={handlePreviewRoute}
+                    onStart={handleStartNavigation}
+                    onCancel={handleCancelPreview}
+                  />
+                </div>
+              )}
             </div>
           ) : (
             <div className={`results-sheet ${sheetEmpty ? 'empty' : ''}`} ref={sheetHeightRef}>
@@ -706,12 +776,13 @@ export default function Home() {
             ✕ Exit
           </button>
 
-          {/* Phase 4A — Navigation compass (shows when map is rotated away from North) */}
+          {/* Bug 6 — Heading-Up toggle. Always visible during navigation
+              (previously hid itself in North-Up mode, which was a dead
+              end with no way back except Recenter's old side effect). */}
           <NavCompass
             mapHeading={currentBearing}
             headingUp={headingUp}
-            onNorthUp={handleNorthUp}
-            onHeadingUp={handleHeadingUp}
+            onToggle={handleToggleHeadingUp}
           />
 
           {/* Phase 6 — Prominent off-route / recalculating banner */}

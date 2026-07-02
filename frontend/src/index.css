@@ -350,7 +350,45 @@ input, select, textarea { font-family: inherit; color: inherit; }
   animation: sheet-up 0.4s cubic-bezier(0.32, 0.72, 0, 1);
 }
 .results-sheet.empty { height: 0; padding: 0; border: none; box-shadow: none; }
-.results-sheet.preview-mode { height: auto; max-height: 75%; }
+/* Bug 7 — same fixed-height + transform technique as .nav-bottom-sheet:
+   height is fixed (matches previewSheetPeeks' max in Home.jsx, 70vh) so
+   useDraggableSheet only ever translates it, never resizes it (no layout
+   reflow while dragging). Replaces the old content-sized `height: auto;
+   max-height: 75%` which had no collapsed state at all. */
+.results-sheet.preview-mode {
+  height: 70vh;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+  transform: translate3d(0, calc(70vh - 132px), 0);
+}
+.results-sheet.preview-mode.dragging .nav-sheet-scroll { pointer-events: none; }
+
+.preview-collapsed-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 18px 16px;
+  flex-shrink: 0;
+}
+.preview-collapsed-info { min-width: 0; flex: 1; }
+.preview-collapsed-start-btn {
+  flex-shrink: 0;
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: 16px;
+  padding: 14px 22px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  box-shadow: 0 4px 16px rgba(37,99,235,0.35);
+  cursor: pointer;
+}
+.preview-collapsed-start-btn:active { transform: scale(0.97); }
+.preview-collapsed-start-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .sheet-handle {
   width: 38px; height: 5px;
@@ -1898,7 +1936,10 @@ input, select, textarea { font-family: inherit; color: inherit; }
 /* ── GPS status pill in nav mode ── */
 .nav-gps-pill {
   position: fixed;
-  top: calc(var(--header-h) + 102px);
+  /* Bug 3 fix: clamped against the live sheet height, same technique as
+     .nav-compass, so it's pushed up rather than overlapped when the
+     draggable sheet reaches Fully Expanded. */
+  top: min(calc(var(--header-h) + 102px), calc(100vh - var(--sheet-h, 0px) - 60px));
   left: 12px;
   background: rgba(0,0,0,0.55);
   color: #fff;
@@ -3581,6 +3622,10 @@ select:-webkit-autofill {
   transform: scale(0.92);
   box-shadow: var(--shadow-sm);
 }
+.nav-compass.off {
+  background: var(--surface);
+  opacity: 0.75;
+}
 .nav-compass-n {
   font-family: var(--font-display);
   font-size: 0.62rem;
@@ -3588,6 +3633,9 @@ select:-webkit-autofill {
   letter-spacing: 0.06em;
   color: #E53E3E;
   line-height: 1;
+}
+.nav-compass.off .nav-compass-n {
+  color: #94A3B8;
 }
 
 /* ── Recenter button — Phase 4.2: now a flex child of .copilot-fab-stack
@@ -3823,6 +3871,9 @@ select:-webkit-autofill {
   padding: 12px;
   font-size: 0.8rem;
   color: var(--muted);
+}
+.venue-menu-error {
+  color: var(--danger, #dc2626);
 }
 
 /* ── Shared lightbox (VenueMenuCard + PosterManager) ────────────────────── */
@@ -4137,4 +4188,7 @@ select:-webkit-autofill {
   font-size: 0.78rem;
   color: var(--muted);
   margin-top: 2px;
+}
+.copilot-card-menu-error {
+  color: var(--danger, #dc2626);
 }

@@ -28,6 +28,7 @@ issued by POST /api/admin/login). Every /api/admin/* route now requires
 
 import os
 import math
+import logging
 from typing import List, Optional
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
@@ -40,6 +41,9 @@ import data_access
 from auth import authenticate_admin, create_access_token, get_current_admin
 from db import SupabaseUnavailableError
 from utils.qr_generator import generate_event_qr
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("ssn-campus-nav")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -63,10 +67,23 @@ app.add_middleware(
 
 @app.exception_handler(SupabaseUnavailableError)
 def _supabase_unavailable_handler(request: Request, exc: SupabaseUnavailableError):
-    """Database/storage unreachable — a clean 503 instead of a raw 500."""
+    """Database/storage unreachable OR a genuine query/table/bucket error —
+    data_access._wrap() turns *any* exception from a Supabase call into
+    this one type, so "Service Unavailable" was previously shown for
+    everything from a real outage to a missing table/column, a bad query,
+    or an unconfigured Storage bucket, with the real cause thrown away.
+    That real cause (str(exc), set by _wrap) is exactly what's needed to
+    tell those apart, so: always log it server-side, and include it in the
+    response too — same as every other endpoint in this file already does
+    with str(e) (see e.g. the admin image/menu routes below). A 503 is
+    still the right status code (something the backend depends on isn't
+    answering correctly right now), it just no longer hides why.
+    """
+    detail = str(exc) or "unknown error"
+    logger.error("Supabase call failed on %s %s: %s", request.method, request.url.path, detail)
     return JSONResponse(
         status_code=503,
-        content={"detail": "Service temporarily unavailable (database connection issue). Please try again shortly."},
+        content={"detail": f"Service temporarily unavailable: {detail}"},
     )
 
 

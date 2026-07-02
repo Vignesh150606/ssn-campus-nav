@@ -28,7 +28,11 @@ async function apiFetch(path, options = {}, token) {
 async function getVenueMenuPublic(venueId, date) {
   const q = date ? `?date=${encodeURIComponent(date)}` : ''
   const res = await fetch(`${API_BASE}/api/locations/${encodeURIComponent(venueId)}/menu${q}`)
-  if (!res.ok) return null
+  if (res.status === 404) return null // genuinely no menu for this date yet
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Request failed: ${res.status}`)
+  }
   return res.json()
 }
 
@@ -71,7 +75,7 @@ export default function VenueMenuAdmin({ venues, token }) {
     setError(null)
     getVenueMenuPublic(selectedVenueId, selectedDate)
       .then(m => { setMenu(m); setDescription(m?.description || '') })
-      .catch(() => { setMenu(null) })
+      .catch((e) => { setMenu(null); setError(e.message) })
   }
 
   useEffect(() => { reload() }, [selectedVenueId, selectedDate])

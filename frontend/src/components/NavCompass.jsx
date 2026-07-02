@@ -1,47 +1,34 @@
 /**
- * NavCompass — Navigation-mode compass rose.
+ * NavCompass — Bug 6: explicit, user-controlled Heading-Up toggle.
  *
- * Appears automatically when the map is in heading-up mode (rotated away from North).
- * Renders a proper compass needle that shows where North is relative to the screen.
+ * Previously this hid itself the instant the map was North-Up (or
+ * headingUp was off), which was a dead end — there was no other control
+ * to get back to Heading-Up, so Recenter had grown a side effect of
+ * silently re-enabling it. Now it's a simple, always-visible toggle
+ * during navigation:
  *
- * Single tap  → snap map back to North-Up  (rotation resets)
- * Double-tap  → return to Heading-Up       (rotation resumes)
+ *   ON  (headingUp=true)  → rotating needle showing where North actually
+ *                           is relative to the (rotated) screen; map
+ *                           rotates with the user's direction of travel.
+ *   OFF (headingUp=false) → static, non-rotating "N" — map stays
+ *                           North-Up, no heading rotation applied.
  *
- * Hidden when map heading ≈ 0 (already North-Up) to avoid a redundant button.
+ * One tap always flips the preference. Recenter (Home.jsx) never touches
+ * this — camera position and heading preference are fully independent.
  */
-import { useRef } from 'react'
-
-const DOUBLE_TAP_MS = 380
-
-export default function NavCompass({ mapHeading, headingUp, onNorthUp, onHeadingUp }) {
-  const lastTapRef = useRef(0)
-
-  // Only show when map is meaningfully rotated away from North
-  if (!headingUp || mapHeading == null) return null
-  const normalised = ((mapHeading % 360) + 360) % 360
-  if (normalised < 5 || normalised > 355) return null
-
-  function handleTap() {
-    const now = Date.now()
-    if (now - lastTapRef.current < DOUBLE_TAP_MS) {
-      onHeadingUp?.()   // double-tap: resume heading-up
-    } else {
-      onNorthUp?.()     // single tap: north-up
-    }
-    lastTapRef.current = now
-  }
-
-  // The compass needle should point toward geographic North.
-  // If the map has been rotated by `mapHeading` degrees (heading-up),
-  // North is now at -mapHeading degrees from "up" on screen.
-  const northAngle = -normalised
+export default function NavCompass({ mapHeading, headingUp, onToggle }) {
+  // Needle angle only means something while heading-up is actually
+  // rotating the map; pinned to 0 (pointing straight up) otherwise.
+  const normalised = mapHeading == null ? 0 : ((mapHeading % 360) + 360) % 360
+  const northAngle = headingUp ? -normalised : 0
 
   return (
     <button
-      className="nav-compass"
-      onClick={handleTap}
-      aria-label="Tap for North-Up. Double-tap to resume Heading-Up."
-      title="Tap: North-Up  ·  Double-tap: Heading-Up"
+      className={`nav-compass${headingUp ? '' : ' off'}`}
+      onClick={onToggle}
+      aria-label={headingUp ? 'Heading-Up is on — tap for North-Up' : 'North-Up is on — tap for Heading-Up'}
+      aria-pressed={headingUp}
+      title={headingUp ? 'Heading-Up (tap for North-Up)' : 'North-Up (tap for Heading-Up)'}
     >
       <svg
         width="30"
@@ -54,12 +41,12 @@ export default function NavCompass({ mapHeading, headingUp, onNorthUp, onHeading
           display: 'block',
         }}
       >
-        {/* North half — red */}
-        <path d="M15 3 L12 15 L15 13 L18 15 Z" fill="#E53E3E" />
-        {/* South half — light grey */}
+        {/* North half — red when active, muted when North-Up/off */}
+        <path d="M15 3 L12 15 L15 13 L18 15 Z" fill={headingUp ? '#E53E3E' : '#94A3B8'} />
+        {/* South half */}
         <path d="M15 27 L12 15 L15 17 L18 15 Z" fill="#CBD5E0" />
         {/* Centre pivot */}
-        <circle cx="15" cy="15" r="2.5" fill="white" stroke="#E53E3E" strokeWidth="1.5" />
+        <circle cx="15" cy="15" r="2.5" fill="white" stroke={headingUp ? '#E53E3E' : '#94A3B8'} strokeWidth="1.5" />
       </svg>
       <span className="nav-compass-n">N</span>
     </button>

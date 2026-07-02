@@ -13,7 +13,9 @@ async function getJSON(path) {
   const res = await fetch(`${API_BASE}${path}`)
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}))
-    throw new Error(detail.detail || `Request failed: ${res.status}`)
+    const err = new Error(detail.detail || `Request failed: ${res.status}`)
+    err.status = res.status
+    throw err
   }
   return res.json()
 }

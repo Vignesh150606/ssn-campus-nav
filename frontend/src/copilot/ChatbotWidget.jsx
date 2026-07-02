@@ -93,6 +93,9 @@ function ChatCard({ card, onPreview, onStart, onDetails }) {
         {card.noMenuToday && (
           <div className="copilot-card-menu-empty">No menu uploaded for today.</div>
         )}
+        {card.menuError && (
+          <div className="copilot-card-menu-empty copilot-card-menu-error">⚠️ Menu couldn't be loaded right now.</div>
+        )}
         {card.eta != null && (
           <div className="copilot-card-eta">🚶 {card.eta <= 1 ? '~1 min walk' : `~${card.eta} min walk`}</div>
         )}
