@@ -1,0 +1,176 @@
+/**
+ * useDraggableSheet — Phase 4.2.2: draggable 3-snap-point bottom sheet.
+ *
+ * Presentation layer ONLY. This hook never reads or writes navigation,
+ * GPS, tracking, or routing state — it only positions a DOM node.
+ *
+ * Every frame (drag or animated snap) writes exactly two things, both via
+ * direct DOM mutation instead of React state, so dragging never triggers a
+ * re-render:
+ *   1. `transform: translate3d(0, y, 0)` on the sheet — compositor-only,
+ *      no layout reflow, so 60fps holds even on mid-range phones.
+ *   2. the `--sheet-h` CSS custom property on <html> — the SAME variable
+ *      `useElementHeightVar` already writes for the other (non-draggable)
+ *      sheets, so the existing floating-control CSS
+ *      (`bottom: calc(var(--sheet-h) + gap)`) tracks this sheet with zero
+ *      changes and the identical animation curve, satisfying "floating
+ *      controls follow the same animation curve as the sheet" for free.
+ *
+ * React state (`tier`) only updates once a drag/animation settles, so
+ * conditional content (which of the 3 tiers' markup is mounted) doesn't
+ * thrash mid-gesture.
+ */
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+const EASE_OUT_CUBIC = t => 1 - Math.pow(1 - t, 3)
+const SNAP_ANIM_MS = 280
+const DRAG_ACTIVATE_PX = 4        // ignore sub-pixel jitter before committing to a drag
+const VELOCITY_FLING_PX_MS = 0.5  // fast flick threshold
+
+export function useDraggableSheet(snapPeeks, initialTier = 'collapsed') {
+  const sheetRef      = useRef(null)
+  const rafRef         = useRef(null)
+  const peekRef        = useRef(snapPeeks[initialTier])
+  const dragRef        = useRef(null)   // { startY, startPeek, lastY, lastT, v, active }
+  const tiersRef       = useRef(snapPeeks)
+  const listenersRef   = useRef(null)   // { move, up } while a drag is in progress
+
+  // Keep the ref in sync with the latest peeks without touching it during
+  // render (refs must only be read/written in effects or event handlers).
+  useEffect(() => { tiersRef.current = snapPeeks }, [snapPeeks])
+
+  const [tier, setTier]         = useState(initialTier)
+  const [dragging, setDragging] = useState(false)
+
+  const maxH = Math.max(snapPeeks.collapsed, snapPeeks.half, snapPeeks.full)
+
+  const applyPeek = useCallback((peek) => {
+    peekRef.current = peek
+    const node = sheetRef.current
+    if (node) node.style.transform = `translate3d(0, ${Math.round(maxH - peek)}px, 0)`
+    document.documentElement.style.setProperty('--sheet-h', `${Math.round(Math.max(0, peek))}px`)
+  }, [maxH])
+
+  const animateTo = useCallback((targetPeek, targetTier) => {
+    cancelAnimationFrame(rafRef.current)
+    const from = peekRef.current
+    const delta = targetPeek - from
+    if (Math.abs(delta) < 0.5) {
+      applyPeek(targetPeek)
+      setTier(targetTier)
+      return
+    }
+    const start = performance.now()
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / SNAP_ANIM_MS)
+      applyPeek(from + delta * EASE_OUT_CUBIC(t))
+      if (t < 1) {
+        rafRef.current = requestAnimationFrame(tick)
+      } else {
+        setTier(targetTier)
+      }
+    }
+    rafRef.current = requestAnimationFrame(tick)
+  }, [applyPeek])
+
+  const snapToTier = useCallback((t) => {
+    animateTo(tiersRef.current[t], t)
+  }, [animateTo])
+
+  // Keep the sheet pinned at its committed tier when the viewport resizes
+  // (e.g. mobile keyboard, orientation change) or the tier changes
+  // programmatically (grip tap).
+  useEffect(() => {
+    applyPeek(snapPeeks[tier])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapPeeks.collapsed, snapPeeks.half, snapPeeks.full, tier])
+
+  const nearestTier = useCallback((peek, velocity) => {
+    const peeks = tiersRef.current
+    const order = ['collapsed', 'half', 'full']
+    // A fast flick commits to the next tier in the flick direction even if
+    // the drag hasn't crossed the midpoint yet — feels far more natural
+    // than pure nearest-distance snapping.
+    if (Math.abs(velocity) > VELOCITY_FLING_PX_MS) {
+      const dir = velocity < 0 ? 1 : -1 // moving up (negative dy) → expand
+      const idx = order.reduce((best, t, i) =>
+        Math.abs(peeks[t] - peek) < Math.abs(peeks[order[best]] - peek) ? i : best, 0)
+      return order[Math.min(order.length - 1, Math.max(0, idx + dir))]
+    }
+    return order.reduce((best, t) =>
+      Math.abs(peeks[t] - peek) < Math.abs(peeks[best] - peek) ? t : best, order[0])
+  }, [])
+
+  // Removes whatever move/up listeners the most recent drag registered.
+  // Reads them from a ref instead of referencing a handler by name, so
+  // there's no circular "function removes its own listener" closure.
+  const stopDragListening = useCallback(() => {
+    const l = listenersRef.current
+    if (!l) return
+    window.removeEventListener('pointermove', l.move)
+    window.removeEventListener('pointerup', l.up)
+    window.removeEventListener('pointercancel', l.up)
+    listenersRef.current = null
+  }, [])
+
+  const onPointerDown = useCallback((e) => {
+    // Only the primary mouse button / a real touch/pen point starts a drag.
+    if (e.button != null && e.button !== 0) return
+    cancelAnimationFrame(rafRef.current)
+    stopDragListening() // clear any prior drag's listeners first (e.g. multi-touch) — never stack duplicates
+    dragRef.current = {
+      startY: e.clientY, startPeek: peekRef.current,
+      lastY: e.clientY, lastT: performance.now(), v: 0, active: false,
+    }
+    setDragging(true)
+
+    const move = (ev) => {
+      const d = dragRef.current
+      if (!d) return
+      const y = ev.clientY
+      const now = performance.now()
+      if (now > d.lastT) d.v = (y - d.lastY) / (now - d.lastT)
+      d.lastY = y; d.lastT = now
+      const dy = d.startY - y   // dragging up = positive = more peek
+      if (!d.active && Math.abs(dy) > DRAG_ACTIVATE_PX) d.active = true
+      if (!d.active) return
+      const peeks = tiersRef.current
+      const lo = Math.min(peeks.collapsed, peeks.half, peeks.full)
+      const hi = Math.max(peeks.collapsed, peeks.half, peeks.full)
+      // Small rubber-band past the ends instead of a hard stop.
+      let next = d.startPeek + dy
+      if (next < lo) next = lo - (lo - next) * 0.35
+      if (next > hi) next = hi + (next - hi) * 0.35
+      applyPeek(next)
+    }
+
+    const up = () => {
+      const d = dragRef.current
+      dragRef.current = null
+      setDragging(false)
+      stopDragListening()
+      if (!d || !d.active) return // was a tap, not a drag — click handler on the grip handles it
+      const target = nearestTier(peekRef.current, d.v || 0)
+      snapToTier(target)
+    }
+
+    listenersRef.current = { move, up }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+  }, [applyPeek, nearestTier, snapToTier, stopDragListening])
+
+  const cycleTier = useCallback(() => {
+    const order = ['collapsed', 'half', 'full']
+    const next = order[(order.indexOf(tier) + 1) % order.length]
+    snapToTier(next)
+  }, [tier, snapToTier])
+
+  useEffect(() => () => {
+    cancelAnimationFrame(rafRef.current)
+    stopDragListening()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return { sheetRef, tier, dragging, snapToTier, cycleTier, onPointerDown }
+}

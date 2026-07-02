@@ -142,7 +142,7 @@ export default function PosterManager({ eventId, token, onUpdated }) {
           </div>
         ) : (
           <div className="poster-mgr-empty">
-            <span>No poster uploaded yet.</span>
+            <span>No posters uploaded yet.</span>
             <button className="poster-mgr-btn upload" onClick={() => handleUpload(true, false)} disabled={loading}>
               📷 Upload Poster
             </button>

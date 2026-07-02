@@ -137,3 +137,33 @@ export function pointAtDistanceAlongPath(path, distanceM) {
   const last = path[path.length - 1]
   return { lat: last.lat, lng: last.lng }
 }
+
+/**
+ * Presentation-only helper for the "Fully Expanded" nav sheet tier — lists
+ * every meaningful turn along the REMAINING route, not just the next one.
+ * Same bearing-diff detection as computeUpcomingTurn, just without the
+ * 300m lookahead cutoff / early return. Does not feed voice guidance, the
+ * GPS off-route check, or routing in any way — it's a read-only summary of
+ * the path array already computed by the router.
+ */
+export function computeAllTurns(path) {
+  if (!path || path.length < 3) return []
+  const turns = []
+  let cumulative = 0
+  for (let i = 1; i < path.length - 1; i++) {
+    cumulative += haversine(path[i - 1].lat, path[i - 1].lng, path[i].lat, path[i].lng)
+    const bearingIn  = bearing(path[i - 1].lat, path[i - 1].lng, path[i].lat, path[i].lng)
+    const bearingOut = bearing(path[i].lat, path[i].lng, path[i + 1].lat, path[i + 1].lng)
+    const diff    = angleDiff(bearingIn, bearingOut)
+    const absDiff = Math.abs(diff)
+    if (absDiff >= STRAIGHT_THRESHOLD_DEG) {
+      const isRight = diff > 0
+      let direction
+      if (absDiff >= UTURN_THRESHOLD_DEG) direction = 'u-turn'
+      else if (absDiff >= SLIGHT_THRESHOLD_DEG) direction = isRight ? 'right' : 'left'
+      else direction = isRight ? 'slight right' : 'slight left'
+      turns.push({ distanceM: Math.round(cumulative), direction, turnIndex: i, lat: path[i].lat, lng: path[i].lng })
+    }
+  }
+  return turns
+}

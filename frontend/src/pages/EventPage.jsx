@@ -13,7 +13,7 @@ import { getEvent, getRoute, getRouteFromCoords, eventQrUrl } from '../api'
 import { useLocationContext } from '../context/LocationContext'
 import { useVoiceGuidance } from '../hooks/useVoiceGuidance'
 import { haversine } from '../utils/geo'
-import { FEST_META } from '../constants'
+import { FEST_META, displayLocationName } from '../constants'
 
 const ENTRY_ID = 'main-gate'
 
@@ -166,7 +166,7 @@ export default function EventPage() {
       room:     event.room_number  || null,
       floor:    event.floor        || null,
       wing:     event.wing         || null,
-      building: event.building     || event.location?.name || null,
+      building: event.building     || (event.location ? displayLocationName(event.location) : null),
       name:     event.name,
     }
     navigate('/', { state: { eventInfo } })
@@ -324,7 +324,7 @@ export default function EventPage() {
           <div className="event-location-row">
             <span className="event-location-icon">📍</span>
             <div>
-              <div className="event-location-name">{event.location?.name || event.location_id}</div>
+              <div className="event-location-name">{displayLocationName(event.location || event.location_id)}</div>
               {distToVenue != null && (
                 <div className="event-location-dist">{fmt(distToVenue)} from your location</div>
               )}
@@ -464,7 +464,7 @@ export default function EventPage() {
                   <span className="nearby-event-tag" style={{ background: f.color }}>{f.label}</span>
                   <div className="nearby-event-info">
                     <div className="nearby-event-name">{ev.name}</div>
-                    <div className="nearby-event-meta">{ev.location?.name} · {ev.start_time}–{ev.end_time}</div>
+                    <div className="nearby-event-meta">{displayLocationName(ev.location)} · {ev.start_time}–{ev.end_time}</div>
                   </div>
                   <span className="nearby-event-arrow">›</span>
                 </Link>

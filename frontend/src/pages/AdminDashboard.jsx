@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { API_BASE } from '../api'
-import { CATEGORY_META, FEST_META } from '../constants'
+import { CATEGORY_META, FEST_META, LOCATION_NAME_OVERRIDES, displayLocationName } from '../constants'
 import { dlog, dwarn } from '../utils/debugLog'
 import PosterManager from '../components/PosterManager'
 import VenueMenuAdmin from '../components/VenueMenuAdmin'
@@ -79,17 +79,19 @@ const LOCATION_DISPLAY_NAMES = {
   'food-snowcube':      'Snow Cube',
   'food-metro':         'Metro',
   'food-pr':            'PR (Food Court)',
-  'food-aswins':        "Aswin's",
   'sports-complex':     'Sports Complex',
   'boys-hostel-gate':   'Boys Hostel Gate',
   'boys-hostel-office': 'Boys Hostel Office',
   'girls-hostel':       'Girls Hostel',
   'medical-center':     'Medical Center',
-  'clock-tower':        'Clock Tower',
   'cdc-block':          'CDC Block',
   'ssn-fountain':       'SSN Fountain',
   'snu-academic':       'SNU Academic Block',
   'main-canteen':       'Main Canteen',
+  // Priority 4 — these three always come from the single shared map in
+  // constants.js so this list can't silently drift out of sync with the
+  // rest of the app (Fest Schedule, Copilot, Search, Map, Food Menu, etc).
+  ...LOCATION_NAME_OVERRIDES,
 }
 
 const BLANK_FORM = {

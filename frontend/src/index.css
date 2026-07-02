@@ -1946,23 +1946,33 @@ input, select, textarea { font-family: inherit; color: inherit; }
    unit. Visual styling only lives here; layout styling moved up to the
    PHASE 4A section is removed — search PHASE 4A for the up-to-date rule. ── */
 
-/* ── Phase 5: Navigation bottom sheet ── */
+/* ── Phase 4.2.2: Draggable 3-snap-point navigation bottom sheet ──
+   Height is a FIXED 86vh (== the 'full' snap point, the tallest of the
+   three) so JS never resizes the box — it only translates it via
+   transform, which is compositor-only (no layout reflow) so dragging and
+   the snap animation stay smooth regardless of how much content is
+   currently mounted inside. useDraggableSheet owns the transform + the
+   --sheet-h custom property; this stylesheet just lays out the content
+   and gives every state (idle / dragging / each tier) its look. The
+   inline transform below is only a same-paint-frame fallback so there's
+   no flash of the wrong position before the hook's mount effect runs. */
 .nav-bottom-sheet {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
+  height: 86vh;
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
   border-radius: 22px 22px 0 0;
   box-shadow: 0 -4px 30px rgba(0,0,0,0.15);
   z-index: 750;
   overflow: hidden;
-  transition: max-height 0.3s cubic-bezier(0.4,0,0.2,1);
-  max-height: 90px;
+  will-change: transform;
+  transform: translate3d(0, calc(86vh - 128px), 0);
 }
-.nav-bottom-sheet.expanded {
-  max-height: 320px;
-}
+.nav-bottom-sheet.dragging { box-shadow: 0 -8px 40px rgba(0,0,0,0.22); }
 
 .nav-sheet-grip {
   display: flex;
@@ -1971,15 +1981,33 @@ input, select, textarea { font-family: inherit; color: inherit; }
   background: none;
   border: none;
   width: 100%;
-  cursor: pointer;
-  touch-action: manipulation;
+  flex-shrink: 0;
+  cursor: grab;
+  touch-action: none;     /* the grip owns the vertical drag gesture entirely */
 }
+.nav-bottom-sheet.dragging .nav-sheet-grip { cursor: grabbing; }
 
 .nav-bottom-row-collapsed {
   display: flex;
   align-items: center;
   gap: 0;
   padding: 0 20px 14px;
+  flex-shrink: 0;
+}
+
+.nav-sheet-turn-compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.nav-sheet-turn-icon { font-size: 1.4rem; line-height: 1; flex-shrink: 0; }
+.nav-turn-compact-label {
+  font-size: 0.92rem !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 30vw;
 }
 
 .nav-dist-big {
@@ -2013,10 +2041,72 @@ input, select, textarea { font-family: inherit; color: inherit; }
   flex-shrink: 0;
 }
 
+/* Half + Full tier content — scrolls internally so it never fights the
+   sheet's own drag gesture (the drag handle is the grip only). */
+.nav-sheet-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+.nav-bottom-sheet.dragging .nav-sheet-scroll { pointer-events: none; }
+
+/* ── Phase 4.2.2 — Priority 2: floating controls "physically attached"
+   to the draggable sheet. useDraggableSheet already writes --sheet-h on
+   every single animation frame (both mid-drag and during the snap-settle
+   animation), so it is already a smooth, live, per-frame value — any CSS
+   `transition` on a property reading it just makes that control chase a
+   constantly-moving target and visibly lag behind the sheet. Those
+   transitions exist for the OTHER sheets (results/route-preview), whose
+   --sheet-h comes from a ResizeObserver firing in sparse discrete jumps,
+   where a transition is exactly what smooths things out. So: while the
+   nav sheet is driving (`html.nav-sheet-driving`, toggled in Home.jsx for
+   exactly as long as navMode is on), those transitions are switched off
+   for the controls listed as needing 1:1 tracking — Copilot + Recenter
+   (one column, `.copilot-fab-stack`), Zoom Controls, and Exit Navigation —
+   so they move in the exact same frame, with the exact same easing
+   (useDraggableSheet's own EASE_OUT_CUBIC), as the sheet itself. */
+html.nav-sheet-driving .copilot-fab-stack {
+  transition: none;
+}
+html.nav-sheet-driving .leaflet-container .leaflet-top.leaflet-left {
+  transition: none;
+}
+html.nav-sheet-driving .nav-exit-btn {
+  transition: transform 0.15s ease, box-shadow 0.15s ease; /* keep press feedback, drop the bottom lag */
+}
+
 .nav-bottom-expanded-content {
-  padding: 2px 20px 24px;
+  padding: 2px 20px 12px;
   border-top: 1px solid var(--line);
 }
+
+.nav-bottom-full-content {
+  padding: 0 20px 24px;
+}
+
+.nav-sheet-section { margin-top: 18px; }
+.nav-sheet-section-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.nav-turn-list { list-style: none; margin: 0; padding: 0; }
+.nav-turn-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+.nav-turn-list-item:last-child { border-bottom: none; }
+.nav-turn-list-icon { font-size: 1.1rem; flex-shrink: 0; width: 22px; text-align: center; }
+.nav-turn-list-label { flex: 1; font-size: 0.88rem; font-weight: 600; color: var(--ink); }
+.nav-turn-list-dist { font-size: 0.8rem; color: var(--muted); flex-shrink: 0; }
 
 .nav-expanded-row {
   display: flex;
@@ -3461,7 +3551,12 @@ select:-webkit-autofill {
 /* ── Navigation compass (heading-up indicator + north-up toggle) ─────────── */
 .nav-compass {
   position: fixed;
-  top: calc(var(--header-h) + 116px); /* just below the instruction card */
+  /* Priority 2: clamped against the live sheet height so the compass is
+     pushed up (never lower than clear of the sheet's visible top edge)
+     as the draggable sheet expands toward Fully Expanded — recalculated
+     by the browser on every --sheet-h write, same frame as the sheet's
+     own transform, no transition needed for it to "keep up". */
+  top: min(calc(var(--header-h) + 116px), calc(100vh - var(--sheet-h, 0px) - 70px));
   right: 14px;
   z-index: 810;
   width: 46px;
@@ -3540,7 +3635,7 @@ select:-webkit-autofill {
 /* ── Safe-area overrides for nav-compass ───────────────────────────────────── */
 @supports (padding: env(safe-area-inset-top)) {
   .nav-compass {
-    top: calc(var(--header-h) + env(safe-area-inset-top, 0px) + 116px);
+    top: min(calc(var(--header-h) + env(safe-area-inset-top, 0px) + 116px), calc(100vh - var(--sheet-h, 0px) - 70px));
   }
 }
 
@@ -3722,6 +3817,11 @@ select:-webkit-autofill {
 .venue-menu-updated {
   padding: 4px 12px 10px;
   font-size: 0.7rem;
+  color: var(--muted);
+}
+.venue-menu-empty {
+  padding: 12px;
+  font-size: 0.8rem;
   color: var(--muted);
 }
 
@@ -4027,4 +4127,14 @@ select:-webkit-autofill {
   padding: 2px 8px;
   border-radius: 999px;
   backdrop-filter: blur(4px);
+}
+.copilot-card-menu-desc {
+  font-size: 0.78rem;
+  color: var(--ink-2);
+  margin-top: 2px;
+}
+.copilot-card-menu-empty {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 2px;
 }

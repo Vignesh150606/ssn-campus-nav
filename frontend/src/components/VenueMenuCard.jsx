@@ -39,8 +39,23 @@ export default function VenueMenuCard({ venueId, venueName }) {
     return () => { cancelled = true }
   }, [venueId])
 
-  // Not yet loaded or no menu today — show nothing
-  if (menu === null || menu === false) return null
+  // Still loading — show nothing (parent already renders its own skeleton/loading state)
+  if (menu === null) return null
+
+  // Priority 3 fix: a food/dining venue's preview must always surface a menu
+  // section — either the real menu or an explicit "no menu" empty state —
+  // rather than silently rendering nothing, which made the whole menu
+  // section disappear as if it were never built.
+  if (menu === false) {
+    return (
+      <div className="venue-menu-card">
+        <div className="venue-menu-header">
+          <span className="venue-menu-label">🍽 Today&apos;s Menu</span>
+        </div>
+        <div className="venue-menu-empty">No menu uploaded for today.</div>
+      </div>
+    )
+  }
 
   const updatedAt = formatUpdatedAt(menu.updated_at || menu.created_at)
 

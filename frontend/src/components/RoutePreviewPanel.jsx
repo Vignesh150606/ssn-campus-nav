@@ -11,6 +11,7 @@
  */
 import { SkeletonRoutePreview } from './Skeleton'
 import VenueMenuCard from './VenueMenuCard'
+import { displayLocationName } from '../constants'
 
 function formatDistance(m) {
   if (m == null) return '—'
@@ -37,7 +38,7 @@ export default function RoutePreviewPanel({
       <div className="route-preview-header">
         <div style={{ minWidth: 0, flex: 1 }}>
           <div className="route-preview-label">Destination</div>
-          <div className="route-preview-dest">{destination.name}</div>
+          <div className="route-preview-dest">{displayLocationName(destination)}</div>
         </div>
         <button className="route-preview-close" onClick={onCancel} aria-label="Cancel">✕</button>
       </div>
@@ -83,7 +84,7 @@ export default function RoutePreviewPanel({
 
           {/* Phase 4.2 — show today's menu for food/dining venues */}
           {['food', 'dining'].includes(destination?.category) && (
-            <VenueMenuCard venueId={destination.id} venueName={destination.name} />
+            <VenueMenuCard venueId={destination.id} venueName={displayLocationName(destination)} />
           )}
 
           <div className="route-preview-actions">

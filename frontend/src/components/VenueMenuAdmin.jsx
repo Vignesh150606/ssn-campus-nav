@@ -9,6 +9,7 @@
  * authentication token" on every request.
  */
 import { useEffect, useState } from 'react'
+import { displayLocationName } from '../constants'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'
 
@@ -134,7 +135,7 @@ export default function VenueMenuAdmin({ venues, token }) {
             onChange={e => setSelectedVenueId(e.target.value)}
           >
             {foodVenues.map(v => (
-              <option key={v.id} value={v.id}>{v.name}</option>
+              <option key={v.id} value={v.id}>{displayLocationName(v)}</option>
             ))}
           </select>
         </label>

@@ -12,6 +12,7 @@ import { copilotChat } from './copilotApi'
 import { haversine } from '../utils/geo'
 import { nearestWithFacility, nearestCanteen } from '../utils/facilities'
 import { getEvents, getRoute, getRouteFromCoords, getVenueMenu } from '../api'
+import { displayLocationName } from '../constants'
 
 const NEED_LABELS = {
   dining: 'somewhere to eat',
@@ -32,17 +33,30 @@ function etaLabel(meters) {
   return min <= 1 ? '~1 min walk' : `~${min} min walk`
 }
 
+// Priority 4 — the backend intent-classifier (utils/copilot.py) is
+// deliberately "dumb": it builds its canned `reply` string from the venue's
+// raw Supabase name before any of this file's canonical-name logic runs.
+// Rather than teach the backend about display-name overrides too (a second
+// copy of the same map), patch the one substring that can be wrong straight
+// in the reply text, using the same override already applied to `loc`.
+function fixReplyName(reply, loc) {
+  if (!reply || !loc?.name) return reply
+  const canonical = displayLocationName(loc)
+  return canonical !== loc.name ? reply.split(loc.name).join(canonical) : reply
+}
+
 function locationCard(loc, { position, actions = ['preview', 'start'], extraMeta = null } = {}) {
   const dist = position ? haversine(position.lat, position.lng, loc.lat, loc.lng) : null
+  const name = displayLocationName(loc)
   return {
     type: 'location',
     id: loc.id,
-    title: loc.name,
+    title: name,
     subtitle: extraMeta?.subtitleOverride ?? (dist != null ? distanceLabel(dist) : (loc.department || null)),
     distance: dist,
     eta: dist ? Math.round(dist / 1.4 / 60) : null,
     description: loc.description,
-    location: { id: loc.id, name: loc.name, lat: loc.lat, lng: loc.lng },
+    location: { id: loc.id, name, lat: loc.lat, lng: loc.lng },
     meta: extraMeta,
     actions,
   }
@@ -72,7 +86,7 @@ function eventCard(ev, position) {
     type: 'event',
     id: ev.id,
     title: ev.name,
-    subtitle: `${timeLabel(ev)} · ${ev.location?.name || ev.location_id}${dist ? ` · ${distanceLabel(dist)}` : ''}`,
+    subtitle: `${timeLabel(ev)} · ${displayLocationName(ev.location || ev.location_id)}${dist ? ` · ${distanceLabel(dist)}` : ''}`,
     distance: dist,
     eta,
     statusBadge,
@@ -81,7 +95,7 @@ function eventCard(ev, position) {
     fest: ev.fest,
     event: ev,
     location: ev.location
-      ? { id: ev.location.id, name: ev.location.name, lat: ev.location.lat, lng: ev.location.lng }
+      ? { id: ev.location.id, name: displayLocationName(ev.location), lat: ev.location.lat, lng: ev.location.lng }
       : null,
     actions: ['details', 'preview', 'start'],
   }
@@ -335,7 +349,7 @@ function currentLocationTurn(allLocations, position) {
   }
   if (!nearest) return { replyText: "No campus locations to compare against.", cards: [], state: {} }
   return {
-    replyText: `You're closest to ${nearest.loc.name} (${distanceLabel(nearest.d)}).`,
+    replyText: `You're closest to ${displayLocationName(nearest.loc)} (${distanceLabel(nearest.d)}).`,
     cards: [locationCard(nearest.loc, { position })],
     state: { lastLocationId: nearest.loc.id, lastCandidates: [{ kind: 'location', id: nearest.loc.id }] },
     suggestions: ["What's nearby?", "Nearest canteen", "What's on today?"],
@@ -382,7 +396,7 @@ function distanceQueryTurn(result, locationsById, position) {
   const dStr  = dist >= 1000 ? `${(dist / 1000).toFixed(1)} km` : `${Math.round(dist)} m`
 
   return {
-    replyText: `${fromLoc.name} → ${toLoc.name}: about ${dStr} (${eta} min walking).`,
+    replyText: `${displayLocationName(fromLoc)} → ${displayLocationName(toLoc)}: about ${dStr} (${eta} min walking).`,
     cards: [locationCard(toLoc, { position })],
     state: { lastLocationId: toLoc.id, lastCandidates: [{ kind: 'location', id: toLoc.id }] },
     suggestions: ['Navigate there', 'How long will it take?', "What's nearby?"],
@@ -409,7 +423,7 @@ async function handleFollowUp(intent, state, locationsById, position) {
     const sorted = [...locCandidates].sort((a, b) =>
       haversine(position.lat, position.lng, a.lat, a.lng) - haversine(position.lat, position.lng, b.lat, b.lng))
     return {
-      replyText: `${sorted[0].name} is the closest.`,
+      replyText: `${displayLocationName(sorted[0])} is the closest.`,
       cards: [locationCard(sorted[0], { position })],
       state: { lastLocationId: sorted[0].id },
       suggestions: ['Navigate there', 'How long will it take?'],
@@ -428,7 +442,7 @@ async function handleFollowUp(intent, state, locationsById, position) {
     if (!route) return { replyText: "I couldn't calculate a route right now.", cards: [], state: {} }
     const dist = route.distance_m >= 1000 ? `${(route.distance_m / 1000).toFixed(1)} km` : `${Math.round(route.distance_m)} m`
     return {
-      replyText: `About ${route.eta_minutes} min (${dist}) to ${locationsById[lastLocId].name}.`,
+      replyText: `About ${route.eta_minutes} min (${dist}) to ${displayLocationName(locationsById[lastLocId])}.`,
       cards: [locationCard(locationsById[lastLocId], { position })],
       state: { lastLocationId: lastLocId },
       suggestions: ['Navigate there', 'Show route preview'],
@@ -456,7 +470,7 @@ async function handleFollowUp(intent, state, locationsById, position) {
     if (lastLocId && locationsById[lastLocId]) {
       const loc = locationsById[lastLocId]
       const cards = [locationCard(loc, { position })]
-      if (loc.description) cards.unshift(infoCard(loc.name, loc.description))
+      if (loc.description) cards.unshift(infoCard(displayLocationName(loc), loc.description))
       return { replyText: loc.description ? null : 'No further details available.', cards, state: {} }
     }
     return { replyText: "Nothing to show details for yet.", cards: [], state: {} }
@@ -490,10 +504,10 @@ export async function runTurn(message, state, deps) {
   switch (intent) {
     case 'classroom_finder': {
       const loc  = locationsById[result.classroom.dept_location_id]
-      const meta = { room: result.classroom.room_label, floor: result.classroom.floor_guess, wing: null, building: loc?.name }
+      const meta = { room: result.classroom.room_label, floor: result.classroom.floor_guess, wing: null, building: loc ? displayLocationName(loc) : null }
       outcome = loc
         ? {
-            replyText: result.reply,
+            replyText: fixReplyName(result.reply, loc),
             cards: [locationCard(loc, { position, extraMeta: meta })],
             state: { lastLocationId: loc.id, lastCandidates: [{ kind: 'location', id: loc.id }], pendingClassroom: meta },
             suggestions: ['Navigate there', 'How long will it take?'],
@@ -514,18 +528,18 @@ export async function runTurn(message, state, deps) {
           let desc = topLoc.description
           if (topLoc.department) desc += `\n\nDepartment: ${topLoc.department}`
           if (topLoc.floors)     desc += `\nFloors: ${topLoc.floors}`
-          allCards.push(infoCard(topLoc.name, desc))
+          allCards.push(infoCard(displayLocationName(topLoc), desc))
         }
         allCards.push(...cards)
         outcome = {
-          replyText: result.reply,
+          replyText: fixReplyName(result.reply, topLoc),
           cards: allCards,
           state: cards.length ? { lastLocationId: cards[0].id, lastCandidates: cards.map(c => ({ kind: 'location', id: c.id })) } : {},
           suggestions: ['Navigate there', 'What events are happening there?', "What's nearby?"],
         }
       } else {
         outcome = {
-          replyText: result.reply,
+          replyText: fixReplyName(result.reply, locationsById[cards[0]?.id]),
           cards,
           state: cards.length ? { lastLocationId: cards[0].id, lastCandidates: cards.map(c => ({ kind: 'location', id: c.id })) } : {},
           suggestions: cards.length > 1
@@ -595,17 +609,35 @@ export async function runTurn(message, state, deps) {
           suggestions: all.length ? ['Navigate to Main Canteen', 'Nearest canteen'] : [],
         }
       } else {
-        // Specific venue(s) requested — also attempt to fetch menu image
+        // Specific venue(s) requested — also attempt to fetch menu image.
+        // This is the same getVenueMenu() call (same /api/locations/{id}/menu
+        // endpoint) that VenueMenuCard uses, so Copilot never disagrees with
+        // what the food court preview panel shows — one data source, not two.
         const cards = await Promise.all(menuLocs.map(async (l) => {
           const base = locationCard(l, { position })
           try {
             const menu = await getVenueMenu(l.id)
-            if (menu?.image_url) base.menuImageUrl = menu.image_url
-          } catch { /* no menu today — card still shown without image */ }
+            if (menu?.image_url) {
+              base.menuImageUrl = menu.image_url
+              base.menuDescription = menu.description || null
+            } else {
+              base.noMenuToday = true
+            }
+          } catch {
+            base.noMenuToday = true   // 404 / no menu today — card still shown, flagged
+          }
           return base
         }))
+        // result.reply is a canned string from the NLU layer, written before
+        // any real menu data was looked up ("Here's today's menu at X") — it
+        // can't be trusted once we actually know whether a menu exists, so
+        // build the reply from the fetched data instead of the canned text.
+        const withMenu = cards.filter(c => c.menuImageUrl)
+        const replyText = withMenu.length
+          ? `Here's today's menu at ${withMenu[0].title}.`
+          : `No menu uploaded for today at ${menuLocs.map(l => displayLocationName(l)).join(', ')}.`
         outcome = {
-          replyText: result.reply || `Here's today's menu at ${menuLocs[0].name}.`,
+          replyText,
           cards,
           state: { lastLocationId: menuLocs[0].id },
           suggestions: ['Navigate there', 'Nearest canteen'],

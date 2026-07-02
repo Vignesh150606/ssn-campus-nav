@@ -32,7 +32,10 @@ import { useCompassHeading } from '../hooks/useCompassHeading'
 import { useNavCamera } from '../hooks/useNavCamera'
 import { useElementHeightVar } from '../hooks/useElementHeightVar'
 import { landmarksAlongPath } from '../utils/facilities'
-import { computeUpcomingTurn, haversine } from '../utils/geo'
+import { computeUpcomingTurn, computeAllTurns, haversine } from '../utils/geo'
+import { displayLocationName } from '../constants'
+import { useDraggableSheet } from '../hooks/useDraggableSheet'
+import VenueMenuCard from '../components/VenueMenuCard'
 
 const SHEET_HEIGHT = 38
 const ENTRY_ID     = 'main-gate'
@@ -64,6 +67,13 @@ function turnLabel(dir) {
 function formatDist(m) {
   if (m == null) return '—'
   return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`
+}
+
+/** Phase 4.2.2 — clock time the user is expected to arrive, e.g. "4:32 PM" */
+function formatArrivalClock(etaMinutes) {
+  if (etaMinutes == null) return '—'
+  const d = new Date(Date.now() + etaMinutes * 60_000)
+  return d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
 }
 
 /** Phase 13: find a named campus landmark within radius of a point. */
@@ -110,8 +120,6 @@ export default function Home() {
   const [navMode, setNavMode]                     = useState(false)
   // Phase 11: room/floor/wing info from event navigation
   const [navEventInfo, setNavEventInfo]           = useState(null)  // {room,floor,wing,building}
-  // ── Phase 5: Bottom sheet expansion ────────────────────────────────────
-  const [navSheetExpanded, setNavSheetExpanded]   = useState(false)
   // Phase 7: Arrival overlay
   const [arrived, setArrived]                     = useState(false)
   // Phase 2: Events happening at the arrival venue
@@ -137,6 +145,45 @@ export default function Home() {
   } = useLocationContext()
 
   const voice = useVoiceGuidance({ tracking, hasRoute, remainingDist, remainingPath, offRoute })
+
+  // ── Phase 4.2.2 — Draggable nav bottom sheet (3 snap points) ───────────
+  // Peeks are in px of sheet visible above the viewport bottom edge.
+  // Recomputed on resize/orientation-change so the sheet stays proportional.
+  const [viewportH, setViewportH] = useState(() => window.innerHeight)
+  useEffect(() => {
+    const onResize = () => setViewportH(window.innerHeight)
+    window.addEventListener('resize', onResize)
+    window.addEventListener('orientationchange', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('orientationchange', onResize)
+    }
+  }, [])
+  const navSheetPeeks = useMemo(() => ({
+    collapsed: 128,
+    half: Math.round(viewportH * 0.44),
+    full: Math.round(viewportH * 0.86),
+  }), [viewportH])
+  const navSheet = useDraggableSheet(navSheetPeeks, 'collapsed')
+  // Every fresh navigation session starts collapsed so the map is visible;
+  // the user drags/taps up for more detail. Presentation-only — doesn't
+  // touch routing/GPS.
+  useEffect(() => {
+    if (navMode) navSheet.snapToTier('collapsed')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navMode])
+  // While the nav sheet is mounted, it is the sole writer of --sheet-h,
+  // updating it every animation frame (drag + snap). The floating controls
+  // that read --sheet-h (copilot-fab-stack, zoom control) have their own
+  // CSS `transition: bottom …` tuned for the OTHER sheets, which update
+  // --sheet-h in sparse discrete jumps rather than every frame. Left on,
+  // that transition would fight our per-frame writes and visibly lag
+  // behind the sheet instead of moving with "the same animation curve" —
+  // so it's disabled for exactly as long as the nav sheet owns the var.
+  useEffect(() => {
+    document.documentElement.classList.toggle('nav-sheet-driving', navMode)
+    return () => document.documentElement.classList.remove('nav-sheet-driving')
+  }, [navMode])
 
   // Phase 4.2 — Priority 1: floating controls track the REAL rendered
   // height of whichever bottom sheet is currently showing (browse results
@@ -264,10 +311,29 @@ export default function Home() {
 
   // Destination name for nav UI
   const destName = useMemo(() => {
-    if (previewLoc?.name) return previewLoc.name
-    if (navDestination?.id) return locations.find(l => l.id === navDestination.id)?.name || null
+    if (previewLoc) return displayLocationName(previewLoc)
+    if (navDestination?.id) {
+      const loc = locations.find(l => l.id === navDestination.id)
+      return loc ? displayLocationName(loc) : null
+    }
     return null
   }, [previewLoc, navDestination, locations])
+
+  // Phase 4.2.2 — full location object for the active nav destination
+  // (navDestination from useLocationContext only carries {id, lat, lng} —
+  // enough for GPS tracking, not enough for category/department/etc).
+  const navDestLoc = useMemo(() => {
+    if (!navDestination?.id) return null
+    return locations.find(l => l.id === navDestination.id) || null
+  }, [navDestination, locations])
+
+  // Phase 4.2.2 — full turn-by-turn list for the "Fully Expanded" sheet
+  // tier. Display-only derivative of the same remainingPath GPS already
+  // tracks; does not feed guidance/voice/off-route logic.
+  const allTurns = useMemo(() => {
+    if (!navMode || !remainingPath?.length) return []
+    return computeAllTurns(remainingPath)
+  }, [navMode, remainingPath])
 
   // Phase 3 + 13: compute upcoming turn with landmark hint
   const nextTurn = useMemo(() => {
@@ -330,7 +396,6 @@ export default function Home() {
     setPreviewRoutes(null)
     // Phase 1: enter navigation mode
     setNavMode(true)
-    setNavSheetExpanded(false)
     setArrived(false)
     setUserManuallyPanned(false)
     // Phase 4A: start in heading-up mode
@@ -363,7 +428,6 @@ export default function Home() {
       setPreviewActive(false)
       setPreviewRoutes(null)
       setNavMode(true)
-      setNavSheetExpanded(false)
       setArrived(false)
       setUserManuallyPanned(false)
       // Phase 4A: start in heading-up mode
@@ -393,7 +457,6 @@ export default function Home() {
     // Phase 1: exit navigation mode
     setNavMode(false)
     setArrived(false)
-    setNavSheetExpanded(false)
     setUserManuallyPanned(false)
     setNavEventInfo(null)
     setArrivalEvents([])
@@ -451,14 +514,15 @@ export default function Home() {
 
   // Phase 4.2 — Priority 2: Share deep link
   // Generates a proper URL that opens the app directly to this destination.
-  async function handleShareLocation() {
-    const loc = previewLoc
+  async function handleShareLocation(locOverride) {
+    const loc = locOverride || previewLoc
     if (!loc?.id) return
 
     const base = window.location.origin
     const deepLink = `${base}/location/${loc.id}`
-    const shareTitle = loc.name
-    const shareText = `Navigate to ${loc.name} at SSN College of Engineering`
+    const shareName = displayLocationName(loc)
+    const shareTitle = shareName
+    const shareText = `Navigate to ${shareName} at SSN College of Engineering`
 
     try {
       if (navigator.share) {
@@ -665,18 +729,41 @@ export default function Home() {
             </div>
           )}
 
-          {/* Phase 5 — Navigation bottom sheet */}
-          <div className={`nav-bottom-sheet ${navSheetExpanded ? 'expanded' : ''}`} ref={sheetHeightRef}>
+          {/* Phase 4.2.2 — Draggable 3-snap-point navigation bottom sheet.
+              Drag the grip (or tap it to cycle tiers) between Collapsed,
+              Half Expanded and Fully Expanded. Positioning is handled
+              entirely by useDraggableSheet via transform — this JSX only
+              decides what content is mounted per tier. */}
+          <div
+            className={`nav-bottom-sheet tier-${navSheet.tier}${navSheet.dragging ? ' dragging' : ''}`}
+            ref={navSheet.sheetRef}
+          >
             <button
               className="nav-sheet-grip"
-              onClick={() => setNavSheetExpanded(e => !e)}
-              aria-label={navSheetExpanded ? 'Collapse' : 'Expand navigation details'}
+              onPointerDown={navSheet.onPointerDown}
+              onClick={navSheet.cycleTier}
+              aria-label="Drag or tap to resize navigation details"
             >
               <div className="sheet-handle" />
             </button>
 
-            {/* Collapsed: distance + ETA */}
+            {/* Visible at every tier: Next Turn · Distance · ETA */}
             <div className="nav-bottom-row-collapsed">
+              {nextTurn ? (
+                <div className="nav-sheet-turn-compact">
+                  <span className="nav-sheet-turn-icon">{turnIcon(nextTurn.direction)}</span>
+                  <div>
+                    <div className="nav-dist-big nav-turn-compact-label">{turnLabel(nextTurn.direction)}</div>
+                    <div className="nav-dist-label">in {formatDist(nextTurn.distanceM)}</div>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="nav-dist-big nav-turn-compact-label">Continue Straight</div>
+                  <div className="nav-dist-label">next turn</div>
+                </div>
+              )}
+              <div className="nav-divider-v" />
               <div>
                 <div className="nav-dist-big">{formatDist(displayDist)}</div>
                 <div className="nav-dist-label">remaining</div>
@@ -686,52 +773,115 @@ export default function Home() {
                 <div className="nav-eta-big">{displayEta != null ? `${displayEta} min` : '—'}</div>
                 <div className="nav-dist-label">estimated</div>
               </div>
-              {destName && (
-                <>
-                  <div className="nav-divider-v" />
-                  <div style={{ flex:1, overflow:'hidden' }}>
-                    <div className="nav-dest-name-small" style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:'0.82rem', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{destName}</div>
-                    <div className="nav-dist-label">destination</div>
-                  </div>
-                </>
-              )}
             </div>
 
-            {/* Expanded: full details */}
-            {navSheetExpanded && (
-              <div className="nav-bottom-expanded-content">
-                <div className="nav-expanded-row">
-                  <span className="nav-expanded-label">Destination</span>
-                  <span className="nav-expanded-value">{destName || '—'}</span>
-                </div>
-                {nextTurn && (
+            {/* Half + Full tier: adds Arrival time, Destination, Event, Menu preview */}
+            {(navSheet.tier === 'half' || navSheet.tier === 'full') && (
+              <div className="nav-sheet-scroll">
+                <div className="nav-bottom-expanded-content">
                   <div className="nav-expanded-row">
-                    <span className="nav-expanded-label">Next turn</span>
-                    <span className="nav-expanded-value">
-                      {turnIcon(nextTurn.direction)} {turnLabel(nextTurn.direction)} in {formatDist(nextTurn.distanceM)}
-                    </span>
+                    <span className="nav-expanded-label">Arrival time</span>
+                    <span className="nav-expanded-value">{formatArrivalClock(displayEta)}</span>
+                  </div>
+                  <div className="nav-expanded-row">
+                    <span className="nav-expanded-label">Destination</span>
+                    <span className="nav-expanded-value">{destName || '—'}</span>
+                  </div>
+                  {offRoute && (
+                    <div className="nav-expanded-row">
+                      <span className="nav-expanded-label">Status</span>
+                      <span className="nav-expanded-value" style={{ color:'var(--danger)' }}>⚠️ Off route</span>
+                    </div>
+                  )}
+                  {navEventInfo?.name && (
+                    <div className="nav-expanded-row">
+                      <span className="nav-expanded-label">Event</span>
+                      <span className="nav-expanded-value">{navEventInfo.name}</span>
+                    </div>
+                  )}
+
+                  {['food', 'dining'].includes(navDestLoc?.category) && (
+                    <div style={{ marginTop: 10 }}>
+                      <VenueMenuCard venueId={navDestLoc.id} venueName={destName} />
+                    </div>
+                  )}
+
+                  <div style={{ marginTop:14, display:'flex', gap:8 }}>
+                    <button className="voice-settings-trigger status-pill" style={{ flex:1, justifyContent:'center' }}
+                      onClick={() => setVoiceSettingsOpen(true)}>
+                      {voice.settings.enabled ? '🔊 Voice On' : '🔇 Voice Off'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Full tier only: turn-by-turn list, building details, share, end nav */}
+                {navSheet.tier === 'full' && (
+                  <div className="nav-bottom-full-content">
+                    {(navEventInfo?.room || navEventInfo?.floor || navEventInfo?.wing || navEventInfo?.building) && (
+                      <div className="nav-sheet-section">
+                        <div className="nav-sheet-section-title">Building details</div>
+                        {navEventInfo.building && (
+                          <div className="nav-expanded-row">
+                            <span className="nav-expanded-label">Building</span>
+                            <span className="nav-expanded-value">{navEventInfo.building}</span>
+                          </div>
+                        )}
+                        {navEventInfo.floor && (
+                          <div className="nav-expanded-row">
+                            <span className="nav-expanded-label">Floor</span>
+                            <span className="nav-expanded-value">{navEventInfo.floor}</span>
+                          </div>
+                        )}
+                        {navEventInfo.wing && (
+                          <div className="nav-expanded-row">
+                            <span className="nav-expanded-label">Wing</span>
+                            <span className="nav-expanded-value">{navEventInfo.wing}</span>
+                          </div>
+                        )}
+                        {navEventInfo.room && (
+                          <div className="nav-expanded-row">
+                            <span className="nav-expanded-label">Room</span>
+                            <span className="nav-expanded-value">{navEventInfo.room}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {navDestLoc?.department && (
+                      <div className="nav-sheet-section">
+                        <div className="nav-sheet-section-title">Destination info</div>
+                        <div className="nav-expanded-row">
+                          <span className="nav-expanded-label">Department</span>
+                          <span className="nav-expanded-value">{navDestLoc.department}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {allTurns.length > 0 && (
+                      <div className="nav-sheet-section">
+                        <div className="nav-sheet-section-title">Turn-by-turn</div>
+                        <ol className="nav-turn-list">
+                          {allTurns.map((t, i) => (
+                            <li key={`${t.turnIndex}-${i}`} className="nav-turn-list-item">
+                              <span className="nav-turn-list-icon">{turnIcon(t.direction)}</span>
+                              <span className="nav-turn-list-label">{turnLabel(t.direction)}</span>
+                              <span className="nav-turn-list-dist">{formatDist(t.distanceM)}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+
+                    <div className="nav-sheet-section" style={{ display:'flex', gap:8 }}>
+                      <button className="arrival-btn secondary" style={{ flex:1 }} onClick={() => handleShareLocation(navDestLoc)}>
+                        {shareCopied ? '✓ Link Copied!' : '↗ Share'}
+                      </button>
+                      <button className="arrival-btn primary" style={{ flex:1 }} onClick={handleClear}>
+                        End Navigation
+                      </button>
+                    </div>
                   </div>
                 )}
-                <div className="nav-expanded-row">
-                  <span className="nav-expanded-label">Distance</span>
-                  <span className="nav-expanded-value">{formatDist(displayDist)}</span>
-                </div>
-                <div className="nav-expanded-row">
-                  <span className="nav-expanded-label">ETA</span>
-                  <span className="nav-expanded-value">{displayEta != null ? `~${displayEta} min` : '—'}</span>
-                </div>
-                {offRoute && (
-                  <div className="nav-expanded-row">
-                    <span className="nav-expanded-label">Status</span>
-                    <span className="nav-expanded-value" style={{ color:'var(--danger)' }}>⚠️ Off route</span>
-                  </div>
-                )}
-                <div style={{ marginTop:14, display:'flex', gap:8 }}>
-                  <button className="voice-settings-trigger status-pill" style={{ flex:1, justifyContent:'center' }}
-                    onClick={() => setVoiceSettingsOpen(true)}>
-                    {voice.settings.enabled ? '🔊 Voice On' : '🔇 Voice Off'}
-                  </button>
-                </div>
               </div>
             )}
           </div>
@@ -838,7 +988,7 @@ export default function Home() {
           locations={locations}
           position={position}
           arrivedLocationId={arrived ? previewLoc?.id : null}
-          arrivedLocationName={arrived ? previewLoc?.name : null}
+          arrivedLocationName={arrived ? (previewLoc ? displayLocationName(previewLoc) : null) : null}
           onPreviewRoute={handleDirections}
           onStartNavigation={startNavigationFromCopilot}
           onViewEventDetails={(eventId) => navigate(`/event/${eventId}`)}

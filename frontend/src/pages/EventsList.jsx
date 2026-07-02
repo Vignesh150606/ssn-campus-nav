@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getEvents } from '../api'
-import { FEST_META } from '../constants'
+import { FEST_META, displayLocationName } from '../constants'
 import { SkeletonScheduleList } from '../components/Skeleton'
 import { dlog, dwarn } from '../utils/debugLog'
 
@@ -72,16 +72,8 @@ function formatTimeRange(start, end) {
   return `${s} – ${e}`
 }
 
-// P8 — frontend display-name overrides (mirrors AdminDashboard LOCATION_DISPLAY_NAMES)
-const VENUE_NAME_OVERRIDES = {
-  'tcs-auditorium': 'Main Auditorium',
-  'mini-hall-1':    'Mini Auditorium',
-  'main-canteen':   'Main Canteen',
-}
-
 function venueName(event) {
-  const id = event.location?.id || event.location_id
-  return VENUE_NAME_OVERRIDES[id] || event.location?.name || id || '—'
+  return displayLocationName(event.location || event.location_id)
 }
 
 export default function EventsList() {

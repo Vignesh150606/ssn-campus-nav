@@ -8,6 +8,7 @@
  * canteens (category 'dining') are real standalone locations.
  */
 import { nearestWithFacility, nearestCanteen } from '../utils/facilities'
+import { displayLocationName } from '../constants'
 
 const CARDS = [
   { key: 'restroom',     icon: '🚻', label: 'Nearest Restroom' },
@@ -41,7 +42,7 @@ export default function NearbyFacilities({ locations, fromLat, fromLng, onNaviga
             <div className="facility-icon">{r.icon}</div>
             <div className="facility-info">
               <div className="facility-label">{r.label}</div>
-              <div className="facility-sub">{r.hit.location.name} · {formatDistance(r.hit.distanceM)}</div>
+              <div className="facility-sub">{displayLocationName(r.hit.location)} · {formatDistance(r.hit.distanceM)}</div>
             </div>
             <button className="facility-nav-btn" onClick={() => onNavigate(r.hit.location)}>
               Navigate
