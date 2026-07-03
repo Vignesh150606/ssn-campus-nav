@@ -44,10 +44,16 @@ export default function VenueMenuCard({ venueId, venueName }) {
           setMenu(false) // genuinely no menu uploaded today — not an error
         } else {
           // A real backend/DB failure (e.g. 503) must stay visible, not get
-          // silently disguised as "no menu today" — that's exactly the kind
-          // of masked error this phase's Bug 1 fix is about.
+          // silently disguised as "no menu today" — that's what the earlier
+          // masking fix was about. But the MESSAGE shown here must always be
+          // a friendly, generic string — never the raw backend/Supabase
+          // detail (which can contain internal error codes/table names,
+          // e.g. "PGRST205" or a raw storage-bucket error). That level of
+          // detail is only appropriate in the admin panel / server logs
+          // (see VenueMenuAdmin.jsx, which does show e.message, and the
+          // backend's own logger.error(...) call for every 503).
           setMenu('error')
-          setErrorMsg(err.message || 'Could not load the menu right now.')
+          setErrorMsg('Unable to reach menu service. Please try again shortly.')
         }
       })
     return () => { cancelled = true }

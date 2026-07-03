@@ -467,17 +467,39 @@ export default function MapView({
 
       {/* ── Route rendering ────────────────────────────────────────── */}
 
-      {/* Full route ghost — shows the complete planned path as a light trail */}
-      {routePath?.length >= 2 && (
+      {/* Full route ghost — shows the complete planned path.
+          Priority 9 (Phase 4.2.5): two different jobs depending on state,
+          so two different treatments:
+           • PREVIEW (no remainingPath yet — nothing else is drawn) needs
+             to be the primary, clearly-visible route on its own: a white
+             casing underneath + a solid, high-contrast dotted violet line
+             on top — Google Maps' own convention for a walking-route
+             preview, and clearly distinct in both color and style from
+             the solid blue line used once actually navigating.
+           • ACTIVE NAV (remainingPath present) keeps the original subtle
+             pale-gray treatment — here it's only a receding "already
+             walked" breadcrumb behind the vivid live blue centerline
+             below, and should stay in the background, not compete with it. */}
+      {routePath?.length >= 2 && !remainingPath?.length && (
         <Polyline
           positions={routePath.map(p => [p.lat, p.lng])}
           pathOptions={{
-            color: '#94A3B8',
-            weight: 6,
-            opacity: 0.38,
+            color: '#FFFFFF',
+            weight: 9,
+            opacity: 0.85,
             lineCap: 'round',
             lineJoin: 'round',
           }}
+        />
+      )}
+      {routePath?.length >= 2 && (
+        <Polyline
+          positions={routePath.map(p => [p.lat, p.lng])}
+          pathOptions={
+            remainingPath?.length
+              ? { color: '#94A3B8', weight: 6, opacity: 0.38, lineCap: 'round', lineJoin: 'round' }
+              : { color: '#6D28D9', weight: 6, opacity: 0.95, dashArray: '1, 12', lineCap: 'round', lineJoin: 'round' }
+          }
         />
       )}
 

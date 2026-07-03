@@ -84,19 +84,31 @@ const TURN_LOOKAHEAD_M       = 300  // extended from 250m
 export function computeUpcomingTurn(path) {
   if (!path || path.length < 3) return null
 
+  // Priority 6 (Phase 4.2.5) root-cause fix: `cumulative` must always mean
+  // "distance from path[0] up to path[i-1]" — i.e. BEFORE the segment
+  // currently being examined — so that `cumulative + segLen` is the
+  // correct distance to path[i]. The previous version only added segLen
+  // to cumulative when i>1, but ALSO re-added the same segment again in
+  // the turn branch below — for i===1 this coincidentally cancelled out
+  // and looked right, but for every turn at i>=2 it dropped the very
+  // first segment of the path from the sum entirely while double-counting
+  // the final segment into the turn, silently reporting the wrong
+  // distance for every turn but the first one. The error is largest
+  // exactly where Priority 6 asks to look closest — closely spaced
+  // intersections/short segments — because a fixed-size double-count/drop
+  // is a much bigger fraction of a short distance than a long one.
   let cumulative = 0
   for (let i = 1; i < path.length - 1; i++) {
-    const segLen = haversine(path[i - 1].lat, path[i - 1].lng, path[i].lat, path[i].lng)
-    if (i > 1) cumulative += segLen
     if (cumulative > TURN_LOOKAHEAD_M) break
 
+    const segLen = haversine(path[i - 1].lat, path[i - 1].lng, path[i].lat, path[i].lng)
     const bearingIn  = bearing(path[i - 1].lat, path[i - 1].lng, path[i].lat, path[i].lng)
     const bearingOut = bearing(path[i].lat, path[i].lng, path[i + 1].lat, path[i + 1].lng)
     const diff    = angleDiff(bearingIn, bearingOut)
     const absDiff = Math.abs(diff)
 
     if (absDiff >= STRAIGHT_THRESHOLD_DEG) {
-      const distanceToTurn = cumulative + haversine(path[i - 1].lat, path[i - 1].lng, path[i].lat, path[i].lng)
+      const distanceToTurn = cumulative + segLen
       const isRight = diff > 0
 
       let direction
@@ -117,6 +129,8 @@ export function computeUpcomingTurn(path) {
         lng: path[i].lng,
       }
     }
+
+    cumulative += segLen
   }
   return null
 }

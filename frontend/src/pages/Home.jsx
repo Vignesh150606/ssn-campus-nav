@@ -242,12 +242,54 @@ export default function Home() {
   // entirely (useCompassHeading's `active` flag), not just its effect on
   // the map. Re-enabling the toggle reattaches it, same as it already does
   // when navMode/tracking toggle.
-  const { heading: rawHeading } = useCompassHeading(navMode && tracking && headingUp)
+  const {
+    heading: rawHeading, supported: compassSupported,
+    needsPermission: compassNeedsPermission, permissionState: compassPermissionState,
+    requestPermission: requestCompassPermission,
+  } = useCompassHeading(navMode && tracking && headingUp)
   // Phase 4A: smooth the raw heading → two outputs:
   //   smoothedHeading: fine-grained, used for the user marker arrow
   //   mapHeading:      coarser, used for map rotation to avoid micro-oscillations
-  const navCameraActive = navMode && tracking && !acquiringGps
+  // Priority 3 (Phase 4.2.5) — ROOT CAUSE of "Heading-Up sometimes never
+  // activates": this used to also require `!acquiringGps`, i.e. a GOOD GPS
+  // FIX, before heading-up could do anything at all — conflating two
+  // unrelated concerns. Compass rotation only needs a compass reading (or
+  // GPS course); it doesn't need accurate positioning, that's a separate
+  // concern already handled independently (MapView's camera-follow effect
+  // already no-ops on its own when userPosition is null). Gating rotation
+  // on GPS accuracy meant heading-up simply never engaged anywhere GPS
+  // took a while to lock (indoors, urban canyon, cloudy sky) even though
+  // the compass itself was ready immediately.
+  const navCameraActive = navMode && tracking && headingUp
   const { smoothedHeading, mapHeading } = useNavCamera(rawHeading, navCameraActive, { gpsCourse, speed })
+
+  // Priority 5 (Phase 4.2.5) — Navigation Status. A single, always-computed
+  // status so nothing about heading-up/GPS acquisition ever just silently
+  // does nothing — the user always sees *why* the map isn't rotating yet
+  // if it isn't. Checked in priority order: a missing/weak GPS fix matters
+  // more than heading state (nothing works well without a position at
+  // all), then whether heading-up specifically has what it needs.
+  const navStatus = useMemo(() => {
+    if (!navMode) return null
+    if (!position) return { icon: '📍', text: 'Waiting for GPS…' }
+    if (accuracy != null && accuracy > 150) return { icon: '⚠', text: 'Weak GPS Signal' }
+    if (headingUp) {
+      // iOS-style explicit permission prompt was denied — say so rather
+      // than leaving heading-up silently inert. GPS course (if available)
+      // still works without compass permission, so only surface this when
+      // there's no fallback either.
+      if (compassNeedsPermission && compassPermissionState === 'denied' && gpsCourse == null) {
+        return { icon: '⚠', text: 'Compass permission denied' }
+      }
+      if (rawHeading == null && gpsCourse == null) {
+        return { icon: '🧭', text: 'Calibrating Heading…' }
+      }
+      if ((!compassSupported || compassPermissionState === 'denied') && gpsCourse != null) {
+        return { icon: '⚠', text: 'Compass unavailable — using GPS heading' }
+      }
+    }
+    return { icon: '✅', text: 'Navigation Ready' }
+  }, [navMode, position, accuracy, headingUp, rawHeading, gpsCourse, compassSupported, compassNeedsPermission, compassPermissionState])
 
   // Reset voice dedup on recalculation
   const prevRecalcVersionRef = useRef(recalcVersion)
@@ -461,8 +503,27 @@ export default function Home() {
     setNavMode(true)
     setArrived(false)
     setUserManuallyPanned(false)
-    // Phase 4A: start in heading-up mode
-    setHeadingUp(true)
+    // Priority 4 (Phase 4.2.5): heading-up begins automatically as a
+    // NATURAL CONSEQUENCE of headingUp already being true (default ON,
+    // see its useState above) — not by force-setting it here. Forcing it
+    // true unconditionally on every nav start would silently override a
+    // user who'd deliberately turned Rotate Map While Walking off in
+    // Navigation Settings, which is exactly what "preserve all Navigation
+    // Settings" rules out. If the preference is on, navCameraActive
+    // (navMode && tracking && headingUp) already activates heading-up on
+    // its own the moment navMode flips true just below; if it's off,
+    // navigation correctly stays North-Up.
+    // Priority 3 (Phase 4.2.5) — reliable initialization. On browsers that
+    // gate orientation access behind an explicit user gesture (iOS
+    // Safari), this is that gesture — request it right here rather than
+    // leaving it to whatever separately-instanced widget happens to call
+    // it (previously only CompassWidget's own "Enable Compass" tap did,
+    // which a user could easily never see before hitting Start
+    // Navigation). No-ops immediately on platforms that don't need it
+    // (Android/desktop) — see useCompassHeading's needsPermission check.
+    // Requested regardless of the current headingUp setting so it's
+    // already granted if the user flips the setting on mid-session.
+    requestCompassPermission()
   }
 
   // Campus Copilot (Phase 1): start navigation directly from a chat card,
@@ -472,6 +533,11 @@ export default function Home() {
   // optionally carries classroom room/floor info into the existing
   // arrival-screen mechanism (navEventInfo) used by event navigation.
   async function startNavigationFromCopilot(loc, eventInfo = null) {
+    // Priority 3 (Phase 4.2.5) — same reasoning as handleStartNavigation;
+    // called first, synchronously, before any `await` below, since some
+    // browsers only honor requestPermission() as part of the original
+    // user-gesture call stack.
+    requestCompassPermission()
     try {
       const r = (tracking && position)
         ? await getRouteFromCoords(position.lat, position.lng, loc.id)
@@ -493,8 +559,8 @@ export default function Home() {
       setNavMode(true)
       setArrived(false)
       setUserManuallyPanned(false)
-      // Phase 4A: start in heading-up mode
-      setHeadingUp(true)
+      // Priority 4 (Phase 4.2.5): don't force headingUp true here either —
+      // see the matching comment in handleStartNavigation above.
       if (eventInfo) setNavEventInfo(eventInfo)
     } catch (e) {
       setRouteError(e.message)
@@ -523,8 +589,14 @@ export default function Home() {
     setUserManuallyPanned(false)
     setNavEventInfo(null)
     setArrivalEvents([])
-    // Phase 4A: reset heading-up on exit
-    setHeadingUp(false)
+    // Priority 4 (Phase 4.2.5): NOT resetting headingUp here anymore.
+    // "Return to North-Up" already happens on its own — the map only
+    // rotates while navMode is true (see the headingUp={navMode &&
+    // headingUp} prop passed to MapView), so exiting navigation already
+    // shows North-Up regardless of this setting's stored value. Actively
+    // resetting the setting itself would throw away the user's
+    // preference the moment they exit, breaking "preserve all Navigation
+    // Settings" for their next Start Navigation.
     setCurrentBearing(0)
   }
 
@@ -639,8 +711,8 @@ export default function Home() {
           dynamicZoom={dynamicZoom}
           zoom={17}
           previewTrigger={previewTrigger}
-          userHeading={navMode && !acquiringGps ? smoothedHeading : null}
-          mapHeading={navMode && !acquiringGps ? mapHeading : null}
+          userHeading={navMode ? smoothedHeading : null}
+          mapHeading={navMode ? mapHeading : null}
           headingUp={navMode && headingUp}
           nextTurnDist={navMode ? nextTurn?.distanceM ?? null : null}
           remainingDist={navMode ? remainingDist : null}
@@ -854,11 +926,14 @@ export default function Home() {
             </div>
           )}
 
-          {/* GPS status pill during navigation */}
-          {tracking && accuracy && (
-            <div className="nav-gps-pill">
+          {/* Priority 5 (Phase 4.2.5) — Navigation Status. Was GPS-accuracy-only
+              text; now covers heading-up/compass state too so nothing about
+              navigation initialization ever silently does nothing. Same pill
+              (position/CSS unchanged), broader content. */}
+          {navStatus && (
+            <div className={`nav-gps-pill${navStatus.icon === '⚠' ? ' warn' : ''}`}>
               <span className="pulse-dot" />
-              {acquiringGps ? `Acquiring ±${Math.round(accuracy)}m` : `±${Math.round(accuracy)}m`}
+              {navStatus.icon} {navStatus.text}
             </div>
           )}
 

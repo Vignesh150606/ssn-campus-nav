@@ -453,14 +453,32 @@ def open_segment(seg_id: str, admin: dict = Depends(get_current_admin)):
 # Venue menus — food court menu images (Phase 4.2)
 # ---------------------------------------------------------------------------
 
+def _friendly_menu_error(exc: Exception, action: str) -> HTTPException:
+    """Priority 2 (Phase 4.2.5) — the global SupabaseUnavailableError handler
+    above deliberately includes the raw backend detail (e.g. a PGRST205
+    "table not found" message, or a storage "Bucket not found" error) —
+    genuinely useful for general API debugging, and left as-is everywhere
+    else. The food-menu widgets are public-facing UI, though, and showing
+    that raw detail there means a random visitor sees a database error
+    code. This logs the full real error (for debugging) and returns a
+    short, friendly, food-menu-specific message instead — never the raw
+    Supabase JSON/exception text.
+    """
+    logger.error("Venue menu %s failed: %s", action, exc)
+    return HTTPException(status_code=503, detail="Unable to reach menu service. Please try again shortly.")
+
+
 @app.get("/api/locations/{venue_id}/menu")
 def get_venue_menu(venue_id: str, date: Optional[str] = Query(None, description="YYYY-MM-DD, defaults to today")):
     """Public — get today's menu image for a food court / dining venue."""
-    if not data_access.venue_exists(venue_id):
-        raise HTTPException(status_code=404, detail=f"Venue '{venue_id}' not found")
-    menu = data_access.get_menu(venue_id, date)
+    try:
+        if not data_access.venue_exists(venue_id):
+            raise HTTPException(status_code=404, detail=f"Venue '{venue_id}' not found")
+        menu = data_access.get_menu(venue_id, date)
+    except SupabaseUnavailableError as e:
+        raise _friendly_menu_error(e, "read") from e
     if not menu:
-        raise HTTPException(status_code=404, detail="No menu available for this venue today.")
+        raise HTTPException(status_code=404, detail="Today's menu has not been uploaded.")
     return menu
 
 
@@ -473,16 +491,24 @@ async def upload_venue_menu(
     admin: dict = Depends(get_current_admin),
 ):
     """Admin — upload (or replace) the menu image for a venue on a specific date."""
-    if not data_access.venue_exists(venue_id):
-        raise HTTPException(status_code=404, detail=f"Venue '{venue_id}' not found")
-    content = await file.read()
     try:
-        public_url, storage_path = data_access.upload_menu_image_file(
-            venue_id, file.filename or "menu", content, file.content_type or "image/jpeg"
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    menu = data_access.upsert_menu(venue_id, date, public_url, storage_path, description, admin["sub"])
+        if not data_access.venue_exists(venue_id):
+            raise HTTPException(status_code=404, detail=f"Venue '{venue_id}' not found")
+        content = await file.read()
+        try:
+            public_url, storage_path = data_access.upload_menu_image_file(
+                venue_id, file.filename or "menu", content, file.content_type or "image/jpeg"
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        menu = data_access.upsert_menu(venue_id, date, public_url, storage_path, description, admin["sub"])
+    except SupabaseUnavailableError as e:
+        # Admin panel — friendly summary in the response, full detail in the
+        # server log; VenueMenuAdmin.jsx still surfaces e.message to the
+        # admin directly, which is fine (it's an operator screen, not
+        # public UI), but the message itself should still be actionable
+        # rather than a raw PostgREST/Storage error string.
+        raise _friendly_menu_error(e, "upload") from e
     return menu
 
 
@@ -493,7 +519,11 @@ def delete_venue_menu(
     admin: dict = Depends(get_current_admin),
 ):
     """Admin — delete the menu for a venue on a specific date."""
-    if not data_access.delete_menu(venue_id, date):
+    try:
+        deleted = data_access.delete_menu(venue_id, date)
+    except SupabaseUnavailableError as e:
+        raise _friendly_menu_error(e, "delete") from e
+    if not deleted:
         raise HTTPException(status_code=404, detail="No menu found for that venue/date.")
     return {"message": "Menu deleted."}
 

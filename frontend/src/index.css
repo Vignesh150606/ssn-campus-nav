@@ -254,12 +254,23 @@ input, select, textarea { font-family: inherit; color: inherit; }
    of the right-side column, especially on Home where a tall browse sheet
    pushes everything up further still. Matching that same 14px gap brings
    it back down in line with the rest of the stack while still sitting
-   cleanly above the FAB column (never overlapping it). */
+   cleanly above the FAB column (never overlapping it).
+   Priority 8 (Phase 4.2.5): this `bottom` formula had no ceiling — on a
+   short viewport with a tall results sheet (--sheet-h can reach ~38% of
+   the screen on Home), the computed offset could climb high enough to
+   overlap the search bar/filter chips near the top of the screen
+   entirely. min() against a header-relative ceiling (same clamping
+   pattern already used by .nav-compass/.nav-gps-pill below) caps how
+   high it can ever go, so it adapts to screen size instead of just
+   trusting the sheet height to stay reasonable. */
 .leaflet-container .leaflet-top.leaflet-left {
   top: auto !important;
   left: auto !important;
   right: 16px;
-  bottom: calc(var(--sheet-h, 0px) + var(--fab-stack-h, 56px) + 14px + env(safe-area-inset-bottom, 0px));
+  bottom: min(
+    calc(var(--sheet-h, 0px) + var(--fab-stack-h, 56px) + 14px + env(safe-area-inset-bottom, 0px)),
+    calc(100vh - var(--header-h, 60px) - 96px)
+  );
   transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 @media (max-width: 430px) {
@@ -784,7 +795,14 @@ input, select, textarea { font-family: inherit; color: inherit; }
   inset: 0;
   background: rgba(0,0,0,0.4);
   backdrop-filter: blur(4px);
-  z-index: 60;
+  /* Priority 8 (Phase 4.2.5) root cause: this was z-index 60 — far below
+     .copilot-fab-stack's 3500 (the highest of the floating nav controls),
+     so the chatbot FAB visually sat on top of this "modal" dialog instead
+     of behind it. A true modal overlay needs to outrank every floating
+     control it's meant to block interaction with, not just visually
+     resemble one; 4000 clears all of them (max in use is 3500) while
+     staying below the reserved boot-gate/lightbox tier (9999). */
+  z-index: 4000;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -2004,6 +2022,17 @@ input, select, textarea { font-family: inherit; color: inherit; }
   gap: 6px;
   z-index: 799;
   backdrop-filter: blur(10px);
+  /* Priority 5 (Phase 4.2.5): this pill now carries longer status text
+     ("Compass unavailable — using GPS heading") than the old accuracy-only
+     readout — guard against overflowing off narrow screens instead of a
+     fixed nowrap. */
+  max-width: min(280px, calc(100vw - 24px));
+  white-space: normal;
+  line-height: 1.25;
+  transition: background 0.2s ease;
+}
+.nav-gps-pill.warn {
+  background: rgba(180, 83, 9, 0.75); /* amber-900 @ 75% — legible on both light and dark map tiles */
 }
 
 /* ── Phase 6: Exit Navigation button ── */
@@ -2143,6 +2172,10 @@ input, select, textarea { font-family: inherit; color: inherit; }
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
+  /* Priority 8 (Phase 4.2.5): this sheet had no safe-area padding at all —
+     content near its bottom edge (e.g. the Navigation Settings button)
+     could sit under a device's home-indicator/gesture bar. */
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
 }
 .nav-bottom-sheet.dragging .nav-sheet-scroll { pointer-events: none; }
 
@@ -2247,7 +2280,10 @@ html.nav-sheet-driving .map-layer {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1200;
+  /* Priority 8 (Phase 4.2.5): was 1200 — same root-cause overlap as the
+     Navigation Settings dialog (below .copilot-fab-stack's 3500). Shared
+     "blocking modal" tier — see .voice-settings-overlay's comment. */
+  z-index: 4000;
   animation: fade-in 0.3s ease;
   padding: 24px;
 }
@@ -2672,7 +2708,7 @@ html.nav-sheet-driving .map-layer {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
+  z-index: 4000; /* Priority 8 (Phase 4.2.5): was below .copilot-fab-stack (3500), same shared "blocking modal" tier fix */
   animation: fade-in 0.2s ease;
   padding: 16px;
 }
@@ -2878,7 +2914,7 @@ html.nav-sheet-driving .map-layer {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
+  z-index: 4000; /* Priority 8 (Phase 4.2.5): was below .copilot-fab-stack (3500), same shared "blocking modal" tier fix */
   animation: fade-in 0.18s ease;
   touch-action: manipulation;
 }
