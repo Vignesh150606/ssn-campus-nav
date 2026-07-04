@@ -541,6 +541,19 @@ export default function MapView({
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        /* Phase 4.2.6 Priority 3 — root cause of the rotation "black
+           screen": leaflet-rotate rotates the tile pane via CSS transform,
+           but Leaflet still only loads tiles to cover the UNROTATED
+           viewport rectangle (+ keepBuffer). At any bearing other than 0°,
+           the rotated viewport's corners reach outside that rectangle, so
+           whichever corner tiles haven't loaded yet show the container's
+           own background instead — see the .leaflet-container background
+           fix below for why that read as literally black. Default
+           keepBuffer is 2; 6 preloads a much wider ring of surrounding
+           tiles up front so a bearing change is far less likely to expose
+           any untiled area at all, rather than only reacting after the
+           fact. */
+        keepBuffer={6}
       />
 
       {/* Campus location markers */}

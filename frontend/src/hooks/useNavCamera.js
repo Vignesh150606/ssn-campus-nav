@@ -38,8 +38,10 @@
  *      = not confident, and low-confidence readings never move the map,
  *      full stop.
  *   5. Rotation threshold — even a confident estimate only commits once
- *      it has drifted ~18° from the map's CURRENT rotation — small
- *      fluctuations under that never touch the map at all.
+ *      it has drifted ~45° from the map's CURRENT rotation — small
+ *      fluctuations under that never touch the map at all. This is the
+ *      "significant direction change" bar from the Smart Orientation
+ *      spec: a real turn, not drift.
  *   6. Cooldown — after any commit, further commits are held off briefly
  *      so one genuine turn can't cause a flurry of re-adjustments.
  *      Bypassed when the route says a turn is imminent (nextTurnDist),
@@ -61,11 +63,20 @@ const MARKER_UPDATE_DEG      = 1.5
 // ── Map rotation (commit/confidence/cooldown) ───────────────────────────
 // Only commit once the estimate has drifted this far from the map's
 // CURRENT rotation — small fluctuations never touch the map at all.
-const ROTATE_THRESHOLD_DEG = 18
+// Phase 4.2.6 Priority 2 (Smart Orientation spec, re-tuned): raised from
+// 18° to ~45° so the map only re-rotates on an unambiguous, deliberate
+// change of walking direction (a real turn) — not on someone drifting
+// diagonally across a wide path or a gentle footpath bend. 18° was
+// catching those as "genuine" direction changes, which is exactly what
+// still read as the map re-adjusting itself too often to feel calm.
+const ROTATE_THRESHOLD_DEG = 45
 
 // Minimum time between two committed rotations, so a single genuine turn
-// can't cause a flurry of re-adjustments as it settles.
-const COOLDOWN_MS = 1200
+// can't cause a flurry of re-adjustments as it settles. Raised alongside
+// the threshold above — "sufficient time has elapsed" per the Smart
+// Orientation spec means a deliberately unhurried pause, not just enough
+// to dodge a double-fire of the same turn.
+const COOLDOWN_MS = 1800
 // When a turn is this close, bypass the cooldown — the map shouldn't be
 // throttled at exactly the moment it needs to respond to a real turn.
 const IMMINENT_TURN_M = 12

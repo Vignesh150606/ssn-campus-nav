@@ -17,6 +17,14 @@
   --brand-soft:   var(--ssn-navy-soft);
 
   --canvas:    #f4f4f5;
+  /* Phase 4.2.6 Priority 3 — dedicated map-only fallback colour, kept
+     separate from --canvas. This is what briefly shows through at the
+     rotated map's edges while tiles for a newly-exposed corner are still
+     loading (see .map-layer .leaflet-container below) — it needs to read
+     as "plain map background", not as the app's own dark surface colour.
+     Light mode's --canvas is already close to a neutral map tone, so this
+     just matches it; dark mode gets its own value (see below). */
+  --map-fallback: #e9e7e2;
   --surface:   #ffffff;
   --surface-translucent: rgba(255, 255, 255, 0.78);
   --elevated:  #ffffff;
@@ -68,6 +76,15 @@
   --brand-soft:   rgba(79, 143, 216, 0.16);
 
   --canvas:    #09090b;
+  /* Phase 4.2.6 Priority 3 — root cause of the rotation "black screen":
+     this element previously fell back to --canvas (#09090b, near-black).
+     During map rotation, leaflet-rotate can briefly expose a viewport
+     corner whose tiles haven't finished loading yet (see keepBuffer note
+     on the TileLayer in MapView.jsx) — that gap showed THIS colour, which
+     at #09090b reads as a flash of solid black. A muted charcoal closer
+     to an actual dark map tile's tone makes the same brief gap read as
+     "map still loading", not a black hole. */
+  --map-fallback: #2a2a30;
   --surface:   #18181b;
   --surface-translucent: rgba(24, 24, 27, 0.75);
   --elevated:  #1f1f23;
@@ -236,7 +253,7 @@ input, select, textarea { font-family: inherit; color: inherit; }
   transition: bottom 0.35s cubic-bezier(0.32, 0.72, 0, 1);
   z-index: 1;
 }
-.map-layer .leaflet-container { background: var(--canvas); }
+.map-layer .leaflet-container { background: var(--map-fallback); }
 /* Priority 2 (Phase 4.2.4) — "Animated rotation". leaflet-rotate applies
    bearing changes by writing a CSS transform straight onto this pane
    (see setBearing() in leaflet-rotate/src/map/Map.js) with no animation
@@ -2131,6 +2148,19 @@ input, select, textarea { font-family: inherit; color: inherit; }
 }
 .nav-bottom-sheet.dragging { box-shadow: 0 -8px 40px rgba(0,0,0,0.22); }
 
+/* Priority 6 (Phase 4.2.6) — the drag zone now spans the grip + the
+   always-visible stat row beneath it, not just the thin grip pill, so the
+   sheet is easy to collapse from anywhere near its top even at the 'full'
+   tier where the directions content crowds that area. touch-action:none
+   here (not just on the grip) is what stops mobile browsers from treating
+   a vertical swipe here as a page scroll instead of the drag gesture. */
+.nav-sheet-drag-zone {
+  flex-shrink: 0;
+  cursor: grab;
+  touch-action: none;
+}
+.nav-bottom-sheet.dragging .nav-sheet-drag-zone { cursor: grabbing; }
+
 .nav-sheet-grip {
   display: flex;
   justify-content: center;
@@ -2140,7 +2170,6 @@ input, select, textarea { font-family: inherit; color: inherit; }
   width: 100%;
   flex-shrink: 0;
   cursor: grab;
-  touch-action: none;     /* the grip owns the vertical drag gesture entirely */
 }
 .nav-bottom-sheet.dragging .nav-sheet-grip { cursor: grabbing; }
 

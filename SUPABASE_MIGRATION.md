@@ -281,3 +281,37 @@ TABLE` statements that drop/rename columns aren't idempotent the way the
 `CREATE TABLE IF NOT EXISTS` statements are. Write new schema changes as a
 separate, dated file (e.g. `backend/supabase/migrations/2026-07-01_add_x.sql`)
 and review it before running it in the SQL Editor.
+
+---
+
+## Phase 4.2.6 — "Unable to reach menu service" (venue_menus table + bucket)
+
+If the admin dashboard's **Diagnose Backend** button under Menus shows:
+
+- `✗ venue_menus table` — `PGRST205: Could not find the table
+  'public.venue_menus' in the schema cache`, and/or
+- `✗ Storage bucket venue-menus` — `404: Bucket not found`
+
+...it means the Phase 4.2 food-menu feature's SQL and Storage setup were
+never applied to this Supabase project — the app code has been correct and
+unchanged; this is a one-time setup step, same as §1/§2 above were for the
+original migration. Fix, in order:
+
+1. **Table.** SQL Editor → New query → paste and run
+   `backend/supabase/venue_menus_migration.sql` (same `venue_menus`
+   definition that's also at the bottom of `schema.sql` — this file exists
+   just so it's a single copy-paste instead of hunting for it in the full
+   schema). It ends with `notify pgrst, 'reload schema';` so the fix takes
+   effect immediately instead of waiting up to ~60s for PostgREST's cache
+   to refresh on its own.
+2. **Bucket.** Same manual steps as §2, with different values:
+   - Left sidebar → **Storage** → **New bucket**
+   - **Name:** `venue-menus` (must match exactly — hardcoded in
+     `backend/data_access.py` as `MENU_IMAGES_BUCKET`)
+   - **Public bucket:** **ON** (menu images load directly in `<img>` tags
+     on the venue card / Copilot, same reasoning as `event-images`)
+   - Click **Create bucket**
+3. **Verify.** Admin dashboard → Menus → **Diagnose Backend** again — both
+   checks should flip green. No redeploy needed; the backend already polls
+   Supabase directly on every request, it was never caching the failure.
+

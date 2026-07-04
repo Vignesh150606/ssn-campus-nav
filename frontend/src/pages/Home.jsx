@@ -950,40 +950,51 @@ export default function Home() {
             className={`nav-bottom-sheet tier-${navSheet.tier}${navSheet.dragging ? ' dragging' : ''}`}
             ref={navSheet.sheetRef}
           >
-            <button
-              className="nav-sheet-grip"
-              onPointerDown={navSheet.onPointerDown}
-              onClick={navSheet.cycleTier}
-              aria-label="Drag or tap to resize navigation details"
-            >
-              <div className="sheet-handle" />
-            </button>
+            {/* Priority 6 (Phase 4.2.6) — at the 'full' tier the directions
+                content pushes right up under the sheet, and the old thin
+                grip strip (32-46px) was the ONLY part of the sheet that
+                responded to a collapse drag — easy to miss when the sheet
+                is nearly full-screen. This wrapper makes the whole header
+                block (grip + the stat row that's already visible at every
+                tier) one dedicated, always-collapsible drag zone, instead
+                of just the pill itself. Tap-to-cycle stays scoped to the
+                grip button alone so tapping a stat number doesn't also
+                cycle tiers. */}
+            <div className="nav-sheet-drag-zone" onPointerDown={navSheet.onPointerDown}>
+              <button
+                className="nav-sheet-grip"
+                onClick={navSheet.cycleTier}
+                aria-label="Drag or tap to resize navigation details"
+              >
+                <div className="sheet-handle" />
+              </button>
 
-            {/* Visible at every tier: Next Turn · Distance · ETA */}
-            <div className="nav-bottom-row-collapsed">
-              {nextTurn ? (
-                <div className="nav-sheet-turn-compact">
-                  <span className="nav-sheet-turn-icon">{turnIcon(nextTurn.direction)}</span>
-                  <div>
-                    <div className="nav-dist-big nav-turn-compact-label">{turnLabel(nextTurn.direction)}</div>
-                    <div className="nav-dist-label">in {formatDist(nextTurn.distanceM)}</div>
+              {/* Visible at every tier: Next Turn · Distance · ETA */}
+              <div className="nav-bottom-row-collapsed">
+                {nextTurn ? (
+                  <div className="nav-sheet-turn-compact">
+                    <span className="nav-sheet-turn-icon">{turnIcon(nextTurn.direction)}</span>
+                    <div>
+                      <div className="nav-dist-big nav-turn-compact-label">{turnLabel(nextTurn.direction)}</div>
+                      <div className="nav-dist-label">in {formatDist(nextTurn.distanceM)}</div>
+                    </div>
                   </div>
-                </div>
-              ) : (
+                ) : (
+                  <div>
+                    <div className="nav-dist-big nav-turn-compact-label">Continue Straight</div>
+                    <div className="nav-dist-label">next turn</div>
+                  </div>
+                )}
+                <div className="nav-divider-v" />
                 <div>
-                  <div className="nav-dist-big nav-turn-compact-label">Continue Straight</div>
-                  <div className="nav-dist-label">next turn</div>
+                  <div className="nav-dist-big">{formatDist(displayDist)}</div>
+                  <div className="nav-dist-label">remaining</div>
                 </div>
-              )}
-              <div className="nav-divider-v" />
-              <div>
-                <div className="nav-dist-big">{formatDist(displayDist)}</div>
-                <div className="nav-dist-label">remaining</div>
-              </div>
-              <div className="nav-divider-v" />
-              <div>
-                <div className="nav-eta-big">{displayEta != null ? `${displayEta} min` : '—'}</div>
-                <div className="nav-dist-label">estimated</div>
+                <div className="nav-divider-v" />
+                <div>
+                  <div className="nav-eta-big">{displayEta != null ? `${displayEta} min` : '—'}</div>
+                  <div className="nav-dist-label">estimated</div>
+                </div>
               </div>
             </div>
 
