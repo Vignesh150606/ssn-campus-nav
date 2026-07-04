@@ -74,7 +74,17 @@ const MARKER_UPDATE_DEG      = 1.5
 // diagonally across a wide path or a gentle footpath bend. 18° was
 // catching those as "genuine" direction changes, which is exactly what
 // still read as the map re-adjusting itself too often to feel calm.
-const ROTATE_THRESHOLD_DEG = 45
+// Phase 4.2.7 Priority 3 re-tune: back down to ~28°, in the spec's
+// requested 20-30° band — but this time paired with a tighter
+// CONFIDENCE_MAX_SPREAD_DEG (below) instead of moving alone. Dropping the
+// threshold back to ~18-20° previously felt jittery because the
+// confidence gate was loose enough to let scattered, wrist-shake samples
+// through as "confident" — so a lower threshold just meant less noise was
+// needed to trigger a commit. Tightening agreement instead of only
+// raising the threshold keeps the map responsive to genuine ~20-30°
+// walking-direction changes while still filtering out the noise that
+// caused the original problem.
+const ROTATE_THRESHOLD_DEG = 28
 
 // Minimum time between two committed rotations, so a single genuine turn
 // can't cause a flurry of re-adjustments as it settles. Raised alongside
@@ -90,7 +100,10 @@ const IMMINENT_TURN_M = 12
 // must agree within CONFIDENCE_MAX_SPREAD_DEG of each other, or the
 // reading is treated as unreliable and never rotates the map.
 const CONFIDENCE_WINDOW_MS       = 1800
-const CONFIDENCE_MAX_SPREAD_DEG  = 32
+// Phase 4.2.7 Priority 3: tightened from 32° alongside lowering
+// ROTATE_THRESHOLD_DEG back toward the spec's 20-30° band — see the
+// comment above ROTATE_THRESHOLD_DEG for why these two move together.
+const CONFIDENCE_MAX_SPREAD_DEG  = 20
 const CONFIDENCE_MIN_SAMPLES     = 3
 
 // A single compass sample jumping more than this in one tick is treated
@@ -174,6 +187,22 @@ export function useNavCamera(rawHeading, active, fusion = {}) {
 
     // ── Stationary lock ────────────────────────────────────────────────
     if (speed != null && speed < STATIONARY_SPEED_MS) return
+    // Phase 4.2.7 Priority 2/3 fix: an UNKNOWN speed (speed === null —
+    // normal for the first second or two right after "Start Navigation",
+    // before the GPS chip has produced a speed-over-ground reading yet)
+    // used to be treated the same as "confirmed moving", so the very
+    // first heading commit could be seeded from a bare compass reading
+    // while the phone was still sitting in someone's hand deciding which
+    // way to walk — exactly the moment phone-orientation jitter is most
+    // noticeable, and exactly what read as Heading-Up "still reacting to
+    // phone orientation" right at the start of a route. Now, until a
+    // heading has actually been committed once, an unknown speed with no
+    // GPS course either is treated the same as "not yet confirmed moving"
+    // rather than assumed — the map simply waits. Once a heading IS
+    // already committed, a single dropped/null speed sample no longer
+    // re-freezes an already-established orientation; only an explicit
+    // low-speed reading does that, same as before.
+    if (committedRef.current == null && speed == null && gpsCourse == null) return
 
     const usingGpsCourse = gpsCourse != null
     const source = usingGpsCourse ? gpsCourse : rawHeading

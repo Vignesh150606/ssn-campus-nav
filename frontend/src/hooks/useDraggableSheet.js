@@ -175,23 +175,43 @@ export function useDraggableSheet(snapPeeks, initialTier = 'collapsed') {
   // pointerdown itself: it watches the first few pixels of movement to
   // tell "pulling the sheet down" and "scrolling the list" apart before
   // committing to either.
+  //
+  // Priority 8 (Phase 4.2.7) root-cause fix: the old version decided ONCE,
+  // on the first few px of movement, whether this gesture was "scrolling"
+  // or "dragging the sheet" — if the content had ANY scroll position at
+  // that instant, the whole rest of that same continuous pull was
+  // permanently handed to native scrolling, even once the list reached
+  // its top a moment later. In practice that meant collapsing Fully
+  // Expanded by swiping down on the content only worked if you happened
+  // to already be scrolled to the very top when the swipe began —
+  // otherwise nothing happened until you released and swiped a SECOND
+  // time. Now it keeps re-checking scrollTop on every move instead of
+  // deciding once, so the moment the content runs out of room to scroll
+  // (scrollTop reaches 0) during the SAME pull, it hands off into the
+  // sheet drag right then, anchored at the current finger position so
+  // the sheet doesn't jump — matching the "scroll up, then the pull keeps
+  // going and drags the sheet down" pattern used by other mobile bottom
+  // sheets.
   const onContentPointerDown = useCallback((e) => {
     if (e.button != null && e.button !== 0) return
     const scrollEl = e.currentTarget
     const startY = e.clientY
     const startPeek = peekRef.current
-    let decided = false
+    let handedOff = false
 
     const preMove = (ev) => {
-      if (decided) return
+      if (handedOff) return
       const dy = ev.clientY - startY // positive = finger moving down
       if (Math.abs(dy) < DRAG_ACTIVATE_PX) return
-      decided = true
+      if (scrollEl.scrollTop > 0) return // still room to scroll — keep watching, don't decide yet
+      handedOff = true
       window.removeEventListener('pointermove', preMove)
       window.removeEventListener('pointerup', preUp)
       window.removeEventListener('pointercancel', preUp)
-      if (dy > 0 && scrollEl.scrollTop <= 0) beginDrag(startY, startPeek)
-      // else: leave it as normal scrolling, nothing further to do here.
+      // Anchor at the CURRENT pointer position, not the gesture's
+      // original start, so the sheet doesn't jump by however far the
+      // finger already travelled while it was still just scrolling.
+      beginDrag(ev.clientY, startPeek)
     }
     const preUp = () => {
       window.removeEventListener('pointermove', preMove)

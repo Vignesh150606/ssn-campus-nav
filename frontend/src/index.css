@@ -339,6 +339,17 @@ input, select, textarea { font-family: inherit; color: inherit; }
     right: 12px;
   }
 }
+/* Priority 5 (Phase 4.2.7): the ceiling math above has now been
+   corrected three times (96px, 120px, then the real ResizeObserver
+   measurement) and the zoom control still isn't reliably clear of the
+   search bar/chip row on every device. Rather than a fourth guess at the
+   numbers, this takes the fallback the brief explicitly allows: the zoom
+   control simply isn't shown on the Home/browse screen at all anymore,
+   only once navigation is active (.nav-mode), where the search overlay
+   is gone entirely and there's nothing left for it to clutter against. */
+.home:not(.nav-mode) .leaflet-container .leaflet-top.leaflet-left {
+  display: none;
+}
 
 /* ---------- Search overlay (top) ---------- */
 .search-overlay {
