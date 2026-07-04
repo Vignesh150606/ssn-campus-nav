@@ -307,20 +307,30 @@ input, select, textarea { font-family: inherit; color: inherit; }
    pattern already used by .nav-compass/.nav-gps-pill below) caps how
    high it can ever go, so it adapts to screen size instead of just
    trusting the sheet height to stay reasonable.
-   Priority 2/4 (Phase 4.2.6): the 96px clearance above was a rough guess
-   — measured against the actual layout it's 12px (.search-overlay's own
-   top offset) + 48px (.search-box height) + 10px (gap) + 38px (.chip-row:
-   34px chip height + 2px top/bottom padding) = 108px, so 96px left it
-   juuust short of fully clearing the category chips on short screens.
-   120px (108px content + 12px breathing margin) is the evidence-based
-   value. */
+   Priority 2/4 (Phase 4.2.5→4.2.6): a hardcoded ceiling constant here has
+   now been corrected TWICE (96px, then 120px) and still wasn't reliably
+   clearing the search bar + chip row on every device. Digging further:
+   the old formula also leaned on --header-h (56px, a generic top-bar
+   height used by .app-header on Events/Admin) — but Home has no
+   .app-header at all, it's an immersive full-screen map with its own
+   absolutely-positioned .search-overlay instead. That term was reserving
+   space for a header that doesn't exist on this screen while separately
+   guessing at the search block's height — two unrelated numbers standing
+   in for one real measurement. --search-header-h fixes this the way
+   --sheet-h/--fab-stack-h already do below: a ResizeObserver on
+   .search-overlay itself (see useElementHeightVar in Home.jsx) reports
+   its ACTUAL rendered height continuously, chips shown or not. Paired
+   with .search-overlay's own real top offset (same
+   `max(12px, safe-area-inset-top)` it's positioned with) instead of the
+   unrelated --header-h, the ceiling now reflects where the search UI
+   truly ends, not a guess. */
 .leaflet-container .leaflet-top.leaflet-left {
   top: auto !important;
   left: auto !important;
   right: 16px;
   bottom: min(
     calc(var(--sheet-h, 0px) + var(--fab-stack-h, 56px) + 14px + env(safe-area-inset-bottom, 0px)),
-    calc(100vh - var(--header-h, 60px) - 120px)
+    calc(100vh - max(12px, env(safe-area-inset-top, 0px)) - var(--search-header-h, 108px) - 12px)
   );
   transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -2496,7 +2506,16 @@ html.nav-sheet-driving .map-layer {
   margin: 0 0 8px;
 }
 
-.event-meta-row {
+/* Phase 4.2.6 Priority 2 root-cause fix: this was named .event-meta-row,
+   an exact collision with EventsList.jsx's schedule-card meta row (see
+   ~line 1144). Both had the same specificity, so this rule — being later
+   in the file — was winning everywhere, including on schedule cards. Its
+   near-white 82%-opacity text (meant for this component's dark photo-hero
+   background) sat on the schedule card's plain --surface (white in light
+   mode), which is exactly what "Venue / Date / Time render blank, layout
+   is otherwise correct" looks like: the text was there, just invisible.
+   Renamed + scoped so the two components can never collide again. */
+.event-hero-meta-row {
   display: flex;
   gap: 14px;
   font-size: 0.8rem;

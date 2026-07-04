@@ -302,7 +302,20 @@ def _candidate_strings(loc: dict):
 
 def resolve_locations(query: str, locations: list, limit: int = 3, cutoff: float = 0.65):
     """Fuzzy-match `query` against every location's name/department/aliases.
-    Returns up to `limit` {id, name, score} dicts, best first, score>=cutoff."""
+    Returns up to `limit` {id, name, score} dicts, best first, score>=cutoff.
+
+    Phase 4.2.6 Priority 3 fix: an exact match (score == 1.0) now wins
+    outright and suppresses everything else, however close. Before this,
+    a query like "main auditorium" scored 1.0 against Main Auditorium but
+    also ~0.93 against Mini Auditorium (difflib.SequenceMatcher rates two
+    strings that share an 11-character common substring — " auditorium"
+    — as ~93% similar even though they name two different buildings), so
+    both cleared the cutoff and both got returned as options — exactly
+    the "explicitly asked for Main, got offered Mini too" bug. Ambiguous
+    *partial* queries like bare "auditorium" are unaffected: neither
+    candidate is an exact match there (both hit the substring-match
+    branch instead, currently the same ~0.88 each), so they still tie
+    and both surface for legitimate disambiguation."""
     query = query.strip()
     if not query:
         return []
@@ -330,6 +343,14 @@ def resolve_locations(query: str, locations: list, limit: int = 3, cutoff: float
         if best >= cutoff:
             scored.append({'id': loc['id'], 'name': loc['name'], 'score': round(best, 3)})
     scored.sort(key=lambda r: -r['score'])
+
+    # An exact match is never ambiguous — a request for "Main Auditorium"
+    # naming that building precisely shouldn't come back with "Mini
+    # Auditorium" riding along just because the two names look alike.
+    exact = [r for r in scored if r['score'] >= 1.0]
+    if exact:
+        return exact[:limit]
+
     return scored[:limit]
 
 
