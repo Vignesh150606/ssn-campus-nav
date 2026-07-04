@@ -109,85 +109,154 @@ function markerIcon(category, isDestination) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Premium user location marker  (Google Maps style)
+//  Premium user location marker  (Google Maps–inspired, not a copy)
+//
+//  Phase 4.2.6, Priority 3 — rebuilt as an IMPERATIVE Leaflet marker
+//  instead of a React-managed <Marker icon={...}> that regenerated a
+//  brand-new divIcon (with the heading baked directly into the SVG's
+//  rotate transform) on every single heading/position update. A freshly
+//  recreated DOM node has no "previous state" for a CSS transition to
+//  animate from, so despite already having reasonable visuals, the old
+//  marker could only ever SNAP between positions and rotations — it could
+//  never actually move or turn smoothly, however good the artwork was.
+//
+//  This version keeps ONE stable DOM node per visual mode (acquiring /
+//  browse dot / nav puck) and mutates it in place:
+//   - position updates go through Leaflet's normal setLatLng (same DOM
+//     node → its own translate3d transform can be CSS-transitioned)
+//   - rotation updates mutate an INNER wrapper div directly, completely
+//     separate from Leaflet's own position transform, so the two can
+//     never fight over the same CSS property
+//   - both apply the same wraparound-jump guard as the map's own bearing
+//     (see applyBearingRaw above) so crossing 0°/360° doesn't spin the
+//     long way around
 // ─────────────────────────────────────────────────────────────────────────────
 
-function userIcon(acquiring, heading) {
-  const CX = 24, CY = 24   // SVG centre in a 48×48 canvas
-
-  if (!acquiring && heading != null) {
-    // ── Navigation mode: blue direction arrow ──────────────────────────
-    return L.divIcon({
-      className: '',
-      html: `<svg width="48" height="48" viewBox="0 0 48 48"
-          xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+function userMarkerHtml(mode) {
+  if (mode === 'acquiring') {
+    return `<div class="user-marker-rotate" style="width:26px;height:26px;position:relative">
+      <div style="position:absolute;inset:0;border-radius:50%;
+        background:rgba(217,119,6,0.2);animation:gps-pulse 1.8s ease-out infinite"></div>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+        width:16px;height:16px;border-radius:50%;
+        background:#D97706;border:3px solid #fff;
+        box-shadow:0 2px 8px rgba(217,119,6,0.55)"></div>
+    </div>`
+  }
+  if (mode === 'puck') {
+    // Navigation puck — rounded chevron + halo + soft directional glow.
+    // Deliberately not a copy of Google Maps' cone: a single bold
+    // arrowhead sitting proud of the dot, rather than a wide translucent
+    // beam, so it reads clearly at a glance without looking derivative.
+    const CX = 24, CY = 24
+    return `<div class="user-marker-rotate" style="width:48px;height:48px">
+      <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
         <defs>
           <filter id="u-shadow" x="-50%" y="-50%" width="200%" height="200%">
             <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(37,99,235,0.45)"/>
           </filter>
         </defs>
-
-        <!-- Heading cone / beam (soft, semi-transparent) -->
-        <path
-          d="M ${CX} 6
-             L ${CX - 11} ${CY + 4}
-             Q ${CX} ${CY - 3} ${CX + 11} ${CY + 4} Z"
-          fill="rgba(66,133,244,0.22)"
-          transform="rotate(${heading},${CX},${CY})"
-        />
-
-        <!-- White halo (gives the dot contrast against any tile colour) -->
+        <!-- soft directional glow -->
+        <path d="M ${CX} 3 L ${CX - 13} ${CY + 8} Q ${CX} ${CY - 6} ${CX + 13} ${CY + 8} Z"
+          fill="rgba(66,133,244,0.20)"/>
+        <!-- white halo for contrast against any tile colour -->
         <circle cx="${CX}" cy="${CY}" r="13" fill="white" filter="url(#u-shadow)"/>
-        <!-- Main blue dot -->
+        <!-- main puck body -->
         <circle cx="${CX}" cy="${CY}" r="11" fill="#4285F4"/>
-        <!-- Subtle inner highlight -->
         <circle cx="${CX}" cy="${CY - 3.5}" r="3.5" fill="rgba(255,255,255,0.4)"/>
-
-        <!-- Arrow head pointing in heading direction (white) -->
-        <polygon
-          points="${CX},${CY - 10} ${CX - 5},${CY - 1} ${CX + 5},${CY - 1}"
-          fill="white"
-          transform="rotate(${heading},${CX},${CY})"
-        />
-      </svg>`,
-      iconSize: [48, 48],
-      iconAnchor: [24, 24],
-    })
+        <!-- bold forward-facing chevron, sitting proud above the puck -->
+        <path d="M ${CX} -2 L ${CX - 6} ${CY - 13} L ${CX} ${CY - 9} L ${CX + 6} ${CY - 13} Z"
+          fill="#FFFFFF" stroke="#4285F4" stroke-width="1.5" stroke-linejoin="round"/>
+      </svg>
+    </div>`
   }
+  // 'dot' — browse mode, not yet navigating
+  return `<div class="user-marker-rotate" style="width:26px;height:26px;position:relative">
+    <div style="position:absolute;inset:0;border-radius:50%;
+      background:rgba(66,133,244,0.20);animation:gps-pulse 1.8s ease-out infinite"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+      width:16px;height:16px;border-radius:50%;
+      background:#4285F4;border:3px solid #fff;
+      box-shadow:0 2px 8px rgba(66,133,244,0.5)"></div>
+  </div>`
+}
 
-  if (acquiring) {
-    // ── GPS acquiring: amber pulsing dot ──────────────────────────────
-    return L.divIcon({
-      className: '',
-      html: `<div style="position:relative;width:26px;height:26px">
-        <div style="position:absolute;inset:0;border-radius:50%;
-          background:rgba(217,119,6,0.2);animation:gps-pulse 1.8s ease-out infinite"></div>
-        <div style="position:absolute;top:50%;left:50%;
-          transform:translate(-50%,-50%);
-          width:16px;height:16px;border-radius:50%;
-          background:#D97706;border:3px solid #fff;
-          box-shadow:0 2px 8px rgba(217,119,6,0.55)"></div>
-      </div>`,
-      iconSize: [26, 26],
-      iconAnchor: [13, 13],
+function UserLocationMarker({ position, acquiring, heading }) {
+  const map = useMap()
+  const markerRef = useRef(null)
+  const modeRef = useRef(null)
+  const lastHeadingRef = useRef(0)
+
+  const mode = acquiring ? 'acquiring' : (heading != null ? 'puck' : 'dot')
+
+  // Create (or replace) the marker only when switching between the 3
+  // discrete visual modes — NOT on every position/heading tick. Keeping
+  // the DOM node stable across those ticks is what makes CSS transitions
+  // able to animate at all (a brand-new node has no prior state to
+  // animate from).
+  useEffect(() => {
+    if (!position || !map) return
+    if (modeRef.current === mode && markerRef.current) return
+    if (markerRef.current) markerRef.current.remove()
+    const size = mode === 'puck' ? 48 : 26
+    const icon = L.divIcon({
+      className: 'user-marker-icon',
+      html: userMarkerHtml(mode),
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2],
     })
-  }
+    markerRef.current = L.marker([position.lat, position.lng], {
+      icon, zIndexOffset: 1000, interactive: false, keyboard: false,
+    }).addTo(map)
+    modeRef.current = mode
+    lastHeadingRef.current = heading ?? 0
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, mode, !!position])
 
-  // ── Normal: blue location dot ──────────────────────────────────────
-  return L.divIcon({
-    className: '',
-    html: `<div style="position:relative;width:26px;height:26px">
-      <div style="position:absolute;inset:0;border-radius:50%;
-        background:rgba(66,133,244,0.20);animation:gps-pulse 1.8s ease-out infinite"></div>
-      <div style="position:absolute;top:50%;left:50%;
-        transform:translate(-50%,-50%);
-        width:16px;height:16px;border-radius:50%;
-        background:#4285F4;border:3px solid #fff;
-        box-shadow:0 2px 8px rgba(66,133,244,0.5)"></div>
-    </div>`,
-    iconSize: [26, 26],
-    iconAnchor: [13, 13],
-  })
+  // Position — Leaflet's own translate3d transform on this same node;
+  // .user-marker-icon's CSS transition (index.css) is what turns this
+  // into a glide instead of a snap.
+  useEffect(() => {
+    if (markerRef.current && position) {
+      markerRef.current.setLatLng([position.lat, position.lng])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally depends on the primitive lat/lng, not the `position` object identity (a fresh object every render would defeat this)
+  }, [position?.lat, position?.lng])
+
+  // Rotation — mutate the inner wrapper directly, never Leaflet's own
+  // position transform. Same wraparound-jump guard as applyBearingRaw.
+  useEffect(() => {
+    if (!markerRef.current || heading == null) return
+    const el = markerRef.current.getElement()
+    const rotateEl = el?.querySelector('.user-marker-rotate')
+    if (!rotateEl) return
+    const wrapped = ((heading % 360) + 360) % 360
+    const rawJump = Math.abs(wrapped - lastHeadingRef.current)
+    if (rawJump > 180) {
+      rotateEl.style.transition = 'none'
+      void rotateEl.offsetHeight // force reflow before re-enabling
+      requestAnimationFrame(() => { rotateEl.style.transition = '' })
+    }
+    lastHeadingRef.current = wrapped
+    rotateEl.style.transform = `rotate(${heading}deg)`
+  }, [heading])
+
+  // Don't fight the map's own zoom animation — a marker gliding on its
+  // own transition WHILE Leaflet is separately animating the zoom looks
+  // detached/floaty. Snap position instantly during a zoom, resume
+  // transitioning once it settles.
+  useEffect(() => {
+    if (!map) return
+    const disable = () => { const e = markerRef.current?.getElement(); if (e) e.style.transition = 'none' }
+    const enable  = () => { const e = markerRef.current?.getElement(); if (e) e.style.transition = '' }
+    map.on('zoomstart', disable)
+    map.on('zoomend', enable)
+    return () => { map.off('zoomstart', disable); map.off('zoomend', enable) }
+  }, [map])
+
+  useEffect(() => () => { markerRef.current?.remove() }, [map])
+
+  return null
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -233,17 +302,36 @@ function NavigationController({
   const isMapAlive = useCallback(() => !!map && !!map._mapPane, [map])
 
   // ── Helper: set bearing + notify parent ────────────────────────────
-  const applyBearing = useCallback((deg) => {
-    if (!isMapAlive() || !map._rotate) return
+  const lastBearingRef = useRef(0)
+  const applyBearingRaw = useCallback((deg) => {
+    const wrapped = ((deg % 360) + 360) % 360
+    const rawJump = Math.abs(wrapped - lastBearingRef.current)
+    if (rawJump > 180) {
+      // Crossing the 0°/360° wrap boundary — disable the CSS transition
+      // for just this one update (a small circular delta applied
+      // instantly is imperceptible; animating the raw/long way is not),
+      // then restore it on the next frame for subsequent normal updates.
+      const pane = map.getPane('rotatePane')
+      if (pane) {
+        pane.style.transition = 'none'
+        void pane.offsetHeight // force reflow so transition:none actually applies before setBearing
+        requestAnimationFrame(() => { pane.style.transition = '' })
+      }
+    }
+    lastBearingRef.current = wrapped
     map.setBearing(deg)
     onRotationChange?.(deg)
-  }, [map, isMapAlive, onRotationChange])
+  }, [map, onRotationChange])
+
+  const applyBearing = useCallback((deg) => {
+    if (!isMapAlive() || !map._rotate) return
+    applyBearingRaw(deg)
+  }, [map, isMapAlive, applyBearingRaw])
 
   const resetBearing = useCallback(() => {
     if (!isMapAlive() || !map._rotate) return
-    map.setBearing(0)
-    onRotationChange?.(0)
-  }, [map, isMapAlive, onRotationChange])
+    applyBearingRaw(0)
+  }, [map, isMapAlive, applyBearingRaw])
 
   // ── Heading-up rotation ────────────────────────────────────────────
   // headingUp=false → always reset to North
@@ -559,16 +647,17 @@ export default function MapView({
             fillOpacity: 0.07,
             weight: 1,
             opacity: 0.22,
+            className: 'user-accuracy-circle',
           }}
         />
       )}
 
       {/* ── User position marker ────────────────────────────────────── */}
       {userPosition && (
-        <Marker
-          position={userPosition}
-          icon={userIcon(acquiringGps, userHeading)}
-          zIndexOffset={1000}
+        <UserLocationMarker
+          position={{ lat: userPosition[0], lng: userPosition[1] }}
+          acquiring={acquiringGps}
+          heading={userHeading}
         />
       )}
 

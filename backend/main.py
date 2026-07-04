@@ -528,6 +528,15 @@ def delete_venue_menu(
     return {"message": "Menu deleted."}
 
 
+@app.get("/api/admin/diagnostics/menu-system")
+def diagnose_menu_system(admin: dict = Depends(get_current_admin)):
+    """Priority 1 (Phase 4.2.6) — hit this once (logged in as admin) to get
+    an unambiguous answer to "what exactly is broken", instead of
+    inferring it from the generic 503 the public endpoints intentionally
+    return. See data_access.diagnose_menu_system's docstring."""
+    return data_access.diagnose_menu_system()
+
+
 # ---------------------------------------------------------------------------
 # Campus Copilot — text understanding only.
 #

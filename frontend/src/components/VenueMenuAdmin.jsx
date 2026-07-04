@@ -51,6 +51,10 @@ async function deleteMenu(venueId, date, token) {
   )
 }
 
+async function diagnoseMenuSystem(token) {
+  return apiFetch('/api/admin/diagnostics/menu-system', {}, token)
+}
+
 const FOOD_CATEGORIES = ['food', 'dining']
 
 export default function VenueMenuAdmin({ venues, token }) {
@@ -66,6 +70,9 @@ export default function VenueMenuAdmin({ venues, token }) {
   const [error,           setError]           = useState(null)
   const [success,         setSuccess]         = useState(null)
   const [preview,         setPreview]         = useState(null)
+  // Priority 1 (Phase 4.2.6) — one-click self-diagnosis, see diagnoseMenuSystem
+  const [diag,            setDiag]            = useState(null)   // null=not run, undefined=loading, obj=result
+  const [diagError,       setDiagError]       = useState(null)
 
   function flash(msg) { setSuccess(msg); setTimeout(() => setSuccess(null), 3000) }
 
@@ -122,6 +129,16 @@ export default function VenueMenuAdmin({ venues, token }) {
     })
   }
 
+  async function runDiagnostics() {
+    if (!token) { setDiagError('Not authenticated — please log in again.'); return }
+    setDiag(undefined); setDiagError(null)
+    try {
+      setDiag(await diagnoseMenuSystem(token))
+    } catch (e) {
+      setDiag(null); setDiagError(e.message)
+    }
+  }
+
   if (foodVenues.length === 0) {
     return <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>No food/dining venues found.</p>
   }
@@ -130,6 +147,30 @@ export default function VenueMenuAdmin({ venues, token }) {
 
   return (
     <div className="venue-menu-admin">
+      <div className="venue-menu-admin-diag">
+        <button className="venue-menu-admin-btn diagnose" onClick={runDiagnostics} disabled={diag === undefined}>
+          🩺 {diag === undefined ? 'Checking…' : 'Diagnose Backend'}
+        </button>
+        {diagError && <div className="venue-menu-admin-error">{diagError}</div>}
+        {diag && diag !== undefined && (
+          <ul className="venue-menu-admin-diag-list">
+            <li className={diag.client_ok ? 'ok' : 'fail'}>
+              {diag.client_ok ? '✓' : '✗'} Supabase client
+              {diag.client_error && <> — <code>{diag.client_error}</code></>}
+            </li>
+            <li className={diag.table_exists ? 'ok' : 'fail'}>
+              {diag.table_exists ? '✓' : '✗'} <code>venue_menus</code> table
+              {diag.table_error && <> — <code>{diag.table_error}</code></>}
+            </li>
+            <li className={diag.bucket_exists ? 'ok' : 'fail'}>
+              {diag.bucket_exists ? '✓' : '✗'} Storage bucket <code>{diag.expected_bucket_name}</code>
+              {diag.bucket_exists && ` (public: ${diag.bucket_public})`}
+              {diag.bucket_error && <> — <code>{diag.bucket_error}</code></>}
+            </li>
+          </ul>
+        )}
+      </div>
+
       <div className="venue-menu-admin-controls">
         <label className="venue-menu-admin-label">
           Venue

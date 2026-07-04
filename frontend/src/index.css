@@ -118,6 +118,33 @@ input, select, textarea { font-family: inherit; color: inherit; }
   0%   { transform: translateX(-50%) scale(0.7); opacity: 0.55; }
   100% { transform: translateX(-50%) scale(2.8); opacity: 0; }
 }
+/* Priority 3 (Phase 4.2.6) — premium user marker: this class lives on the
+   OUTER element Leaflet itself positions via translate3d (see
+   UserLocationMarker in MapView.jsx) — because that DOM node now stays
+   stable across GPS updates instead of being recreated each time, this
+   transition can actually animate position changes into a glide instead
+   of a snap. zoomstart/zoomend in MapView.jsx temporarily disables it so
+   it doesn't fight Leaflet's own zoom animation. */
+.user-marker-icon {
+  transition: transform 0.4s linear;
+}
+/* The INNER wrapper Leaflet doesn't touch — rotation is applied here
+   directly (see UserLocationMarker), completely separate from the
+   position transform above so the two can never conflict. */
+.user-marker-rotate {
+  transition: transform 0.4s ease-out;
+  transform-origin: center center;
+}
+/* "Animated accuracy circle" — a slow breathing opacity pulse rather than
+   a resizing one (resizing a Leaflet Circle's actual radius would visibly
+   misrepresent the real accuracy value while mid-animation). */
+@keyframes accuracy-breathe {
+  0%, 100% { opacity: 0.22; }
+  50%      { opacity: 0.4; }
+}
+.user-accuracy-circle {
+  animation: accuracy-breathe 3s ease-in-out infinite;
+}
 @keyframes sheet-up {
   from { transform: translateY(20px); opacity: 0; }
   to   { transform: translateY(0); opacity: 1; }
@@ -262,14 +289,21 @@ input, select, textarea { font-family: inherit; color: inherit; }
    entirely. min() against a header-relative ceiling (same clamping
    pattern already used by .nav-compass/.nav-gps-pill below) caps how
    high it can ever go, so it adapts to screen size instead of just
-   trusting the sheet height to stay reasonable. */
+   trusting the sheet height to stay reasonable.
+   Priority 2/4 (Phase 4.2.6): the 96px clearance above was a rough guess
+   — measured against the actual layout it's 12px (.search-overlay's own
+   top offset) + 48px (.search-box height) + 10px (gap) + 38px (.chip-row:
+   34px chip height + 2px top/bottom padding) = 108px, so 96px left it
+   juuust short of fully clearing the category chips on short screens.
+   120px (108px content + 12px breathing margin) is the evidence-based
+   value. */
 .leaflet-container .leaflet-top.leaflet-left {
   top: auto !important;
   left: auto !important;
   right: 16px;
   bottom: min(
     calc(var(--sheet-h, 0px) + var(--fab-stack-h, 56px) + 14px + env(safe-area-inset-bottom, 0px)),
-    calc(100vh - var(--header-h, 60px) - 96px)
+    calc(100vh - var(--header-h, 60px) - 120px)
   );
   transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -4240,6 +4274,35 @@ select:-webkit-autofill {
 .venue-menu-admin-btn.replace { background: #2563EB; color: #fff; border-color: #2563EB; }
 .venue-menu-admin-btn.delete  { background: #DC2626; color: #fff; border-color: #DC2626; }
 .venue-menu-admin-btn.preview { background: var(--canvas); }
+
+/* Priority 1 (Phase 4.2.6) — backend self-diagnosis panel */
+.venue-menu-admin-diag {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.venue-menu-admin-btn.diagnose { background: var(--canvas); align-self: flex-start; }
+.venue-menu-admin-diag-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+.venue-menu-admin-diag-list li { display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
+.venue-menu-admin-diag-list li.ok   { color: #2E9E5B; }
+.venue-menu-admin-diag-list li.fail { color: #D7263D; }
+.venue-menu-admin-diag-list code {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--muted);
+  word-break: break-word;
+}
 .venue-menu-admin-empty {
   display: flex;
   align-items: center;

@@ -616,6 +616,53 @@ def upload_menu_image_file(venue_id: str, filename: str,
     return _wrap(_run)
 
 
+def diagnose_menu_system() -> dict:
+    """Priority 1 (Phase 4.2.6) — unambiguous self-diagnosis for the
+    food-menu backend, so "Unable to reach menu service" never has to be
+    debugged by guessing. Deliberately does NOT go through `_wrap` — a
+    broken system here must still return a structured report, not itself
+    raise a 503. Exposed via GET /api/admin/diagnostics/menu-system
+    (admin-only, since it can reveal internal Supabase error detail).
+
+    Each check runs independently so one failure doesn't hide the others
+    — e.g. if BOTH the table and the bucket are missing, the report says
+    so, rather than stopping at whichever is checked first.
+    """
+    result = {
+        "expected_bucket_name": MENU_IMAGES_BUCKET,
+        "client_ok": False, "client_error": None,
+        "table_exists": False, "table_error": None,
+        "bucket_exists": False, "bucket_error": None, "bucket_public": None,
+    }
+    try:
+        client = get_client()
+        result["client_ok"] = True
+    except Exception as exc:
+        result["client_error"] = str(exc)
+        return result  # nothing else is checkable without a client
+
+    # Table check — select(...).limit(1) is enough to prove the table (and
+    # PostgREST's schema cache) actually sees `venue_menus`, without
+    # depending on there being any rows in it yet.
+    try:
+        client.table("venue_menus").select("id").limit(1).execute()
+        result["table_exists"] = True
+    except Exception as exc:
+        result["table_error"] = str(exc)
+
+    # Bucket check — get_bucket() is a direct single-bucket lookup (a 404
+    # here means "doesn't exist", vs. list_buckets() + search which is
+    # both more expensive and less precise about *why* it failed).
+    try:
+        bucket = client.storage.get_bucket(MENU_IMAGES_BUCKET)
+        result["bucket_exists"] = True
+        result["bucket_public"] = getattr(bucket, "public", None)
+    except Exception as exc:
+        result["bucket_error"] = str(exc)
+
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Event image delete  (Phase 4.2 — poster management)
 # ---------------------------------------------------------------------------

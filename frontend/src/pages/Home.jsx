@@ -261,7 +261,17 @@ export default function Home() {
   // took a while to lock (indoors, urban canyon, cloudy sky) even though
   // the compass itself was ready immediately.
   const navCameraActive = navMode && tracking && headingUp
-  const { smoothedHeading, mapHeading } = useNavCamera(rawHeading, navCameraActive, { gpsCourse, speed })
+  // Phase 3 + 13: compute upcoming turn with landmark hint. Moved up from
+  // its old spot further down — Priority 2 (Phase 4.2.6)'s cooldown-bypass
+  // logic in useNavCamera needs nextTurn.distanceM to know when a turn is
+  // imminent, so this has to run before that hook is called.
+  const nextTurn = useMemo(() => {
+    if (!navMode || !remainingPath?.length) return null
+    return computeUpcomingTurn(remainingPath)
+  }, [navMode, remainingPath])
+  const { smoothedHeading, mapHeading } = useNavCamera(rawHeading, navCameraActive, {
+    gpsCourse, speed, nextTurnDist: nextTurn?.distanceM ?? null,
+  })
 
   // Priority 5 (Phase 4.2.5) — Navigation Status. A single, always-computed
   // status so nothing about heading-up/GPS acquisition ever just silently
@@ -437,12 +447,6 @@ export default function Home() {
   const allTurns = useMemo(() => {
     if (!navMode || !remainingPath?.length) return []
     return computeAllTurns(remainingPath)
-  }, [navMode, remainingPath])
-
-  // Phase 3 + 13: compute upcoming turn with landmark hint
-  const nextTurn = useMemo(() => {
-    if (!navMode || !remainingPath?.length) return null
-    return computeUpcomingTurn(remainingPath)
   }, [navMode, remainingPath])
 
   const turnLandmark = useMemo(() => {
