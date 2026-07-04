@@ -4,21 +4,25 @@
  * Phase 4.2.4, Priority 1: previously the only in-navigation preference
  * was voice guidance (VoiceSettingsPanel) — Heading-Up had its own
  * separate always-visible floating toggle (NavCompass) and there was no
- * way to control the compass display or auto-recenter/dynamic-zoom
- * behaviour at all. This consolidates all five into one panel:
+ * way to control auto-recenter/dynamic-zoom behaviour at all. This
+ * consolidates all four into one panel:
  *
  *   Rotate Map While Walking  — headingUp preference (own state, Home.jsx)
- *   Show Compass              — showCompass (own state, Home.jsx) — NavCompass
- *                                only renders while this is on
  *   Voice Guidance            — reads/writes the EXISTING useVoiceGuidance
  *                                settings object directly; deliberately not
  *                                duplicated here, so there's one source of truth
  *   Auto Recenter             — autoRecenter (own state, Home.jsx)
  *   Dynamic Zoom              — dynamicZoom (own state, Home.jsx)
  *
- * All five are plain in-memory React state owned by Home.jsx — that's
- * enough to satisfy "persist during the current navigation session"
- * (they live for as long as the app is open) without the added
+ * Phase 4.2.7 (yellow Heading-Up control spec): removed the "Show
+ * Compass" row that used to live here. NavCompass is now always visible
+ * during navigation (Home.jsx) rather than an opt-in setting, so a
+ * separate checkbox for its visibility would just be dead state that no
+ * longer did anything.
+ *
+ * All remaining are plain in-memory React state owned by Home.jsx —
+ * that's enough to satisfy "persist during the current navigation
+ * session" (they live for as long as the app is open) without the added
  * complexity/risk of localStorage persistence, which voice guidance
  * already handles separately for the one setting that's meant to
  * survive across sessions.
@@ -29,7 +33,6 @@
 export default function NavSettingsPanel({
   voice, open, onClose,
   headingUp, onToggleHeadingUp,
-  showCompass, onToggleShowCompass,
   autoRecenter, onToggleAutoRecenter,
   dynamicZoom, onToggleDynamicZoom,
 }) {
@@ -48,11 +51,6 @@ export default function NavSettingsPanel({
         <div className="voice-settings-row voice-toggle-row">
           <span>Rotate Map While Walking</span>
           <input type="checkbox" checked={headingUp} onChange={onToggleHeadingUp} />
-        </div>
-
-        <div className="voice-settings-row voice-toggle-row">
-          <span>Show Compass</span>
-          <input type="checkbox" checked={showCompass} onChange={e => onToggleShowCompass(e.target.checked)} />
         </div>
 
         <div className="voice-settings-row voice-toggle-row">

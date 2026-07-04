@@ -118,6 +118,13 @@ const JUMP_CONFIRM_TOLERANCE_DEG   = 20
 // follow magnetometer noise from a phone that's sitting still.
 const STATIONARY_SPEED_MS = 0.35
 
+// How long to wait, right after navigation activates, for real speed/GPS-
+// course telemetry before falling back to the confidence-buffer alone.
+// Long enough to skip the "phone still settling in your hand" moment;
+// short enough that a device which simply never reports speed/course
+// doesn't stay frozen on North-Up for the whole walk.
+const NO_TELEMETRY_GRACE_MS = 4000
+
 /** Signed shortest angular distance from a → b in [-180, +180] */
 function circDiff(a, b) {
   let d = ((b - a) % 360 + 360) % 360
@@ -171,6 +178,7 @@ export function useNavCamera(rawHeading, active, fusion = {}) {
   const bufferRef       = useRef([])     // [{ value, at }] recent samples for confidence
   const lastCommitAtRef = useRef(0)
   const pendingJumpRef  = useRef(null)   // { value, at } — a rejected impossible jump awaiting confirmation
+  const navActivatedAtRef = useRef(0)    // when this activation began — for the no-telemetry grace window
 
   useEffect(() => {
     if (!active) {
@@ -180,35 +188,43 @@ export function useNavCamera(rawHeading, active, fusion = {}) {
       bufferRef.current = []
       lastCommitAtRef.current = 0
       pendingJumpRef.current = null
+      navActivatedAtRef.current = 0
       setSmoothedHeading(null)
       setMapHeading(null)
       return
     }
 
+    const now = Date.now()
+
     // ── Stationary lock ────────────────────────────────────────────────
     if (speed != null && speed < STATIONARY_SPEED_MS) return
-    // Phase 4.2.7 Priority 2/3 fix: an UNKNOWN speed (speed === null —
-    // normal for the first second or two right after "Start Navigation",
-    // before the GPS chip has produced a speed-over-ground reading yet)
-    // used to be treated the same as "confirmed moving", so the very
-    // first heading commit could be seeded from a bare compass reading
-    // while the phone was still sitting in someone's hand deciding which
-    // way to walk — exactly the moment phone-orientation jitter is most
-    // noticeable, and exactly what read as Heading-Up "still reacting to
-    // phone orientation" right at the start of a route. Now, until a
-    // heading has actually been committed once, an unknown speed with no
-    // GPS course either is treated the same as "not yet confirmed moving"
-    // rather than assumed — the map simply waits. Once a heading IS
-    // already committed, a single dropped/null speed sample no longer
-    // re-freezes an already-established orientation; only an explicit
-    // low-speed reading does that, same as before.
-    if (committedRef.current == null && speed == null && gpsCourse == null) return
+    // Phase 4.2.7 Priority 2/3 fix, corrected: the previous version of
+    // this fix blocked the FIRST heading commit outright whenever speed
+    // AND gpsCourse were both null — but on plenty of real devices/
+    // browsers, `coords.speed` is simply never populated reliably (it can
+    // stay null indefinitely even while genuinely walking), and gpsCourse
+    // is gated on the same kind of sustained-movement signal. That made
+    // the block permanent instead of temporary: Heading-Up never entered
+    // its active state at all, the map stayed North-Up for the whole
+    // session. This still avoids seeding the very first heading from a
+    // single raw sample in the moment right after "Start Navigation" (the
+    // phone may still be settling in someone's hand) — but only for a
+    // short grace window. After that, if speed/gpsCourse still haven't
+    // shown up, this falls through to the SAME confidence-buffer gate
+    // every later compass reading already has to pass (3 agreeing samples
+    // within CONFIDENCE_MAX_SPREAD_DEG) — already enough on its own to
+    // stop a bare noisy sample from snapping the map, without requiring
+    // speed/course telemetry this device may never actually provide.
+    if (navActivatedAtRef.current === 0) navActivatedAtRef.current = now
+    if (
+      committedRef.current == null &&
+      speed == null && gpsCourse == null &&
+      now - navActivatedAtRef.current < NO_TELEMETRY_GRACE_MS
+    ) return
 
     const usingGpsCourse = gpsCourse != null
     const source = usingGpsCourse ? gpsCourse : rawHeading
     if (source == null) return
-
-    const now = Date.now()
 
     // ═══ Marker arrow — light continuous smoothing (unchanged philosophy,
     //     this is NOT the thing that made navigation feel jittery) ═══════

@@ -122,7 +122,7 @@ export default function Home() {
   // spec ("persist during the current navigation session") — see
   // NavSettingsPanel.jsx's header comment for why that doesn't need
   // localStorage the way voice guidance does.
-  const [showCompass, setShowCompass]   = useState(false) // default OFF — "Compass hidden unless explicitly enabled"
+
   const [autoRecenter, setAutoRecenter] = useState(false) // Phase 4.2.6 Priority 7 — default OFF; user opts in via Navigation Settings
   const [dynamicZoom, setDynamicZoom]   = useState(true)
 
@@ -921,19 +921,20 @@ export default function Home() {
             ✕ Exit
           </button>
 
-          {/* Priority 1 (Phase 4.2.4) — Compass is now purely opt-in via
-              Navigation Settings (default OFF), decoupled from the
-              Rotate-Map-While-Walking preference it used to double as the
-              only control for. Tapping it (once shown) still flips
-              headingUp too, as a convenience — same shared state, not a
-              second source of truth. */}
-          {showCompass && (
-            <NavCompass
-              mapHeading={currentBearing}
-              headingUp={headingUp}
-              onToggle={handleToggleHeadingUp}
-            />
-          )}
+          {/* Phase 4.2.7 (yellow Heading-Up control spec): this used to be
+              opt-in via Navigation Settings, default OFF (Phase 4.2.4) —
+              meaning nothing appeared to switch back to North-Up unless
+              you'd found and enabled a settings checkbox first. Now it's
+              simply always present during navigation, defaulting to its
+              active (Heading-Up ON) state, matching the immediate-
+              manual-override pattern of other navigation apps: tap once
+              for North-Up, tap again to resume Heading-Up. Same shared
+              headingUp state as before — not a second source of truth. */}
+          <NavCompass
+            mapHeading={currentBearing}
+            headingUp={headingUp}
+            onToggle={handleToggleHeadingUp}
+          />
 
           {/* Phase 6 — Prominent off-route / recalculating banner */}
           {(offRoute || recalculating) && (
@@ -1212,8 +1213,6 @@ export default function Home() {
         onClose={() => setNavSettingsOpen(false)}
         headingUp={headingUp}
         onToggleHeadingUp={handleToggleHeadingUp}
-        showCompass={showCompass}
-        onToggleShowCompass={setShowCompass}
         autoRecenter={autoRecenter}
         onToggleAutoRecenter={setAutoRecenter}
         dynamicZoom={dynamicZoom}
