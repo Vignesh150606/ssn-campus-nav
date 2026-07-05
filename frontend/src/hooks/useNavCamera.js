@@ -36,7 +36,12 @@
  *      signal. Tight agreement (holding a direction, or smoothly turning)
  *      = confident. Scattered samples (wrist movement, hand shake, noise)
  *      = not confident, and low-confidence readings never move the map,
- *      full stop.
+ *      full stop. This now also gates the very FIRST commit when
+ *      navigation starts (compass path) — the map opens on an already-
+ *      vetted heading instead of snapping to whatever the first raw
+ *      sample happened to be, which is what used to read as "hesitant/
+ *      unstable" before it settled. GPS course seeds instantly either
+ *      way, since it's high-confidence by construction.
  *   5. Rotation threshold — even a confident estimate only commits once
  *      it has drifted ~45° from the map's CURRENT rotation — small
  *      fluctuations under that never touch the map at all. This is the
@@ -224,11 +229,36 @@ export function useNavCamera(rawHeading, active, fusion = {}) {
     bufferRef.current = buffer
 
     if (committedRef.current == null) {
-      // First-ever reading — seed immediately so the map isn't blank
-      // waiting for a confidence window to fill.
-      committedRef.current = source
-      lastCommitAtRef.current = now
-      setMapHeading(source)
+      // Phase 4.2.6 Priority 6 fix: this used to commit the very FIRST
+      // raw sample instantly, with no confidence check at all — a noisy
+      // first compass reading (magnetometer settling, phone tilt) would
+      // snap the map to a possibly-wrong heading immediately, and then —
+      // because committedRef was already set — any correction from the
+      // confidence buffer filling in moments later had to fight through
+      // the normal ROTATE_THRESHOLD_DEG/cooldown gates meant for genuine
+      // mid-walk turns. That's exactly "hesitant/unstable before
+      // settling": an instant snap, then a stuck pause, then a sudden
+      // correction. GPS course is already high-confidence by construction
+      // (derived from consecutive real positions) so it still seeds
+      // instantly — only the compass path now waits for the SAME
+      // confidence buffer as every later reading before its first commit,
+      // so navigation opens on a heading that's already been vetted
+      // instead of a bare guess.
+      if (usingGpsCourse) {
+        committedRef.current = source
+        lastCommitAtRef.current = now
+        setMapHeading(source)
+      } else if (buffer.length >= CONFIDENCE_MIN_SAMPLES) {
+        const mean = circMean(buffer.map(s => s.value))
+        const spread = circSpread(buffer.map(s => s.value), mean)
+        if (spread <= CONFIDENCE_MAX_SPREAD_DEG) {
+          committedRef.current = mean
+          lastCommitAtRef.current = now
+          setMapHeading(mean)
+        }
+        // else: still scattered — keep waiting, map stays North-up a
+        // little longer rather than opening on an unreliable guess.
+      }
       return
     }
 
