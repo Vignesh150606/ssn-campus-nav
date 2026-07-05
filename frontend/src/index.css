@@ -307,30 +307,20 @@ input, select, textarea { font-family: inherit; color: inherit; }
    pattern already used by .nav-compass/.nav-gps-pill below) caps how
    high it can ever go, so it adapts to screen size instead of just
    trusting the sheet height to stay reasonable.
-   Priority 2/4 (Phase 4.2.5→4.2.6): a hardcoded ceiling constant here has
-   now been corrected TWICE (96px, then 120px) and still wasn't reliably
-   clearing the search bar + chip row on every device. Digging further:
-   the old formula also leaned on --header-h (56px, a generic top-bar
-   height used by .app-header on Events/Admin) — but Home has no
-   .app-header at all, it's an immersive full-screen map with its own
-   absolutely-positioned .search-overlay instead. That term was reserving
-   space for a header that doesn't exist on this screen while separately
-   guessing at the search block's height — two unrelated numbers standing
-   in for one real measurement. --search-header-h fixes this the way
-   --sheet-h/--fab-stack-h already do below: a ResizeObserver on
-   .search-overlay itself (see useElementHeightVar in Home.jsx) reports
-   its ACTUAL rendered height continuously, chips shown or not. Paired
-   with .search-overlay's own real top offset (same
-   `max(12px, safe-area-inset-top)` it's positioned with) instead of the
-   unrelated --header-h, the ceiling now reflects where the search UI
-   truly ends, not a guess. */
+   Priority 2/4 (Phase 4.2.6): the 96px clearance above was a rough guess
+   — measured against the actual layout it's 12px (.search-overlay's own
+   top offset) + 48px (.search-box height) + 10px (gap) + 38px (.chip-row:
+   34px chip height + 2px top/bottom padding) = 108px, so 96px left it
+   juuust short of fully clearing the category chips on short screens.
+   120px (108px content + 12px breathing margin) is the evidence-based
+   value. */
 .leaflet-container .leaflet-top.leaflet-left {
   top: auto !important;
   left: auto !important;
   right: 16px;
   bottom: min(
     calc(var(--sheet-h, 0px) + var(--fab-stack-h, 56px) + 14px + env(safe-area-inset-bottom, 0px)),
-    calc(100vh - max(12px, env(safe-area-inset-top, 0px)) - var(--search-header-h, 108px) - 12px)
+    calc(100vh - var(--header-h, 60px) - 120px)
   );
   transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -338,17 +328,6 @@ input, select, textarea { font-family: inherit; color: inherit; }
   .leaflet-container .leaflet-top.leaflet-left {
     right: 12px;
   }
-}
-/* Priority 5 (Phase 4.2.7): the ceiling math above has now been
-   corrected three times (96px, 120px, then the real ResizeObserver
-   measurement) and the zoom control still isn't reliably clear of the
-   search bar/chip row on every device. Rather than a fourth guess at the
-   numbers, this takes the fallback the brief explicitly allows: the zoom
-   control simply isn't shown on the Home/browse screen at all anymore,
-   only once navigation is active (.nav-mode), where the search overlay
-   is gone entirely and there's nothing left for it to clutter against. */
-.home:not(.nav-mode) .leaflet-container .leaflet-top.leaflet-left {
-  display: none;
 }
 
 /* ---------- Search overlay (top) ---------- */
@@ -2517,16 +2496,7 @@ html.nav-sheet-driving .map-layer {
   margin: 0 0 8px;
 }
 
-/* Phase 4.2.6 Priority 2 root-cause fix: this was named .event-meta-row,
-   an exact collision with EventsList.jsx's schedule-card meta row (see
-   ~line 1144). Both had the same specificity, so this rule — being later
-   in the file — was winning everywhere, including on schedule cards. Its
-   near-white 82%-opacity text (meant for this component's dark photo-hero
-   background) sat on the schedule card's plain --surface (white in light
-   mode), which is exactly what "Venue / Date / Time render blank, layout
-   is otherwise correct" looks like: the text was there, just invisible.
-   Renamed + scoped so the two components can never collide again. */
-.event-hero-meta-row {
+.event-meta-row {
   display: flex;
   gap: 14px;
   font-size: 0.8rem;
@@ -3779,12 +3749,10 @@ select:-webkit-autofill {
    PHASE 4A — Premium Google Maps Navigation Experience
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── Heading-Up toggle — the primary, always-visible-during-navigation
-   mode switch. Occupies the slot this used to share with the compass
-   display before Phase 4.2.7 split them into two independent controls. ── */
-.heading-up-toggle {
+/* ── Navigation compass (heading-up indicator + north-up toggle) ─────────── */
+.nav-compass {
   position: fixed;
-  /* Priority 2: clamped against the live sheet height so the control is
+  /* Priority 2: clamped against the live sheet height so the compass is
      pushed up (never lower than clear of the sheet's visible top edge)
      as the draggable sheet expands toward Fully Expanded — recalculated
      by the browser on every --sheet-h write, same frame as the sheet's
@@ -3810,52 +3778,13 @@ select:-webkit-autofill {
   animation: fade-in 0.25s ease;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-.heading-up-toggle:active {
+.nav-compass:active {
   transform: scale(0.92);
   box-shadow: var(--shadow-sm);
 }
-.heading-up-toggle.off {
+.nav-compass.off {
   background: var(--surface);
   opacity: 0.75;
-}
-.heading-up-toggle-label {
-  font-family: var(--font-display);
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  color: #E53E3E;
-  line-height: 1;
-}
-.heading-up-toggle.off .heading-up-toggle-label {
-  color: #94A3B8;
-}
-
-/* ── Compass — OPTIONAL North indicator, independent of the Heading-Up
-   toggle above (Phase 4.2.7 split). Purely decorative: no cursor, no
-   click/active states, no "off" variant — it's either mounted (Show
-   Compass is on) or not rendered at all. Offset further down the same
-   right-hand column so it never overlaps HeadingUpToggle when both are
-   visible at once. ── */
-.nav-compass {
-  position: fixed;
-  top: min(calc(var(--header-h) + 116px + 62px), calc(100vh - var(--sheet-h, 0px) - 10px));
-  right: 14px;
-  z-index: 809;
-  width: 46px;
-  height: 52px;
-  border-radius: 12px;
-  background: var(--surface-translucent);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  border: 1px solid var(--line-strong);
-  box-shadow: var(--shadow-md);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  padding: 6px 4px 4px;
-  animation: fade-in 0.25s ease;
 }
 .nav-compass-n {
   font-family: var(--font-display);
@@ -3864,6 +3793,9 @@ select:-webkit-autofill {
   letter-spacing: 0.06em;
   color: #E53E3E;
   line-height: 1;
+}
+.nav-compass.off .nav-compass-n {
+  color: #94A3B8;
 }
 
 /* ── Recenter button — Phase 4.2: now a flex child of .copilot-fab-stack
@@ -3908,13 +3840,10 @@ select:-webkit-autofill {
   white-space: nowrap;
 }
 
-/* ── Safe-area overrides — Heading-Up toggle + Compass ────────────────────── */
+/* ── Safe-area overrides for nav-compass ───────────────────────────────────── */
 @supports (padding: env(safe-area-inset-top)) {
-  .heading-up-toggle {
-    top: min(calc(var(--header-h) + env(safe-area-inset-top, 0px) + 116px), calc(100vh - var(--sheet-h, 0px) - 70px));
-  }
   .nav-compass {
-    top: min(calc(var(--header-h) + env(safe-area-inset-top, 0px) + 116px + 62px), calc(100vh - var(--sheet-h, 0px) - 10px));
+    top: min(calc(var(--header-h) + env(safe-area-inset-top, 0px) + 116px), calc(100vh - var(--sheet-h, 0px) - 70px));
   }
 }
 
@@ -3938,7 +3867,7 @@ select:-webkit-autofill {
 
 /* ── Mobile sizing ────────────────────────────────────────────────────────── */
 @media (max-width: 430px) {
-  .heading-up-toggle, .nav-compass {
+  .nav-compass {
     width: 42px;
     height: 48px;
     right: 12px;

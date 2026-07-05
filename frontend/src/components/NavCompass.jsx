@@ -1,34 +1,35 @@
 /**
- * NavCompass — optional North indicator ("Compass").
+ * NavCompass — Bug 6: explicit, user-controlled Heading-Up toggle.
  *
- * Phase 4.2.7 (Heading-Up/Compass separation) root-cause fix: this used
- * to ALSO be the Heading-Up toggle (it took headingUp/onToggle props and
- * flipped the preference on tap). That conflated two separate concepts:
- * "which way is North" and "which navigation mode am I in" ended up
- * sharing one visibility rule and one interaction, so hiding the compass
- * also removed the only way to switch modes, and showing it implied it
- * WAS the mode switch. The brief is explicit these must be independent.
+ * Previously this hid itself the instant the map was North-Up (or
+ * headingUp was off), which was a dead end — there was no other control
+ * to get back to Heading-Up, so Recenter had grown a side effect of
+ * silently re-enabling it. Now it's a simple, always-visible toggle
+ * during navigation:
  *
- * This is now purely a decorative North indicator:
- *   • No click handler, no headingUp prop, no effect on navigation mode.
- *   • The needle always points to true North on screen, whatever the
- *     map's current rotation (mapHeading) is — including 0 while
- *     North-Up, where "pointing up" and "pointing North" are the same
- *     thing anyway.
- *   • Visibility is entirely independent, controlled by the "Show
- *     Compass" Navigation Setting (default OFF, see NavSettingsPanel).
- *     Turning it on/off never touches Heading-Up; turning Heading-Up
- *     off never hides it.
+ *   ON  (headingUp=true)  → rotating needle showing where North actually
+ *                           is relative to the (rotated) screen; map
+ *                           rotates with the user's direction of travel.
+ *   OFF (headingUp=false) → static, non-rotating "N" — map stays
+ *                           North-Up, no heading rotation applied.
  *
- * HeadingUpToggle.jsx is the separate, always-visible-during-navigation
- * mode switch this used to double as.
+ * One tap always flips the preference. Recenter (Home.jsx) never touches
+ * this — camera position and heading preference are fully independent.
  */
-export default function NavCompass({ mapHeading }) {
+export default function NavCompass({ mapHeading, headingUp, onToggle }) {
+  // Needle angle only means something while heading-up is actually
+  // rotating the map; pinned to 0 (pointing straight up) otherwise.
   const normalised = mapHeading == null ? 0 : ((mapHeading % 360) + 360) % 360
-  const northAngle = -normalised
+  const northAngle = headingUp ? -normalised : 0
 
   return (
-    <div className="nav-compass" aria-hidden="true" title="North">
+    <button
+      className={`nav-compass${headingUp ? '' : ' off'}`}
+      onClick={onToggle}
+      aria-label={headingUp ? 'Heading-Up is on — tap for North-Up' : 'North-Up is on — tap for Heading-Up'}
+      aria-pressed={headingUp}
+      title={headingUp ? 'Heading-Up (tap for North-Up)' : 'North-Up (tap for Heading-Up)'}
+    >
       <svg
         width="30"
         height="30"
@@ -40,14 +41,14 @@ export default function NavCompass({ mapHeading }) {
           display: 'block',
         }}
       >
-        {/* North half */}
-        <path d="M15 3 L12 15 L15 13 L18 15 Z" fill="#E53E3E" />
+        {/* North half — red when active, muted when North-Up/off */}
+        <path d="M15 3 L12 15 L15 13 L18 15 Z" fill={headingUp ? '#E53E3E' : '#94A3B8'} />
         {/* South half */}
         <path d="M15 27 L12 15 L15 17 L18 15 Z" fill="#CBD5E0" />
         {/* Centre pivot */}
-        <circle cx="15" cy="15" r="2.5" fill="white" stroke="#E53E3E" strokeWidth="1.5" />
+        <circle cx="15" cy="15" r="2.5" fill="white" stroke={headingUp ? '#E53E3E' : '#94A3B8'} strokeWidth="1.5" />
       </svg>
       <span className="nav-compass-n">N</span>
-    </div>
+    </button>
   )
 }

@@ -23,7 +23,6 @@ import RoutePreviewPanel from '../components/RoutePreviewPanel'
 import NearbyFacilities from '../components/NearbyFacilities'
 import CompassWidget from '../components/CompassWidget'
 import NavCompass from '../components/NavCompass'
-import HeadingUpToggle from '../components/HeadingUpToggle'
 import NavSettingsPanel from '../components/NavSettingsPanel'
 import ChatbotWidget from '../copilot/ChatbotWidget'
 import { getLocations, searchLocations, getRoute, getRouteFromCoords, getRoadSegments, getEvents } from '../api'
@@ -123,15 +122,9 @@ export default function Home() {
   // spec ("persist during the current navigation session") — see
   // NavSettingsPanel.jsx's header comment for why that doesn't need
   // localStorage the way voice guidance does.
-
-  const [autoRecenter, setAutoRecenter] = useState(false) // Phase 4.2.6 Priority 7 — default OFF; user opts in via Navigation Settings
+  const [showCompass, setShowCompass]   = useState(false) // default OFF — "Compass hidden unless explicitly enabled"
+  const [autoRecenter, setAutoRecenter] = useState(true)
   const [dynamicZoom, setDynamicZoom]   = useState(true)
-  // Phase 4.2.7 (Heading-Up/Compass separation): the optional North-
-  // indicator's OWN visibility — fully independent of headingUp. Default
-  // OFF; the user opts in via "Show Compass" in Navigation Settings.
-  // Toggling this never touches headingUp, and toggling headingUp never
-  // touches this.
-  const [showCompass, setShowCompass] = useState(false)
 
   // ── Phase 1: Navigation mode state ─────────────────────────────────────
   const [navMode, setNavMode]                     = useState(false)
@@ -240,17 +233,6 @@ export default function Home() {
   // and the floating button stack's own height, instead of hardcoded
   // pixel offsets that desync the moment the sheet's actual height
   // changes. See useElementHeightVar for details.
-  // Phase 4.2.6 Priority 4: the zoom control's "how high can it climb"
-  // ceiling used to be a hardcoded 120px guess at the search bar + chip
-  // row's height (see index.css history on .leaflet-top.leaflet-left —
-  // it's already been corrected once, from 96px to 120px, and users were
-  // still seeing an overlap). A guessed constant will always eventually
-  // drift out of sync with the real layout (font scaling, a longer chip
-  // label wrapping, a future added element) — exactly like --sheet-h and
-  // --fab-stack-h below, this measures the ACTUAL rendered height of the
-  // search overlay (bar + chips) instead, so the ceiling is always
-  // correct regardless of what that block actually contains right now.
-  const searchHeaderHeightRef = useElementHeightVar('--search-header-h')
   const sheetHeightRef    = useElementHeightVar('--sheet-h')
   const fabStackHeightRef = useElementHeightVar('--fab-stack-h')
 
@@ -741,14 +723,13 @@ export default function Home() {
           recalcVersion={recalcVersion}
           onMapDrag={handleMapDrag}
           onRotationChange={setCurrentBearing}
-          navMode={navMode}
         />
       </div>
 
       {/* ── Browse UI — hidden in navigation mode ── */}
       {!navMode && (
         <>
-          <div className="search-overlay" ref={searchHeaderHeightRef}>
+          <div className="search-overlay">
             <SearchBar value={query} onChange={setQuery} />
             {searchResults === null && <CategoryChips active={category} onChange={setCategory} />}
           </div>
@@ -847,7 +828,7 @@ export default function Home() {
               )}
 
               {(previewSheet.tier === 'half' || previewSheet.tier === 'full') && (
-                <div className="nav-sheet-scroll" onPointerDown={previewSheet.onContentPointerDown}>
+                <div className="nav-sheet-scroll">
                   <RoutePreviewPanel
                     destination={previewLoc}
                     routes={previewRoutes}
@@ -928,22 +909,18 @@ export default function Home() {
             ✕ Exit
           </button>
 
-          {/* Phase 4.2.7 (Heading-Up/Compass separation) root-cause fix:
-              these were one combined element (NavCompass did double duty
-              as both), so hiding the optional compass also removed the
-              only way to switch modes. Now they're two independent
-              elements with two independent visibility rules:
-              HeadingUpToggle is the primary mode switch — always shown
-              during navigation, never gated behind a setting. NavCompass
-              is the optional North-indicator overlay — gated purely by
-              showCompass (default OFF, set in Navigation Settings) and
-              has no effect on headingUp whatsoever. */}
-          <HeadingUpToggle
-            headingUp={headingUp}
-            onToggle={handleToggleHeadingUp}
-          />
+          {/* Priority 1 (Phase 4.2.4) — Compass is now purely opt-in via
+              Navigation Settings (default OFF), decoupled from the
+              Rotate-Map-While-Walking preference it used to double as the
+              only control for. Tapping it (once shown) still flips
+              headingUp too, as a convenience — same shared state, not a
+              second source of truth. */}
           {showCompass && (
-            <NavCompass mapHeading={currentBearing} />
+            <NavCompass
+              mapHeading={currentBearing}
+              headingUp={headingUp}
+              onToggle={handleToggleHeadingUp}
+            />
           )}
 
           {/* Phase 6 — Prominent off-route / recalculating banner */}
@@ -1023,7 +1000,7 @@ export default function Home() {
 
             {/* Half + Full tier: adds Arrival time, Destination, Event, Menu preview */}
             {(navSheet.tier === 'half' || navSheet.tier === 'full') && (
-              <div className="nav-sheet-scroll" onPointerDown={navSheet.onContentPointerDown}>
+              <div className="nav-sheet-scroll">
                 <div className="nav-bottom-expanded-content">
                   <div className="nav-expanded-row">
                     <span className="nav-expanded-label">Arrival time</span>

@@ -231,7 +231,7 @@ export default function EventPage() {
             )}
           </div>
           <h1 className="event-title-large">{event.name}</h1>
-          <div className="event-hero-meta-row">
+          <div className="event-meta-row">
             <span>📅 {event.date}</span>
             <span>⏰ {event.start_time}–{event.end_time}</span>
             {event.department && <span>🏛 {event.department}</span>}

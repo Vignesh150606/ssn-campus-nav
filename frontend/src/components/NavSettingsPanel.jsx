@@ -3,31 +3,25 @@
  *
  * Phase 4.2.4, Priority 1: previously the only in-navigation preference
  * was voice guidance (VoiceSettingsPanel) — Heading-Up had its own
- * separate always-visible floating toggle and there was no way to
- * control the compass display or auto-recenter/dynamic-zoom behaviour at
- * all. This consolidates all five into one panel:
+ * separate always-visible floating toggle (NavCompass) and there was no
+ * way to control the compass display or auto-recenter/dynamic-zoom
+ * behaviour at all. This consolidates all five into one panel:
  *
- *   Rotate Map While Walking  — headingUp preference (own state, Home.jsx).
- *                                Also directly controllable during nav via
- *                                the always-visible HeadingUpToggle.
- *   Show Compass              — showCompass (own state, Home.jsx) — the
- *                                OPTIONAL North-indicator (NavCompass)
- *                                only renders while this is on. Fully
- *                                independent of Rotate Map / Heading-Up:
- *                                toggling either one never touches the
- *                                other (Phase 4.2.7 root-cause fix — they
- *                                used to be one combined control).
+ *   Rotate Map While Walking  — headingUp preference (own state, Home.jsx)
+ *   Show Compass              — showCompass (own state, Home.jsx) — NavCompass
+ *                                only renders while this is on
  *   Voice Guidance            — reads/writes the EXISTING useVoiceGuidance
  *                                settings object directly; deliberately not
  *                                duplicated here, so there's one source of truth
  *   Auto Recenter             — autoRecenter (own state, Home.jsx)
  *   Dynamic Zoom              — dynamicZoom (own state, Home.jsx)
  *
- * All plain in-memory React state owned by Home.jsx — that's enough to
- * satisfy "persist during the current navigation session" (they live for
- * as long as the app is open) without the added complexity/risk of
- * localStorage persistence, which voice guidance already handles
- * separately for the one setting that's meant to survive across sessions.
+ * All five are plain in-memory React state owned by Home.jsx — that's
+ * enough to satisfy "persist during the current navigation session"
+ * (they live for as long as the app is open) without the added
+ * complexity/risk of localStorage persistence, which voice guidance
+ * already handles separately for the one setting that's meant to
+ * survive across sessions.
  *
  * Reuses the existing .voice-settings-* CSS (overlay/panel/header/row
  * styling) rather than introducing a parallel set of class names.
