@@ -100,6 +100,10 @@ export function LocationProvider({ children }) {
   const [acquiringGps, setAcquiringGps]     = useState(false) // true until first accurate fix
   const [tracking, setTracking]            = useState(false)
   const [error, setError]                  = useState(null)
+  // Priority 11 (Phase 4.2.7): distinguishes "permission denied" from any
+  // other GPS error (timeout, position unavailable, etc.) so the UI can
+  // show a specific, actionable prompt instead of a generic error string.
+  const [permissionDenied, setPermissionDenied] = useState(false)
   const [remainingPath, setRemainingPath]  = useState(null)
   const [remainingDist, setRemainingDist]  = useState(null)
   const [liveEta, setLiveEta]              = useState(null)
@@ -333,13 +337,19 @@ export function LocationProvider({ children }) {
       return
     }
     setError(null)
+    setPermissionDenied(false)
     setTracking(true)
     goodFixReceivedRef.current = false  // reset so acquiring state fires for new session
     bestAccuracyRef.current   = null      // reset best-accuracy tracking
     lastPositionAtRef.current = null
     watchId.current = navigator.geolocation.watchPosition(
       (pos) => processPosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.speed, pos.coords.heading),
-      (err) => { setError(`GPS: ${err.message}`); setTracking(false) },
+      (err) => {
+        setError(`GPS: ${err.message}`)
+        setTracking(false)
+        // code 1 === GeolocationPositionError.PERMISSION_DENIED
+        setPermissionDenied(err.code === 1)
+      },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
     )
   }, [processPosition])
@@ -543,6 +553,9 @@ export function LocationProvider({ children }) {
   const value = {
     // existing public API — unchanged
     position, accuracy, acquiringGps, tracking, error, arrivalRadius,
+    // Priority 11 (Phase 4.2.7) — lets the UI show a specific "location
+    // access needed" prompt with a retry action, instead of staying silent.
+    permissionDenied,
     remainingPath, remainingDist, liveEta,
     guidance, offRoute,
     start, stop, setRoute, clearRoute,

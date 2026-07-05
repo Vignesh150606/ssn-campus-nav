@@ -118,6 +118,22 @@ export function useDraggableSheet(snapPeeks, initialTier = 'collapsed') {
     if (e.button != null && e.button !== 0) return
     cancelAnimationFrame(rafRef.current)
     stopDragListening() // clear any prior drag's listeners first (e.g. multi-touch) — never stack duplicates
+
+    // Priority 7 (Phase 4.2.7) root-cause fix for "sheet occasionally gets
+    // stuck when fully expanded": without pointer capture, a fast drag
+    // near a screen edge could have its pointer events hijacked mid-gesture
+    // by the browser's own competing gesture recognizer (iOS edge-swipe,
+    // overscroll/refresh, etc). When that happened, neither `pointerup`
+    // nor `pointercancel` ever fired on `window`, so `up()` never ran —
+    // the sheet was left wherever the last raw drag frame had put it,
+    // never snapped to a tier, and no longer responded to the next drag
+    // (a stale, never-cleared dragRef). Capturing the pointer on the grip
+    // itself guarantees this element keeps receiving move/up events for
+    // that pointer for its entire lifetime, regardless of where it
+    // physically travels or what other gesture the OS tries to start.
+    const pointerId = e.pointerId
+    try { e.currentTarget.setPointerCapture?.(pointerId) } catch { /* already released — ignore */ }
+
     dragRef.current = {
       startY: e.clientY, startPeek: peekRef.current,
       lastY: e.clientY, lastT: performance.now(), v: 0, active: false,
@@ -134,6 +150,10 @@ export function useDraggableSheet(snapPeeks, initialTier = 'collapsed') {
       const dy = d.startY - y   // dragging up = positive = more peek
       if (!d.active && Math.abs(dy) > DRAG_ACTIVATE_PX) d.active = true
       if (!d.active) return
+      // Once a real drag is underway, stop the browser from also treating
+      // it as a page scroll/refresh gesture — belt-and-braces alongside
+      // pointer capture above.
+      ev.preventDefault?.()
       const peeks = tiersRef.current
       const lo = Math.min(peeks.collapsed, peeks.half, peeks.full)
       const hi = Math.max(peeks.collapsed, peeks.half, peeks.full)
@@ -149,6 +169,7 @@ export function useDraggableSheet(snapPeeks, initialTier = 'collapsed') {
       dragRef.current = null
       setDragging(false)
       stopDragListening()
+      try { e.currentTarget.releasePointerCapture?.(pointerId) } catch { /* already released — ignore */ }
       if (!d || !d.active) return // was a tap, not a drag — click handler on the grip handles it
       const target = nearestTier(peekRef.current, d.v || 0)
       snapToTier(target)

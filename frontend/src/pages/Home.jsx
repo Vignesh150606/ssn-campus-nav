@@ -23,6 +23,7 @@ import RoutePreviewPanel from '../components/RoutePreviewPanel'
 import NearbyFacilities from '../components/NearbyFacilities'
 import CompassWidget from '../components/CompassWidget'
 import NavCompass from '../components/NavCompass'
+import HeadingUpToggle from '../components/HeadingUpToggle'
 import NavSettingsPanel from '../components/NavSettingsPanel'
 import ChatbotWidget from '../copilot/ChatbotWidget'
 import { getLocations, searchLocations, getRoute, getRouteFromCoords, getRoadSegments, getEvents } from '../api'
@@ -145,6 +146,7 @@ export default function Home() {
 
   const {
     position, accuracy, acquiringGps, tracking, error: gpsError,
+    permissionDenied: gpsPermissionDenied,
     remainingPath, remainingDist, liveEta,
     guidance, offRoute, hasRoute,
     fullPath, fullDistance, fullEta, recalculating, recalcVersion,
@@ -212,28 +214,50 @@ export default function Home() {
     if (previewActive) previewSheet.snapToTier('collapsed')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewActive, previewLoc])
-  // While either the nav sheet or the route-preview sheet is mounted, it
-  // is the sole writer of --sheet-h, updating it every animation frame
-  // (drag + snap). The floating controls that read --sheet-h
-  // (copilot-fab-stack, zoom control) have their own CSS `transition:
-  // bottom …` tuned for the OTHER sheets, which update --sheet-h in
-  // sparse discrete jumps rather than every frame. Left on, that
-  // transition would fight our per-frame writes and visibly lag behind
-  // the sheet instead of moving with "the same animation curve" — so
-  // it's disabled for exactly as long as one of these two sheets (which
-  // are mutually exclusive — never both mounted at once) owns the var.
-  useEffect(() => {
-    document.documentElement.classList.toggle('nav-sheet-driving', navMode || previewActive)
-    return () => document.documentElement.classList.remove('nav-sheet-driving')
-  }, [navMode, previewActive])
 
-  // Phase 4.2 — Priority 1: floating controls track the REAL rendered
-  // height of whichever bottom sheet is currently showing (browse results
-  // sheet, route preview sheet, or nav-mode sheet — collapsed/expanded),
-  // and the floating button stack's own height, instead of hardcoded
-  // pixel offsets that desync the moment the sheet's actual height
-  // changes. See useElementHeightVar for details.
-  const sheetHeightRef    = useElementHeightVar('--sheet-h')
+  // Priority X.1 (Phase 4.2.7) — the "Campus Locations" panel on the Home
+  // screen used to be a plain static div fixed at 38% height (SHEET_HEIGHT
+  // below); it's now a full 3-tier draggable sheet, same as nav/preview.
+  // 'half' keeps the same 38%-of-viewport default so nothing about the
+  // everyday look changes — it's just draggable now, both up and down.
+  const browseSheetPeeks = useMemo(() => ({
+    collapsed: 132,
+    half: Math.round(viewportH * (SHEET_HEIGHT / 100)),
+    full: Math.round(viewportH * 0.86),
+  }), [viewportH])
+  const browseSheet = useDraggableSheet(browseSheetPeeks, 'half')
+
+  // Priority X.2 (Phase 4.2.7) — pressing Enter/Search on the mobile
+  // keyboard dismisses it (handled in SearchBar itself) and moves focus
+  // onto the results list, so it's immediately visible and keyboard-
+  // navigable with no extra tap. Also expands the sheet off 'collapsed'
+  // so a collapsed sheet doesn't hide the very results just requested.
+  const resultsListRef = useRef(null)
+  const handleSearchSubmit = useCallback(() => {
+    if (browseSheet.tier === 'collapsed') browseSheet.snapToTier('half')
+    resultsListRef.current?.focus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [browseSheet.tier])
+
+  // Priority 4 (Phase 4.2.7) — root cause of "zoom controls too close to
+  // the search bar on some devices": Leaflet's zoom control was always
+  // mounted, even on the Home browse screen where the search bar and
+  // category chips already occupy that same top-left corner on short
+  // viewports. Rather than trust yet another clamped-offset formula to
+  // cover every device, the zoom control is simply hidden entirely on the
+  // browse screen (pinch-to-zoom / double-tap still work) and only shown
+  // during active navigation, where it already has guaranteed clearance.
+  useEffect(() => {
+    document.documentElement.classList.toggle('app-navmode', navMode)
+    return () => document.documentElement.classList.remove('app-navmode')
+  }, [navMode])
+
+  // Phase 4.2 — Priority 1 / Priority X.1 (4.2.7): the floating button
+  // stack tracks its OWN real rendered height via ResizeObserver (still
+  // needed — its height genuinely varies with content). --sheet-h itself
+  // is now written directly by whichever draggable sheet is mounted (nav,
+  // route-preview, or browse — all three use useDraggableSheet), so a
+  // separate ResizeObserver-based measurement for it is no longer needed.
   const fabStackHeightRef = useElementHeightVar('--fab-stack-h')
 
   // Phase 4 + 4A: compass heading + premium smoothing.
@@ -418,6 +442,21 @@ export default function Home() {
 
   const listItems  = searchResults !== null ? searchResults : visibleLocations
   const sheetEmpty = !previewActive && listItems.length === 0 && !loadError
+
+  // While any of the three draggable sheets (nav, route-preview, or browse)
+  // is mounted, it is the sole writer of --sheet-h, updating it every
+  // animation frame (drag + snap). The floating controls that read
+  // --sheet-h (copilot-fab-stack, zoom control) have their own CSS
+  // `transition: bottom …` tuned for the OLD non-draggable sheets, which
+  // updated --sheet-h in sparse discrete jumps rather than every frame.
+  // Left on, that transition would fight our per-frame writes and visibly
+  // lag behind the sheet instead of moving with "the same animation
+  // curve" — so it's disabled for exactly as long as one of these sheets
+  // (mutually exclusive — never more than one mounted at once) owns the var.
+  useEffect(() => {
+    document.documentElement.classList.toggle('nav-sheet-driving', navMode || previewActive || !sheetEmpty)
+    return () => document.documentElement.classList.remove('nav-sheet-driving')
+  }, [navMode, previewActive, sheetEmpty])
 
   const mainGateLoc = useMemo(() => locations.find(l => l.id === ENTRY_ID), [locations])
   const refLat = position?.lat ?? mainGateLoc?.lat ?? null
@@ -687,19 +726,18 @@ export default function Home() {
         style={{
           bottom: navMode
             ? 0
-            // Priority 3 fix: the route-preview sheet is a floating overlay
-            // (position absolute, its own transform) whose visible height
-            // swings from 160px collapsed up to 70vh expanded — pinning the
-            // map to a flat 38% here left a gap between the map's clipped
-            // bottom edge and the sheet's actual top edge (an empty strip
-            // when collapsed) while also risking markers hiding behind the
-            // sheet when expanded. Tracking the SAME --sheet-h custom
-            // property the preview sheet already writes on every
-            // drag/snap frame (useDraggableSheet) keeps the map's visible
-            // area exactly matched to the sheet's real height at all times.
+            // Priority 3 fix (and Priority X.1, same reasoning): both the
+            // route-preview sheet and the browse results sheet are floating
+            // overlays whose visible height now changes as the user drags
+            // them — pinning the map to a flat percentage here would leave
+            // a gap (collapsed) or hide markers behind the sheet
+            // (expanded). Tracking the SAME --sheet-h custom property
+            // whichever sheet is mounted writes on every drag/snap frame
+            // (useDraggableSheet) keeps the map's visible area exactly
+            // matched to the sheet's real height at all times.
             : previewActive
               ? 'var(--sheet-h, 160px)'
-              : sheetEmpty ? 0 : `${SHEET_HEIGHT}%`
+              : sheetEmpty ? 0 : `var(--sheet-h, ${SHEET_HEIGHT}%)`
         }}
       >
         <MapView
@@ -718,6 +756,7 @@ export default function Home() {
           userHeading={navMode ? smoothedHeading : null}
           mapHeading={navMode ? mapHeading : null}
           headingUp={navMode && headingUp}
+          declutter={navMode}
           nextTurnDist={navMode ? nextTurn?.distanceM ?? null : null}
           remainingDist={navMode ? remainingDist : null}
           recalcVersion={recalcVersion}
@@ -730,9 +769,28 @@ export default function Home() {
       {!navMode && (
         <>
           <div className="search-overlay">
-            <SearchBar value={query} onChange={setQuery} />
+            <SearchBar value={query} onChange={setQuery} onSubmit={handleSearchSubmit} />
             {searchResults === null && <CategoryChips active={category} onChange={setCategory} />}
           </div>
+
+          {/* Priority 11 (Phase 4.2.7) — the only feedback a user got
+              before this fix, if they denied the location prompt on first
+              launch, was silence: gpsError was only ever surfaced inside
+              the nav-mode status bar, which never renders in browse mode
+              with no route yet. This is the missing "clear prompt +
+              retry" the requirement asks for. */}
+          {gpsPermissionDenied && (
+            <div className="location-permission-banner">
+              <span className="location-permission-banner-icon">📍</span>
+              <div className="location-permission-banner-text">
+                <strong>Location access is off</strong>
+                <span>Turn it on so the map can show where you are and navigate you across campus.</span>
+              </div>
+              <button className="location-permission-retry-btn" onClick={() => startTracking()}>
+                Retry
+              </button>
+            </div>
+          )}
 
           <CompassWidget
             active={tracking && hasRoute}
@@ -842,9 +900,18 @@ export default function Home() {
               )}
             </div>
           ) : (
-            <div className={`results-sheet ${sheetEmpty ? 'empty' : ''}`} ref={sheetHeightRef}>
-              <div className="sheet-handle" />
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'4px 18px 8px' }}>
+            <div
+              className={`results-sheet browse-mode tier-${browseSheet.tier}${browseSheet.dragging ? ' dragging' : ''} ${sheetEmpty ? 'empty' : ''}`}
+              ref={browseSheet.sheetRef}
+            >
+              <div
+                className="browse-sheet-grip"
+                onPointerDown={browseSheet.onPointerDown}
+                onClick={browseSheet.cycleTier}
+              >
+                <div className="sheet-handle" />
+              </div>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 18px 8px' }}>
                 <div className="sheet-title" style={{ padding:0 }}>
                   {searchResults !== null ? `"${query}"` : 'Campus locations'}
                 </div>
@@ -852,7 +919,11 @@ export default function Home() {
                   {tracking ? '📍 Tracking' : '📍 My location'}
                 </button>
               </div>
-              <div className="sheet-list">
+              <div
+                className={`sheet-list nav-sheet-scroll${browseSheet.dragging ? ' dragging' : ''}`}
+                ref={resultsListRef}
+                tabIndex={-1}
+              >
                 {searchResults === null && (
                   <NearbyFacilities locations={locations} fromLat={refLat} fromLng={refLng} onNavigate={handleDirections} />
                 )}
@@ -909,18 +980,19 @@ export default function Home() {
             ✕ Exit
           </button>
 
-          {/* Priority 1 (Phase 4.2.4) — Compass is now purely opt-in via
-              Navigation Settings (default OFF), decoupled from the
-              Rotate-Map-While-Walking preference it used to double as the
-              only control for. Tapping it (once shown) still flips
-              headingUp too, as a convenience — same shared state, not a
-              second source of truth. */}
+          {/* Priority 1 (Phase 4.2.7) — Heading-Up toggle is the actual
+              feature control: ALWAYS visible during navigation, regardless
+              of "Show Compass". It must never disappear, never be
+              replaced, and heading-up itself already auto-activates the
+              instant navCameraActive goes true (see the useNavCamera call
+              above) — this button only ever reflects/flips that state. */}
+          <HeadingUpToggle active={headingUp} onToggle={handleToggleHeadingUp} />
+
+          {/* The compass needle is a fully separate, purely informational
+              overlay — "Show Compass" only ever hides/shows THIS, and can
+              never touch the Heading-Up toggle above. */}
           {showCompass && (
-            <NavCompass
-              mapHeading={currentBearing}
-              headingUp={headingUp}
-              onToggle={handleToggleHeadingUp}
-            />
+            <NavCompass mapHeading={currentBearing} headingUp={headingUp} />
           )}
 
           {/* Phase 6 — Prominent off-route / recalculating banner */}

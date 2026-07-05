@@ -41,7 +41,13 @@ export default defineConfig({
         short_name: 'SSN Navigator',
         description: 'Find buildings, departments and fest events at SSN College of Engineering, with walking directions.',
         theme_color: '#003b7a',
-        background_color: '#003b7a',
+        // Priority 12 (Phase 4.2.7): this is what Android/Chrome actually
+        // use to generate the native install/launch splash screen from the
+        // icons below. It used to be the SAME blue as the logo itself
+        // (#003b7a on #003b7a) — Option A from the brief: dark background,
+        // blue logo, so the wordmark actually stands out instead of
+        // disappearing into its own background.
+        background_color: '#09090b',
         display: 'standalone',
         start_url: '/',
         icons: [

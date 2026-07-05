@@ -57,7 +57,15 @@ LOCATION_ALIASES = {
     'cdc-block':        ['cdc', 'placement', 'placement cell', 'placement office', 'career development',
                           'career development cell', 'career cell'],
     'central-library':  ['library', 'lib', 'central library'],
-    'tcs-auditorium':   ['tcs auditorium', 'auditorium', 'tcs'],
+    # Priority 9 (Phase 4.2.7) root-cause fix: "Main Auditorium" used to
+    # rank BELOW "Mini Auditorium" — verified via resolve_locations() directly:
+    # without this alias, "main auditorium" only reached this location through
+    # the bare 'auditorium' alias's substring-match formula (score ~0.887),
+    # while a plain difflib ratio against "mini auditorium" (nearly identical
+    # spelling, same length) scored ~0.933 and won outright. Adding the exact
+    # phrase people actually use gives it a guaranteed 1.0 exact-match score,
+    # which no fuzzy ratio against a different building can ever beat.
+    'tcs-auditorium':   ['tcs auditorium', 'auditorium', 'tcs', 'main auditorium'],
     'mini-hall-1':      ['mini hall', 'mini hall 1', 'minihall'],
     'open-air-theatre':  ['oat', 'open air theatre', 'open air theater'],
     'main-gate':        ['main gate', 'gate', 'entrance', 'entry'],

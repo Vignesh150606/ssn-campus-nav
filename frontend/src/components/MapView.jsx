@@ -520,6 +520,11 @@ export default function MapView({
   remainingDist = null,
   /** Phase 4A: increments on reroute → triggers zoom-to-fit */
   recalcVersion = 0,
+  /** Priority 6 (Phase 4.2.7): true during active navigation — hides every
+      campus location marker except the active destination, so the map
+      only shows destination + user + route + (nav instructions, drawn
+      separately in the turn card) instead of every building pin. */
+  declutter = false,
   /** Phase 14: called when user manually drags the map */
   onMapDrag,
   /** Phase 4A: called with current bearing in degrees */
@@ -543,15 +548,20 @@ export default function MapView({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      {/* Campus location markers */}
-      {locations.map(loc => (
-        <Marker
-          key={loc.id}
-          position={[loc.lat, loc.lng]}
-          icon={markerIcon(loc.category, loc.id === destinationId)}
-          eventHandlers={{ click: () => onSelect?.(loc) }}
-        />
-      ))}
+      {/* Campus location markers — Priority 6: during active navigation,
+          every marker except the destination is hidden so the map isn't
+          competing with the turn card for attention. Browse/preview mode
+          is unaffected (declutter=false). */}
+      {locations
+        .filter(loc => !declutter || loc.id === destinationId)
+        .map(loc => (
+          <Marker
+            key={loc.id}
+            position={[loc.lat, loc.lng]}
+            icon={markerIcon(loc.category, loc.id === destinationId)}
+            eventHandlers={{ click: () => onSelect?.(loc) }}
+          />
+        ))}
 
       {/* ── Route rendering ────────────────────────────────────────── */}
 

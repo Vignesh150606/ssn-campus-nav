@@ -312,6 +312,14 @@ input, select, textarea { font-family: inherit; color: inherit; }
     right: 12px;
   }
 }
+/* Priority 4 (Phase 4.2.7): hidden entirely on the Home browse screen — no
+   clamped-offset formula reliably clears the search bar + category chips
+   on every short/narrow viewport, and pinch-to-zoom / double-tap already
+   cover zooming there. Only shown during active navigation, where the
+   turn-instruction card + nav sheet already guarantee clearance. */
+html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
+  display: none;
+}
 
 /* ---------- Search overlay (top) ---------- */
 .search-overlay {
@@ -432,6 +440,36 @@ input, select, textarea { font-family: inherit; color: inherit; }
 }
 .results-sheet.preview-mode.dragging .nav-sheet-scroll { pointer-events: none; }
 
+/* Priority X.1 (Phase 4.2.7) — Home browse "Campus locations" sheet is now
+   a full 3-tier draggable sheet, same fixed-height + transform technique
+   as .nav-bottom-sheet / .results-sheet.preview-mode above (height is
+   fixed to the tallest tier so useDraggableSheet only ever translates it,
+   never resizes it — no layout reflow while dragging). */
+.results-sheet.browse-mode {
+  height: 86vh;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+  /* Same-paint-frame fallback before useDraggableSheet's mount effect
+     takes over — approximates the default 'half' tier (~38% of viewport,
+     matching the old fixed SHEET_HEIGHT) so there's no visible jump. */
+  transform: translate3d(0, 48vh, 0);
+}
+.results-sheet.browse-mode.empty { height: 0; padding: 0; border: none; box-shadow: none; }
+.results-sheet.browse-mode.dragging .nav-sheet-scroll { pointer-events: none; }
+
+.browse-sheet-grip {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 2px;
+  min-height: 26px;
+  touch-action: none; /* the grip owns the vertical drag gesture entirely, same as .nav-sheet-grip */
+  cursor: grab;
+}
+.results-sheet.browse-mode.dragging .browse-sheet-grip { cursor: grabbing; }
+
 .preview-collapsed-row {
   display: flex;
   align-items: center;
@@ -492,6 +530,7 @@ input, select, textarea { font-family: inherit; color: inherit; }
   overflow-y: auto;
   padding: 4px 14px 20px;
 }
+.sheet-list:focus { outline: none; }
 
 .location-btn {
   display: inline-flex;
@@ -1049,6 +1088,61 @@ input, select, textarea { font-family: inherit; color: inherit; }
   background: color-mix(in oklab, var(--warning) 25%, transparent);
   color: var(--warning-ink);
 }
+
+/* Priority 11 (Phase 4.2.7) — location-permission-denied prompt, browse mode */
+.location-permission-banner {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0) + 72px);
+  left: 12px; right: 12px;
+  z-index: 24;
+  padding: 14px 16px;
+  background: var(--warning-bg);
+  color: var(--warning-ink);
+  border: 1px solid color-mix(in oklab, var(--warning) 30%, transparent);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: fade-in 0.25s ease;
+}
+.location-permission-banner-icon {
+  font-size: 22px;
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  background: color-mix(in oklab, var(--warning) 25%, transparent);
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.location-permission-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.location-permission-banner-text strong {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+.location-permission-banner-text span {
+  font-size: 0.8rem;
+  font-weight: 500;
+  opacity: 0.9;
+  line-height: 1.3;
+}
+.location-permission-retry-btn {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: none;
+  background: var(--warning-ink);
+  color: var(--warning-bg);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.location-permission-retry-btn:active { transform: scale(0.96); }
 
 .closure-banner {
   position: absolute;
@@ -2467,7 +2561,16 @@ html.nav-sheet-driving .map-layer {
   margin: 0 0 8px;
 }
 
-.event-meta-row {
+/* Priority 8 (Phase 4.2.7) root-cause fix: this rule used to be named
+   .event-meta-row — the EXACT same class EventsList.jsx's schedule cards
+   use for their Venue/Date/Time row. Because this rule (white text, for
+   the photo/colour banner here) appeared LATER in the stylesheet than the
+   schedule-card version (dark text, for a plain surface background), it
+   won the cascade everywhere, including on the schedule list — making
+   Venue/Date/Time render as near-white text on a light card background,
+   i.e. invisible. Renaming this one (banner-only, unique to EventPage)
+   fully separates the two so neither can ever bleed into the other again. */
+.event-banner-meta-row {
   display: flex;
   gap: 14px;
   font-size: 0.8rem;
@@ -3720,15 +3823,60 @@ select:-webkit-autofill {
    PHASE 4A — Premium Google Maps Navigation Experience
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── Navigation compass (heading-up indicator + north-up toggle) ─────────── */
+/* ── Floating nav-control column (Priority 1, Phase 4.2.7) ────────────────
+   Shared base offset for both the Heading-Up toggle (always visible) and
+   the compass needle (optional, stacks directly below it) — defined once
+   so the two never drift out of sync with each other. */
+:root {
+  --nav-float-top: min(calc(var(--header-h) + 116px), calc(100vh - var(--sheet-h, 0px) - 70px));
+}
+
+/* ── Heading-Up toggle — Priority 1: the actual feature control, ALWAYS
+   rendered during navigation regardless of the "Show Compass" setting. ── */
+.heading-up-toggle {
+  position: fixed;
+  top: var(--nav-float-top);
+  right: 14px;
+  z-index: 810;
+  width: 52px;
+  height: 56px;
+  border-radius: 14px;
+  background: var(--surface-translucent);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1.5px solid var(--line-strong);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 4px 5px;
+  cursor: pointer;
+  animation: fade-in 0.25s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.heading-up-toggle:active { transform: scale(0.92); box-shadow: var(--shadow-sm); }
+.heading-up-toggle.active {
+  border-color: #2563EB;
+  background: color-mix(in srgb, #2563EB 10%, var(--surface-translucent));
+}
+.heading-up-toggle-label {
+  font-family: var(--font-display);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  line-height: 1;
+  white-space: nowrap;
+}
+.heading-up-toggle.active .heading-up-toggle-label { color: #2563EB; }
+
+/* ── Navigation compass — purely decorative needle, shown only when
+   "Show Compass" is on, stacked directly below the Heading-Up toggle. ── */
 .nav-compass {
   position: fixed;
-  /* Priority 2: clamped against the live sheet height so the compass is
-     pushed up (never lower than clear of the sheet's visible top edge)
-     as the draggable sheet expands toward Fully Expanded — recalculated
-     by the browser on every --sheet-h write, same frame as the sheet's
-     own transform, no transition needed for it to "keep up". */
-  top: min(calc(var(--header-h) + 116px), calc(100vh - var(--sheet-h, 0px) - 70px));
+  top: calc(var(--nav-float-top) + 64px);
   right: 14px;
   z-index: 810;
   width: 46px;
@@ -3745,13 +3893,8 @@ select:-webkit-autofill {
   justify-content: center;
   gap: 2px;
   padding: 6px 4px 4px;
-  cursor: pointer;
   animation: fade-in 0.25s ease;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.nav-compass:active {
-  transform: scale(0.92);
-  box-shadow: var(--shadow-sm);
+  pointer-events: none; /* purely informational — never intercepts taps */
 }
 .nav-compass.off {
   background: var(--surface);
@@ -3811,10 +3954,10 @@ select:-webkit-autofill {
   white-space: nowrap;
 }
 
-/* ── Safe-area overrides for nav-compass ───────────────────────────────────── */
+/* ── Safe-area overrides for the heading-up toggle + compass column ──────── */
 @supports (padding: env(safe-area-inset-top)) {
-  .nav-compass {
-    top: min(calc(var(--header-h) + env(safe-area-inset-top, 0px) + 116px), calc(100vh - var(--sheet-h, 0px) - 70px));
+  :root {
+    --nav-float-top: min(calc(var(--header-h) + env(safe-area-inset-top, 0px) + 116px), calc(100vh - var(--sheet-h, 0px) - 70px));
   }
 }
 
@@ -3838,10 +3981,16 @@ select:-webkit-autofill {
 
 /* ── Mobile sizing ────────────────────────────────────────────────────────── */
 @media (max-width: 430px) {
+  .heading-up-toggle {
+    width: 48px;
+    height: 52px;
+    right: 12px;
+  }
   .nav-compass {
     width: 42px;
     height: 48px;
     right: 12px;
+    top: calc(var(--nav-float-top) + 60px);
   }
   .recenter-btn {
     min-width: 60px;

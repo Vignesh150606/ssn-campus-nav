@@ -1,34 +1,34 @@
 /**
- * NavCompass — Bug 6: explicit, user-controlled Heading-Up toggle.
+ * NavCompass — Phase 4.2.7, Priority 1: purely decorative compass needle.
  *
- * Previously this hid itself the instant the map was North-Up (or
- * headingUp was off), which was a dead end — there was no other control
- * to get back to Heading-Up, so Recenter had grown a side effect of
- * silently re-enabling it. Now it's a simple, always-visible toggle
- * during navigation:
+ * Previously this was ALSO the heading-up on/off control, gated behind
+ * "Show Compass" (default OFF) — which meant the control disappeared
+ * unless that setting was on. The two responsibilities are now split:
+ *
+ *   - HeadingUpToggle.jsx: the actual on/off control, always visible
+ *     during navigation regardless of this setting.
+ *   - NavCompass (this file): shown ONLY when "Show Compass" is on, purely
+ *     informational, no click handler, no control over heading-up at all.
+ *     Disabling "Show Compass" only hides this needle — it can never hide
+ *     or disable the Heading-Up toggle, and never did the reverse either.
  *
  *   ON  (headingUp=true)  → rotating needle showing where North actually
  *                           is relative to the (rotated) screen; map
  *                           rotates with the user's direction of travel.
  *   OFF (headingUp=false) → static, non-rotating "N" — map stays
  *                           North-Up, no heading rotation applied.
- *
- * One tap always flips the preference. Recenter (Home.jsx) never touches
- * this — camera position and heading preference are fully independent.
  */
-export default function NavCompass({ mapHeading, headingUp, onToggle }) {
+export default function NavCompass({ mapHeading, headingUp }) {
   // Needle angle only means something while heading-up is actually
   // rotating the map; pinned to 0 (pointing straight up) otherwise.
   const normalised = mapHeading == null ? 0 : ((mapHeading % 360) + 360) % 360
   const northAngle = headingUp ? -normalised : 0
 
   return (
-    <button
+    <div
       className={`nav-compass${headingUp ? '' : ' off'}`}
-      onClick={onToggle}
-      aria-label={headingUp ? 'Heading-Up is on — tap for North-Up' : 'North-Up is on — tap for Heading-Up'}
-      aria-pressed={headingUp}
-      title={headingUp ? 'Heading-Up (tap for North-Up)' : 'North-Up (tap for Heading-Up)'}
+      role="img"
+      aria-label={headingUp ? 'Compass: heading-up active' : 'Compass: north-up'}
     >
       <svg
         width="30"
@@ -49,6 +49,6 @@ export default function NavCompass({ mapHeading, headingUp, onToggle }) {
         <circle cx="15" cy="15" r="2.5" fill="white" stroke={headingUp ? '#E53E3E' : '#94A3B8'} strokeWidth="1.5" />
       </svg>
       <span className="nav-compass-n">N</span>
-    </button>
+    </div>
   )
 }

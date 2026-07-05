@@ -7,9 +7,18 @@
  * way to control the compass display or auto-recenter/dynamic-zoom
  * behaviour at all. This consolidates all five into one panel:
  *
- *   Rotate Map While Walking  — headingUp preference (own state, Home.jsx)
- *   Show Compass              — showCompass (own state, Home.jsx) — NavCompass
- *                                only renders while this is on
+ *   Rotate Map While Walking  — headingUp preference (own state, Home.jsx).
+ *                                Phase 4.2.7: the Heading-Up toggle button
+ *                                itself is a separate, ALWAYS-visible control
+ *                                during navigation (HeadingUpToggle.jsx) —
+ *                                this setting only decides whether the map
+ *                                actually rotates, never whether the button
+ *                                is shown.
+ *   Show Compass              — showCompass (own state, Home.jsx) — purely
+ *                                the decorative NavCompass needle overlay;
+ *                                independent of Heading-Up in both
+ *                                directions (toggling one never touches
+ *                                the other)
  *   Voice Guidance            — reads/writes the EXISTING useVoiceGuidance
  *                                settings object directly; deliberately not
  *                                duplicated here, so there's one source of truth
