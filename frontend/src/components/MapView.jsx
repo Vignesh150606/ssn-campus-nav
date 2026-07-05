@@ -144,15 +144,10 @@ function userMarkerHtml(mode) {
     </div>`
   }
   if (mode === 'puck') {
-    // Navigation puck — Google Maps–inspired blue dot with a visible
-    // forward-direction cone (explicitly requested — a prior pass here
-    // had deliberately kept this wedge very faint to avoid looking like
-    // a direct copy, but a barely-there cone doesn't actually read as a
-    // direction indicator at a glance, which is the whole point of it
-    // during navigation). Gradient-faded from solid near the puck to
-    // transparent at the tip reads as a proper beam rather than a flat
-    // triangle, and keeps it from ever fighting with the map/route colour
-    // underneath it.
+    // Navigation puck — rounded chevron + halo + soft directional glow.
+    // Deliberately not a copy of Google Maps' cone: a single bold
+    // arrowhead sitting proud of the dot, rather than a wide translucent
+    // beam, so it reads clearly at a glance without looking derivative.
     const CX = 24, CY = 24
     return `<div class="user-marker-rotate" style="width:48px;height:48px">
       <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
@@ -160,14 +155,10 @@ function userMarkerHtml(mode) {
           <filter id="u-shadow" x="-50%" y="-50%" width="200%" height="200%">
             <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(37,99,235,0.45)"/>
           </filter>
-          <radialGradient id="u-cone" cx="${CX}" cy="${CY}" r="24" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stop-color="rgba(66,133,244,0.42)"/>
-            <stop offset="100%" stop-color="rgba(66,133,244,0)"/>
-          </radialGradient>
         </defs>
-        <!-- forward direction cone -->
-        <path d="M ${CX} ${CY - 22} L ${CX - 17} ${CY + 6} Q ${CX} ${CY - 10} ${CX + 17} ${CY + 6} Z"
-          fill="url(#u-cone)"/>
+        <!-- soft directional glow -->
+        <path d="M ${CX} 3 L ${CX - 13} ${CY + 8} Q ${CX} ${CY - 6} ${CX + 13} ${CY + 8} Z"
+          fill="rgba(66,133,244,0.20)"/>
         <!-- white halo for contrast against any tile colour -->
         <circle cx="${CX}" cy="${CY}" r="13" fill="white" filter="url(#u-shadow)"/>
         <!-- main puck body -->
@@ -533,9 +524,6 @@ export default function MapView({
   onMapDrag,
   /** Phase 4A: called with current bearing in degrees */
   onRotationChange,
-  /** Phase 4.2.6 Priority 8: true while actively navigating — hides every
-      POI marker except the destination so the map stays clean/focused. */
-  navMode = false,
 }) {
   return (
     <MapContainer
@@ -553,32 +541,10 @@ export default function MapView({
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        /* Phase 4.2.6 Priority 3 — root cause of the rotation "black
-           screen": leaflet-rotate rotates the tile pane via CSS transform,
-           but Leaflet still only loads tiles to cover the UNROTATED
-           viewport rectangle (+ keepBuffer). At any bearing other than 0°,
-           the rotated viewport's corners reach outside that rectangle, so
-           whichever corner tiles haven't loaded yet show the container's
-           own background instead — see the .leaflet-container background
-           fix below for why that read as literally black. Default
-           keepBuffer is 2; 6 preloads a much wider ring of surrounding
-           tiles up front so a bearing change is far less likely to expose
-           any untiled area at all, rather than only reacting after the
-           fact. */
-        keepBuffer={6}
       />
 
-      {/* Campus location markers — Priority 8 (Phase 4.2.6): during active
-          navigation, every unrelated POI (buildings, facilities, food,
-          hostels, etc.) is hidden so the map reads as "route + destination"
-          only, not the full campus directory. The destination pin itself
-          always stays, navMode or not. Nothing here is destroyed — this is
-          a render-time filter over the same `locations` prop, so exiting
-          navigation restores every marker immediately with no extra state
-          to track or reset. */}
-      {locations
-        .filter(loc => !navMode || loc.id === destinationId)
-        .map(loc => (
+      {/* Campus location markers */}
+      {locations.map(loc => (
         <Marker
           key={loc.id}
           position={[loc.lat, loc.lng]}

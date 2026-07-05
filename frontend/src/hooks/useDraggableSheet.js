@@ -113,12 +113,14 @@ export function useDraggableSheet(snapPeeks, initialTier = 'collapsed') {
     listenersRef.current = null
   }, [])
 
-  const beginDrag = useCallback((startY, startPeek) => {
+  const onPointerDown = useCallback((e) => {
+    // Only the primary mouse button / a real touch/pen point starts a drag.
+    if (e.button != null && e.button !== 0) return
     cancelAnimationFrame(rafRef.current)
     stopDragListening() // clear any prior drag's listeners first (e.g. multi-touch) — never stack duplicates
     dragRef.current = {
-      startY, startPeek,
-      lastY: startY, lastT: performance.now(), v: 0, active: false,
+      startY: e.clientY, startPeek: peekRef.current,
+      lastY: e.clientY, lastT: performance.now(), v: 0, active: false,
     }
     setDragging(true)
 
@@ -158,51 +160,6 @@ export function useDraggableSheet(snapPeeks, initialTier = 'collapsed') {
     window.addEventListener('pointercancel', up)
   }, [applyPeek, nearestTier, snapToTier, stopDragListening])
 
-  const onPointerDown = useCallback((e) => {
-    // Only the primary mouse button / a real touch/pen point starts a drag.
-    if (e.button != null && e.button !== 0) return
-    beginDrag(e.clientY, peekRef.current)
-  }, [beginDrag])
-
-  // Priority 9 (Phase 4.2.6): the grip alone (however large) is still a
-  // second, separate touch target from "the directions I'm reading" — at
-  // the 'full' tier that's most of the screen, so the natural gesture is
-  // to just pull down on the list itself. This hands a downward pull off
-  // to the exact same drag machinery as the grip, but ONLY when the list
-  // is already scrolled to its very top when the gesture starts — reading
-  // further down the list (scrolling up, or starting mid-scroll) is left
-  // completely untouched, still native scrolling. Nothing is decided at
-  // pointerdown itself: it watches the first few pixels of movement to
-  // tell "pulling the sheet down" and "scrolling the list" apart before
-  // committing to either.
-  const onContentPointerDown = useCallback((e) => {
-    if (e.button != null && e.button !== 0) return
-    const scrollEl = e.currentTarget
-    const startY = e.clientY
-    const startPeek = peekRef.current
-    let decided = false
-
-    const preMove = (ev) => {
-      if (decided) return
-      const dy = ev.clientY - startY // positive = finger moving down
-      if (Math.abs(dy) < DRAG_ACTIVATE_PX) return
-      decided = true
-      window.removeEventListener('pointermove', preMove)
-      window.removeEventListener('pointerup', preUp)
-      window.removeEventListener('pointercancel', preUp)
-      if (dy > 0 && scrollEl.scrollTop <= 0) beginDrag(startY, startPeek)
-      // else: leave it as normal scrolling, nothing further to do here.
-    }
-    const preUp = () => {
-      window.removeEventListener('pointermove', preMove)
-      window.removeEventListener('pointerup', preUp)
-      window.removeEventListener('pointercancel', preUp)
-    }
-    window.addEventListener('pointermove', preMove)
-    window.addEventListener('pointerup', preUp)
-    window.addEventListener('pointercancel', preUp)
-  }, [beginDrag])
-
   const cycleTier = useCallback(() => {
     const order = ['collapsed', 'half', 'full']
     const next = order[(order.indexOf(tier) + 1) % order.length]
@@ -215,5 +172,5 @@ export function useDraggableSheet(snapPeeks, initialTier = 'collapsed') {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return { sheetRef, tier, dragging, snapToTier, cycleTier, onPointerDown, onContentPointerDown }
+  return { sheetRef, tier, dragging, snapToTier, cycleTier, onPointerDown }
 }

@@ -123,7 +123,7 @@ export default function Home() {
   // NavSettingsPanel.jsx's header comment for why that doesn't need
   // localStorage the way voice guidance does.
   const [showCompass, setShowCompass]   = useState(false) // default OFF — "Compass hidden unless explicitly enabled"
-  const [autoRecenter, setAutoRecenter] = useState(false) // Phase 4.2.6 Priority 7 — default OFF; user opts in via Navigation Settings
+  const [autoRecenter, setAutoRecenter] = useState(true)
   const [dynamicZoom, setDynamicZoom]   = useState(true)
 
   // ── Phase 1: Navigation mode state ─────────────────────────────────────
@@ -233,17 +233,6 @@ export default function Home() {
   // and the floating button stack's own height, instead of hardcoded
   // pixel offsets that desync the moment the sheet's actual height
   // changes. See useElementHeightVar for details.
-  // Phase 4.2.6 Priority 4: the zoom control's "how high can it climb"
-  // ceiling used to be a hardcoded 120px guess at the search bar + chip
-  // row's height (see index.css history on .leaflet-top.leaflet-left —
-  // it's already been corrected once, from 96px to 120px, and users were
-  // still seeing an overlap). A guessed constant will always eventually
-  // drift out of sync with the real layout (font scaling, a longer chip
-  // label wrapping, a future added element) — exactly like --sheet-h and
-  // --fab-stack-h below, this measures the ACTUAL rendered height of the
-  // search overlay (bar + chips) instead, so the ceiling is always
-  // correct regardless of what that block actually contains right now.
-  const searchHeaderHeightRef = useElementHeightVar('--search-header-h')
   const sheetHeightRef    = useElementHeightVar('--sheet-h')
   const fabStackHeightRef = useElementHeightVar('--fab-stack-h')
 
@@ -734,14 +723,13 @@ export default function Home() {
           recalcVersion={recalcVersion}
           onMapDrag={handleMapDrag}
           onRotationChange={setCurrentBearing}
-          navMode={navMode}
         />
       </div>
 
       {/* ── Browse UI — hidden in navigation mode ── */}
       {!navMode && (
         <>
-          <div className="search-overlay" ref={searchHeaderHeightRef}>
+          <div className="search-overlay">
             <SearchBar value={query} onChange={setQuery} />
             {searchResults === null && <CategoryChips active={category} onChange={setCategory} />}
           </div>
@@ -840,7 +828,7 @@ export default function Home() {
               )}
 
               {(previewSheet.tier === 'half' || previewSheet.tier === 'full') && (
-                <div className="nav-sheet-scroll" onPointerDown={previewSheet.onContentPointerDown}>
+                <div className="nav-sheet-scroll">
                   <RoutePreviewPanel
                     destination={previewLoc}
                     routes={previewRoutes}
@@ -962,57 +950,46 @@ export default function Home() {
             className={`nav-bottom-sheet tier-${navSheet.tier}${navSheet.dragging ? ' dragging' : ''}`}
             ref={navSheet.sheetRef}
           >
-            {/* Priority 6 (Phase 4.2.6) — at the 'full' tier the directions
-                content pushes right up under the sheet, and the old thin
-                grip strip (32-46px) was the ONLY part of the sheet that
-                responded to a collapse drag — easy to miss when the sheet
-                is nearly full-screen. This wrapper makes the whole header
-                block (grip + the stat row that's already visible at every
-                tier) one dedicated, always-collapsible drag zone, instead
-                of just the pill itself. Tap-to-cycle stays scoped to the
-                grip button alone so tapping a stat number doesn't also
-                cycle tiers. */}
-            <div className="nav-sheet-drag-zone" onPointerDown={navSheet.onPointerDown}>
-              <button
-                className="nav-sheet-grip"
-                onClick={navSheet.cycleTier}
-                aria-label="Drag or tap to resize navigation details"
-              >
-                <div className="sheet-handle" />
-              </button>
+            <button
+              className="nav-sheet-grip"
+              onPointerDown={navSheet.onPointerDown}
+              onClick={navSheet.cycleTier}
+              aria-label="Drag or tap to resize navigation details"
+            >
+              <div className="sheet-handle" />
+            </button>
 
-              {/* Visible at every tier: Next Turn · Distance · ETA */}
-              <div className="nav-bottom-row-collapsed">
-                {nextTurn ? (
-                  <div className="nav-sheet-turn-compact">
-                    <span className="nav-sheet-turn-icon">{turnIcon(nextTurn.direction)}</span>
-                    <div>
-                      <div className="nav-dist-big nav-turn-compact-label">{turnLabel(nextTurn.direction)}</div>
-                      <div className="nav-dist-label">in {formatDist(nextTurn.distanceM)}</div>
-                    </div>
-                  </div>
-                ) : (
+            {/* Visible at every tier: Next Turn · Distance · ETA */}
+            <div className="nav-bottom-row-collapsed">
+              {nextTurn ? (
+                <div className="nav-sheet-turn-compact">
+                  <span className="nav-sheet-turn-icon">{turnIcon(nextTurn.direction)}</span>
                   <div>
-                    <div className="nav-dist-big nav-turn-compact-label">Continue Straight</div>
-                    <div className="nav-dist-label">next turn</div>
+                    <div className="nav-dist-big nav-turn-compact-label">{turnLabel(nextTurn.direction)}</div>
+                    <div className="nav-dist-label">in {formatDist(nextTurn.distanceM)}</div>
                   </div>
-                )}
-                <div className="nav-divider-v" />
-                <div>
-                  <div className="nav-dist-big">{formatDist(displayDist)}</div>
-                  <div className="nav-dist-label">remaining</div>
                 </div>
-                <div className="nav-divider-v" />
+              ) : (
                 <div>
-                  <div className="nav-eta-big">{displayEta != null ? `${displayEta} min` : '—'}</div>
-                  <div className="nav-dist-label">estimated</div>
+                  <div className="nav-dist-big nav-turn-compact-label">Continue Straight</div>
+                  <div className="nav-dist-label">next turn</div>
                 </div>
+              )}
+              <div className="nav-divider-v" />
+              <div>
+                <div className="nav-dist-big">{formatDist(displayDist)}</div>
+                <div className="nav-dist-label">remaining</div>
+              </div>
+              <div className="nav-divider-v" />
+              <div>
+                <div className="nav-eta-big">{displayEta != null ? `${displayEta} min` : '—'}</div>
+                <div className="nav-dist-label">estimated</div>
               </div>
             </div>
 
             {/* Half + Full tier: adds Arrival time, Destination, Event, Menu preview */}
             {(navSheet.tier === 'half' || navSheet.tier === 'full') && (
-              <div className="nav-sheet-scroll" onPointerDown={navSheet.onContentPointerDown}>
+              <div className="nav-sheet-scroll">
                 <div className="nav-bottom-expanded-content">
                   <div className="nav-expanded-row">
                     <span className="nav-expanded-label">Arrival time</span>
