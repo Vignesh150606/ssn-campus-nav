@@ -3779,10 +3779,12 @@ select:-webkit-autofill {
    PHASE 4A — Premium Google Maps Navigation Experience
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── Navigation compass (heading-up indicator + north-up toggle) ─────────── */
-.nav-compass {
+/* ── Heading-Up toggle — the primary, always-visible-during-navigation
+   mode switch. Occupies the slot this used to share with the compass
+   display before Phase 4.2.7 split them into two independent controls. ── */
+.heading-up-toggle {
   position: fixed;
-  /* Priority 2: clamped against the live sheet height so the compass is
+  /* Priority 2: clamped against the live sheet height so the control is
      pushed up (never lower than clear of the sheet's visible top edge)
      as the draggable sheet expands toward Fully Expanded — recalculated
      by the browser on every --sheet-h write, same frame as the sheet's
@@ -3808,13 +3810,52 @@ select:-webkit-autofill {
   animation: fade-in 0.25s ease;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-.nav-compass:active {
+.heading-up-toggle:active {
   transform: scale(0.92);
   box-shadow: var(--shadow-sm);
 }
-.nav-compass.off {
+.heading-up-toggle.off {
   background: var(--surface);
   opacity: 0.75;
+}
+.heading-up-toggle-label {
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #E53E3E;
+  line-height: 1;
+}
+.heading-up-toggle.off .heading-up-toggle-label {
+  color: #94A3B8;
+}
+
+/* ── Compass — OPTIONAL North indicator, independent of the Heading-Up
+   toggle above (Phase 4.2.7 split). Purely decorative: no cursor, no
+   click/active states, no "off" variant — it's either mounted (Show
+   Compass is on) or not rendered at all. Offset further down the same
+   right-hand column so it never overlaps HeadingUpToggle when both are
+   visible at once. ── */
+.nav-compass {
+  position: fixed;
+  top: min(calc(var(--header-h) + 116px + 62px), calc(100vh - var(--sheet-h, 0px) - 10px));
+  right: 14px;
+  z-index: 809;
+  width: 46px;
+  height: 52px;
+  border-radius: 12px;
+  background: var(--surface-translucent);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 4px 4px;
+  animation: fade-in 0.25s ease;
 }
 .nav-compass-n {
   font-family: var(--font-display);
@@ -3823,9 +3864,6 @@ select:-webkit-autofill {
   letter-spacing: 0.06em;
   color: #E53E3E;
   line-height: 1;
-}
-.nav-compass.off .nav-compass-n {
-  color: #94A3B8;
 }
 
 /* ── Recenter button — Phase 4.2: now a flex child of .copilot-fab-stack
@@ -3870,10 +3908,13 @@ select:-webkit-autofill {
   white-space: nowrap;
 }
 
-/* ── Safe-area overrides for nav-compass ───────────────────────────────────── */
+/* ── Safe-area overrides — Heading-Up toggle + Compass ────────────────────── */
 @supports (padding: env(safe-area-inset-top)) {
-  .nav-compass {
+  .heading-up-toggle {
     top: min(calc(var(--header-h) + env(safe-area-inset-top, 0px) + 116px), calc(100vh - var(--sheet-h, 0px) - 70px));
+  }
+  .nav-compass {
+    top: min(calc(var(--header-h) + env(safe-area-inset-top, 0px) + 116px + 62px), calc(100vh - var(--sheet-h, 0px) - 10px));
   }
 }
 
@@ -3897,7 +3938,7 @@ select:-webkit-autofill {
 
 /* ── Mobile sizing ────────────────────────────────────────────────────────── */
 @media (max-width: 430px) {
-  .nav-compass {
+  .heading-up-toggle, .nav-compass {
     width: 42px;
     height: 48px;
     right: 12px;

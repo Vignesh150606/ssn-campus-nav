@@ -23,6 +23,7 @@ import RoutePreviewPanel from '../components/RoutePreviewPanel'
 import NearbyFacilities from '../components/NearbyFacilities'
 import CompassWidget from '../components/CompassWidget'
 import NavCompass from '../components/NavCompass'
+import HeadingUpToggle from '../components/HeadingUpToggle'
 import NavSettingsPanel from '../components/NavSettingsPanel'
 import ChatbotWidget from '../copilot/ChatbotWidget'
 import { getLocations, searchLocations, getRoute, getRouteFromCoords, getRoadSegments, getEvents } from '../api'
@@ -125,6 +126,12 @@ export default function Home() {
 
   const [autoRecenter, setAutoRecenter] = useState(false) // Phase 4.2.6 Priority 7 — default OFF; user opts in via Navigation Settings
   const [dynamicZoom, setDynamicZoom]   = useState(true)
+  // Phase 4.2.7 (Heading-Up/Compass separation): the optional North-
+  // indicator's OWN visibility — fully independent of headingUp. Default
+  // OFF; the user opts in via "Show Compass" in Navigation Settings.
+  // Toggling this never touches headingUp, and toggling headingUp never
+  // touches this.
+  const [showCompass, setShowCompass] = useState(false)
 
   // ── Phase 1: Navigation mode state ─────────────────────────────────────
   const [navMode, setNavMode]                     = useState(false)
@@ -921,20 +928,23 @@ export default function Home() {
             ✕ Exit
           </button>
 
-          {/* Phase 4.2.7 (yellow Heading-Up control spec): this used to be
-              opt-in via Navigation Settings, default OFF (Phase 4.2.4) —
-              meaning nothing appeared to switch back to North-Up unless
-              you'd found and enabled a settings checkbox first. Now it's
-              simply always present during navigation, defaulting to its
-              active (Heading-Up ON) state, matching the immediate-
-              manual-override pattern of other navigation apps: tap once
-              for North-Up, tap again to resume Heading-Up. Same shared
-              headingUp state as before — not a second source of truth. */}
-          <NavCompass
-            mapHeading={currentBearing}
+          {/* Phase 4.2.7 (Heading-Up/Compass separation) root-cause fix:
+              these were one combined element (NavCompass did double duty
+              as both), so hiding the optional compass also removed the
+              only way to switch modes. Now they're two independent
+              elements with two independent visibility rules:
+              HeadingUpToggle is the primary mode switch — always shown
+              during navigation, never gated behind a setting. NavCompass
+              is the optional North-indicator overlay — gated purely by
+              showCompass (default OFF, set in Navigation Settings) and
+              has no effect on headingUp whatsoever. */}
+          <HeadingUpToggle
             headingUp={headingUp}
             onToggle={handleToggleHeadingUp}
           />
+          {showCompass && (
+            <NavCompass mapHeading={currentBearing} />
+          )}
 
           {/* Phase 6 — Prominent off-route / recalculating banner */}
           {(offRoute || recalculating) && (
@@ -1213,6 +1223,8 @@ export default function Home() {
         onClose={() => setNavSettingsOpen(false)}
         headingUp={headingUp}
         onToggleHeadingUp={handleToggleHeadingUp}
+        showCompass={showCompass}
+        onToggleShowCompass={setShowCompass}
         autoRecenter={autoRecenter}
         onToggleAutoRecenter={setAutoRecenter}
         dynamicZoom={dynamicZoom}
