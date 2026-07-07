@@ -304,6 +304,24 @@ function NavigationController({
   // ── Helper: set bearing + notify parent ────────────────────────────
   const lastBearingRef = useRef(0)
   const applyBearingRaw = useCallback((deg) => {
+    // Root cause of the "reversed orientation" bug: `deg` here is a
+    // standard compass-style heading — 0=North, increasing CLOCKWISE
+    // (E=90, S=180, W=270) — the same convention used everywhere else in
+    // this app (marker rotation, NavCompass needle, useNavCamera). But
+    // leaflet-rotate's OWN setBearing() uses the OPPOSITE convention
+    // internally (increasing counter-clockwise) — confirmed directly from
+    // its bundled CompassBearing handler (node_modules/leaflet-rotate/src/
+    // map/handler/CompassBearing.js), which explicitly does
+    // `angle = 360 - angle` to convert a standard (iOS webkitCompassHeading)
+    // compass reading into what it then passes to setBearing(). Passing a
+    // plain compass heading straight into setBearing() without that same
+    // conversion rotates the map exactly backwards — e.g. facing East
+    // visually put East at the BOTTOM of the screen instead of the top.
+    // We do the identical `360 - deg` conversion here, at the single choke
+    // point where the Leaflet API is actually called, so every other
+    // consumer of a heading value in this app can keep using plain,
+    // unambiguous compass degrees — only this one call site needs to know
+    // about leaflet-rotate's inverted convention.
     const wrapped = ((deg % 360) + 360) % 360
     const rawJump = Math.abs(wrapped - lastBearingRef.current)
     if (rawJump > 180) {
@@ -319,7 +337,7 @@ function NavigationController({
       }
     }
     lastBearingRef.current = wrapped
-    map.setBearing(deg)
+    map.setBearing(360 - deg)
     onRotationChange?.(deg)
   }, [map, onRotationChange])
 
@@ -543,9 +561,24 @@ export default function MapView({
       touchRotate={false}      // disable pinch-to-rotate (use our programmatic API only)
       shiftKeyRotate={false}
     >
+      {/* Priority 2 (Phase 4.2.7) — root cause of the brief black-map flash
+          during rapid rotation: Leaflet's default keepBuffer (2 rows/cols
+          of tiles beyond the visible viewport) is sized for an AXIS-ALIGNED
+          viewport. Once the map is rotated, the visible viewport's corners
+          sweep out well past that default margin — so a fast rotation
+          could briefly expose a tile-less (blank/black) gap at the edges
+          before new tiles load in. A larger buffer keeps enough
+          surrounding tiles already loaded that rotating into them is
+          instant, at the cost of a bit more tile memory/bandwidth — a
+          clearly worthwhile trade for a navigation map that rotates
+          continuously. updateWhenZooming=false avoids extra tile churn
+          mid-gesture (Priority 2's "avoid unnecessary camera resets /
+          minimize map redraws"). */}
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        keepBuffer={6}
+        updateWhenZooming={false}
       />
 
       {/* Campus location markers — Priority 6: during active navigation,

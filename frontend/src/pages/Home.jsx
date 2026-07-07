@@ -30,7 +30,7 @@ import { getLocations, searchLocations, getRoute, getRouteFromCoords, getRoadSeg
 import { useLocationContext } from '../context/LocationContext'
 import { useVoiceGuidance } from '../hooks/useVoiceGuidance'
 import { useCompassHeading } from '../hooks/useCompassHeading'
-import { useNavCamera } from '../hooks/useNavCamera'
+import { useNavCamera, circDiff } from '../hooks/useNavCamera'
 import { useElementHeightVar } from '../hooks/useElementHeightVar'
 import { landmarksAlongPath } from '../utils/facilities'
 import { computeUpcomingTurn, computeAllTurns, haversine } from '../utils/geo'
@@ -175,11 +175,38 @@ export default function Home() {
       window.removeEventListener('orientationchange', onResize)
     }
   }, [])
-  const navSheetPeeks = useMemo(() => ({
-    collapsed: 128,
-    half: Math.round(viewportH * 0.44),
-    full: Math.round(viewportH * 0.86),
-  }), [viewportH])
+  // Priority 3 (Phase 4.2.7) — root cause of "fully-expanded sheet collides
+  // with the turn instruction card": the sheet's 'full' tier was a flat
+  // 86% of viewport height with no awareness of the turn card at all,
+  // while the turn card is pinned near the top at a fixed offset. On
+  // shorter phones (or whenever the card grows taller — a longer street
+  // name, a destination badge, etc.) the sheet's top edge could rise
+  // above the turn card's bottom edge, and the two would overlap.
+  // Measuring the card's REAL rendered bottom edge and clamping 'full' to
+  // stop just below it (with a small gap) means the two can never
+  // collide, regardless of device height or how tall the card gets.
+  const [turnCardBottom, setTurnCardBottom] = useState(0)
+  const turnCardRoRef = useRef(null)
+  const turnCardRef = useCallback((node) => {
+    if (turnCardRoRef.current) { turnCardRoRef.current.disconnect(); turnCardRoRef.current = null }
+    if (!node) { setTurnCardBottom(0); return }
+    const measure = () => setTurnCardBottom(node.getBoundingClientRect().bottom)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(node)
+    turnCardRoRef.current = ro
+  }, [])
+  const navSheetPeeks = useMemo(() => {
+    const TURN_CARD_GAP = 16
+    const maxFullBeforeCollision = turnCardBottom > 0
+      ? Math.max(240, viewportH - turnCardBottom - TURN_CARD_GAP)
+      : Math.round(viewportH * 0.86)
+    return {
+      collapsed: 128,
+      half: Math.round(viewportH * 0.44),
+      full: Math.min(Math.round(viewportH * 0.86), maxFullBeforeCollision),
+    }
+  }, [viewportH, turnCardBottom])
   const navSheet = useDraggableSheet(navSheetPeeks, 'collapsed')
   // Every fresh navigation session starts collapsed so the map is visible;
   // the user drags/taps up for more detail. Presentation-only — doesn't
@@ -753,7 +780,22 @@ export default function Home() {
           dynamicZoom={dynamicZoom}
           zoom={17}
           previewTrigger={previewTrigger}
-          userHeading={navMode ? smoothedHeading : null}
+          // The user's own marker icon lives in Leaflet's markerPane, which
+          // leaflet-rotate deliberately does NOT rotate along with the map
+          // (only tilePane/overlayPane rotate — see node_modules/leaflet-
+          // rotate/src/map/Map.js's rotatePane/norotatePane split). So once
+          // the map itself is rotated to put the travel direction "up"
+          // (headingUp active), the marker's own arrow must show only the
+          // small RESIDUAL drift between the current live heading and the
+          // map's last committed bearing — not the raw absolute heading —
+          // or it doubly rotates and points the wrong way entirely. In
+          // North-up mode the map isn't rotated at all, so the raw
+          // absolute heading is exactly what should be shown, as before.
+          userHeading={navMode
+            ? (headingUp && mapHeading != null
+                ? circDiff(mapHeading, smoothedHeading)
+                : smoothedHeading)
+            : null}
           mapHeading={navMode ? mapHeading : null}
           headingUp={navMode && headingUp}
           declutter={navMode}
@@ -950,7 +992,7 @@ export default function Home() {
       {navMode && !arrived && (
         <>
           {/* Phase 3 — Turn instruction card */}
-          <div className="nav-instruction-card">
+          <div className="nav-instruction-card" ref={turnCardRef}>
             <div className="nav-turn-icon-wrap">
               <span className="nav-turn-icon">{nextTurn ? turnIcon(nextTurn.direction) : '↑'}</span>
             </div>
