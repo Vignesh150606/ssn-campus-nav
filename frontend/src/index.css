@@ -301,8 +301,12 @@ input, select, textarea { font-family: inherit; color: inherit; }
   top: auto !important;
   left: auto !important;
   right: 16px;
+  /* Same 128px fallback fix as .nav-exit-btn above, and for the same
+     reason: this control is only ever visible in nav mode (Priority 4),
+     which always starts at the 128px collapsed tier — matching that here
+     avoids a first-frame flash lower than its correct resting position. */
   bottom: min(
-    calc(var(--sheet-h, 0px) + var(--fab-stack-h, 56px) + 14px + env(safe-area-inset-bottom, 0px)),
+    calc(var(--sheet-h, 128px) + var(--fab-stack-h, 56px) + 14px + env(safe-area-inset-bottom, 0px)),
     calc(100vh - var(--header-h, 60px) - 120px)
   );
   transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2166,7 +2170,16 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
 /* ── Phase 6: Exit Navigation button ── */
 .nav-exit-btn {
   position: fixed;
-  bottom: calc(var(--sheet-h, 0px) + 14px + env(safe-area-inset-bottom, 0px));
+  /* Priority (Phase 4.2.7) — root cause of "Exit button overlapping the
+     turn text": this fallback used to be 0px, meaning for the single
+     frame before useDraggableSheet's mount effect first writes the real
+     --sheet-h value, the button assumed the sheet had ZERO height and
+     rendered right at the very bottom of the screen — squarely on top of
+     the collapsed sheet's peek row (which is ALWAYS 128px tall the
+     instant navigation starts; see navSheetPeeks.collapsed in Home.jsx).
+     Matching that same 128px here means the button is correctly clear of
+     the sheet from the very first paint, not just after JS catches up. */
+  bottom: calc(var(--sheet-h, 128px) + 20px + env(safe-area-inset-bottom, 0px));
   left: 14px;
   background: #DC2626;
   color: #fff;
@@ -3167,7 +3180,13 @@ html.nav-sheet-driving .map-layer {
    a specific sheet state and never drifts out of sync. ── */
 .copilot-fab-stack {
   position: fixed;
-  bottom: calc(var(--sheet-h, 0px) + 14px + env(safe-area-inset-bottom, 0px));
+  /* Same fix as .nav-exit-btn / zoom control above — this stack is shared
+     between browse mode (where the browse sheet defaults to ~38% of
+     viewport, not 128px) and nav mode (128px collapsed). Nav mode is the
+     more failure-prone case (recenter-btn + Exit sit close together
+     there), so it gets the safer fallback; browse mode's actual sheet
+     height overwrites this within one JS tick regardless. */
+  bottom: calc(var(--sheet-h, 128px) + 14px + env(safe-area-inset-bottom, 0px));
   right: 20px;
   z-index: 3500;
   display: flex;
@@ -3596,7 +3615,7 @@ select:-webkit-autofill {
 @media (min-width: 720px) {
   .copilot-fab-stack {
     right: 24px;
-    bottom: calc(var(--sheet-h, 0px) + 18px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(var(--sheet-h, 128px) + 18px + env(safe-area-inset-bottom, 0px));
   }
   .copilot-sheet {
     left: auto;

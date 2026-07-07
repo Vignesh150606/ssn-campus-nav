@@ -560,6 +560,25 @@ export default function MapView({
       bearing={0}
       touchRotate={false}      // disable pinch-to-rotate (use our programmatic API only)
       shiftKeyRotate={false}
+      // Priority 1 (Phase 4.2.7) root-cause fix — THE mystery "orange
+      // button": leaflet-rotate adds its OWN native rotate control by
+      // default (rotateControl: true, undocumented in our own code since
+      // it's injected entirely by the library, not rendered by React —
+      // see node_modules/leaflet-rotate/src/control/Rotate.js). It's a
+      // COMPLETELY SEPARATE, rival rotation system: tapping it cycles
+      // the library's own touch-rotate / raw-device-compass "Compass
+      // mode" (turning the button literally `style.backgroundColor =
+      // 'orange'` in its own source — a plain JS colour keyword, not a
+      // CSS class, which is why it was invisible to every colour/class
+      // search of our own code) — entirely bypassing our own carefully-
+      // tuned useNavCamera pipeline (GPS-course preference, jitter
+      // smoothing, stationary lock, etc). It only ever appeared once our
+      // OWN rotation changed the bearing away from 0 (closeOnZeroBearing
+      // hides it otherwise), which is why it looked like it "came on
+      // once you started walking." There should be exactly one heading-
+      // up implementation in this app — ours — so this rival control is
+      // disabled outright rather than left to silently compete with it.
+      rotateControl={false}
     >
       {/* Priority 2 (Phase 4.2.7) — root cause of the brief black-map flash
           during rapid rotation: Leaflet's default keepBuffer (2 rows/cols

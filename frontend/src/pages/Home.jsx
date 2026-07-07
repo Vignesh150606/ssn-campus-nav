@@ -124,7 +124,7 @@ export default function Home() {
   // NavSettingsPanel.jsx's header comment for why that doesn't need
   // localStorage the way voice guidance does.
   const [showCompass, setShowCompass]   = useState(false) // default OFF — "Compass hidden unless explicitly enabled"
-  const [autoRecenter, setAutoRecenter] = useState(true)
+  const [autoRecenter, setAutoRecenter] = useState(false)
   const [dynamicZoom, setDynamicZoom]   = useState(true)
 
   // ── Phase 1: Navigation mode state ─────────────────────────────────────
