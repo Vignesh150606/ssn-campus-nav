@@ -58,18 +58,6 @@ function PhotoLightbox({ photos, startIdx, onClose }) {
   )
 }
 
-// ── Off-route / recalculating banner ───────────────────────────────────────
-function OffRouteBanner({ offRoute, recalculating }) {
-  if (!offRoute && !recalculating) return null
-  return (
-    <div className={`off-route-banner ${recalculating ? 'recalculating' : ''}`}>
-      {recalculating
-        ? '🔄 Recalculating Route…'
-        : '⚠ Off Route Detected'}
-    </div>
-  )
-}
-
 export default function EventPage() {
   const { eventId }  = useParams()
   const navigate     = useNavigate()
@@ -85,7 +73,7 @@ export default function EventPage() {
 
   const {
     setRoute, start: startTracking, tracking, position,
-    hasRoute, remainingDist, remainingPath, offRoute, recalculating,
+    hasRoute, remainingDist, remainingPath, offRoute,
   } = useLocationContext()
 
   const voice = useVoiceGuidance({

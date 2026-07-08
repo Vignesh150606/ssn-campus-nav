@@ -29,7 +29,6 @@ import { LocationContext } from './LocationContext'
 import { pathLength, nearestIndex, destinationPoint, pointAtDistanceAlongPath } from '../utils/geo'
 import { getRouteFromCoords } from '../api'
 
-const ANNOUNCE_THRESHOLDS = [200, 100, 50, 20] // metres from destination
 // Hysteresis on off-route detection: flag off-route only once past
 // OFF_ROUTE_ENTER_M, and don't clear it again until back within
 // OFF_ROUTE_CLEAR_M. A single shared threshold meant GPS jitter right at
@@ -59,9 +58,6 @@ const GPS_HARD_REJECT_M       = 1000
 const GPS_SOFT_REPLACE_M      = 150
 // ACQUIRING_THRESHOLD_M : below this the dot turns green and route logic activates.
 const GPS_ACCURACY_THRESHOLD_M = 50
-// POSITION_AGE_MS : after this many ms without any update we consider the
-//   position stale and re-enter acquiring mode even if accuracy was good.
-const GPS_POSITION_MAX_AGE_MS = 30000
 
 const RECALC_COOLDOWN_MS = 4000      // Phase 2: 3-5 second cooldown per spec
 const RECALC_MIN_REMAINING_M = 15    // don't bother rerouting if basically already there

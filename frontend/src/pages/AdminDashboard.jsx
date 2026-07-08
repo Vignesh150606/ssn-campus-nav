@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { API_BASE } from '../api'
-import { CATEGORY_META, FEST_META, LOCATION_NAME_OVERRIDES, displayLocationName } from '../constants'
+import { LOCATION_NAME_OVERRIDES } from '../constants'
 import { dlog, dwarn } from '../utils/debugLog'
 import PosterManager from '../components/PosterManager'
 import VenueMenuAdmin from '../components/VenueMenuAdmin'
@@ -18,7 +18,7 @@ async function adminFetch(path, method='GET', body=null, token) {
       headers,
       body: body ? JSON.stringify(body) : null,
     })
-  } catch (networkErr) {
+  } catch {
     // Backend unreachable (cold start, offline, DNS, etc.) — distinct from
     // an authenticated-but-rejected response, so callers can tell the two
     // apart instead of treating "server didn't answer" the same as

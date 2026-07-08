@@ -83,7 +83,6 @@ export default function EventsList() {
     return cached || null
   })
   const [error, setError] = useState(null)
-  const [lastUpdated, setLastUpdated] = useState(null)
 
   dlog('EventsList/render', 'component body executing — events =', events === null ? 'null' : `array(${events.length})`, ' error =', error)
 
@@ -114,7 +113,6 @@ export default function EventsList() {
           dlog('EventsList/fetch', `✅ getEvents() resolved after ${ms}ms with ${data?.length ?? 0} events — calling setEvents()`)
           setEvents(data)
           setError(null)
-          setLastUpdated(Date.now())
           saveEventsCache(data)
         })
         .catch((e) => {

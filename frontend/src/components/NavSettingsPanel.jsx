@@ -8,12 +8,13 @@
  * behaviour at all. This consolidates all five into one panel:
  *
  *   Rotate Map While Walking  — headingUp preference (own state, Home.jsx).
- *                                Phase 4.2.7: the Heading-Up toggle button
- *                                itself is a separate, ALWAYS-visible control
- *                                during navigation (HeadingUpToggle.jsx) —
- *                                this setting only decides whether the map
- *                                actually rotates, never whether the button
- *                                is shown.
+ *                                Phase 4.3: the Heading-Up toggle itself is
+ *                                the native Leaflet rotate control (see the
+ *                                L.Control.Rotate override in MapView.jsx),
+ *                                a separate, ALWAYS-visible control during
+ *                                navigation — this setting only decides
+ *                                whether the map actually rotates, never
+ *                                whether that button is shown.
  *   Show Compass              — showCompass (own state, Home.jsx) — purely
  *                                the decorative NavCompass needle overlay;
  *                                independent of Heading-Up in both

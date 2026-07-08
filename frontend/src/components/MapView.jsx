@@ -60,6 +60,45 @@ L.DomUtil.setPosition = function (el, ...rest) {
   return _setPosition.call(this, el, ...rest)
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Priority 1 (Phase 4.3) — ONE Heading-Up implementation, not two.
+//
+// leaflet-rotate ships its own native rotate control (node_modules/
+// leaflet-rotate/src/control/Rotate.js) — a separate, rival system whose
+// "Compass mode" reads DeviceOrientationEvent directly with zero
+// smoothing (node_modules/leaflet-rotate/src/map/handler/
+// CompassBearing.js: `this._map.setBearing(angle - deviceOrientation)` on
+// every raw sample, throttled only to 100ms) — confirmed as the actual
+// source of both the jitter and the tile-buffer-outrunning black flash on
+// fast spins, since it bypasses useNavCamera's GPS-course preference /
+// stationary lock / impossible-jump rejection / confidence-window
+// smoothing entirely.
+//
+// Rather than run two competing systems, this native button is now the
+// ONLY heading-up UI in the app — but its behaviour is fully replaced.
+// map.compassBearing is never enabled (nothing below ever calls
+// .enable() on it, and touchRotate={false} on MapContainer keeps the
+// other rival sub-mode off too); clicking the button just calls back
+// into React via map._headingUpToggle, and its highlighted state mirrors
+// map._headingUpActive instead of map.compassBearing.enabled(). The
+// actual rotation is still applied exactly as before — by
+// NavigationController's applyBearing(), driven by useNavCamera's
+// already-smoothed mapHeading — so this is a UI/control swap, not a new
+// rotation system. This is an app-level override, not a node_modules
+// patch (same reasoning as the DomUtil wrap above), so it survives every
+// `npm install`/reinstall of leaflet-rotate.
+if (L.Control.Rotate) {
+  L.Control.Rotate.prototype._cycleState = function () {
+    if (!this._map) return
+    this._map._headingUpToggle?.()
+  }
+  L.Control.Rotate.prototype._restyle = function () {
+    if (!this._map || !this._link) return
+    const active = !!this._map._headingUpActive
+    L.DomUtil[active ? 'addClass' : 'removeClass'](this._link, 'heading-up-active')
+  }
+}
+
 export const CAMPUS_CENTER = [12.7510, 80.1970]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -280,6 +319,7 @@ function NavigationController({
   recalcVersion,    // increments whenever route is recalculated
   routePath,        // full route path (for fit-bounds after reroute)
   onRotationChange, // callback(degrees) — informs parent of current bearing
+  onToggleHeadingUp, // Priority 1 (Phase 4.3): callback — flips headingUp, wired to the native Leaflet button
 }) {
   const map = useMap()
   const lastPosRef    = useRef(null)
@@ -300,6 +340,26 @@ function NavigationController({
   // `isMapAlive()` is the standard Leaflet idiom for "has .remove() been
   // called on this instance" and guards every map mutation below.
   const isMapAlive = useCallback(() => !!map && !!map._mapPane, [map])
+
+  // ── Native Heading-Up button bridge (Priority 1, Phase 4.3) ─────────
+  // Bridges React's headingUp state + toggle handler onto the map
+  // instance itself so the monkey-patched L.Control.Rotate (top of this
+  // file) can read/call them without needing its own React tree — the
+  // control is native Leaflet DOM, added via addInitHook, entirely
+  // outside React's render output. A ref keeps the toggle callback
+  // fresh across renders without re-running the mount effect below.
+  const onToggleHeadingUpRef = useRef(onToggleHeadingUp)
+  onToggleHeadingUpRef.current = onToggleHeadingUp
+  useEffect(() => {
+    if (!map) return
+    map._headingUpToggle = () => onToggleHeadingUpRef.current?.()
+    return () => { if (map._headingUpToggle) map._headingUpToggle = null }
+  }, [map])
+  useEffect(() => {
+    if (!isMapAlive()) return
+    map._headingUpActive = headingUp
+    map.rotateControl?._restyle?.()
+  }, [map, isMapAlive, headingUp])
 
   // ── Helper: set bearing + notify parent ────────────────────────────
   const lastBearingRef = useRef(0)
@@ -547,6 +607,8 @@ export default function MapView({
   onMapDrag,
   /** Phase 4A: called with current bearing in degrees */
   onRotationChange,
+  /** Priority 1 (Phase 4.3): flips headingUp — wired to the native Leaflet button */
+  onToggleHeadingUp,
 }) {
   return (
     <MapContainer
@@ -560,43 +622,42 @@ export default function MapView({
       bearing={0}
       touchRotate={false}      // disable pinch-to-rotate (use our programmatic API only)
       shiftKeyRotate={false}
-      // Priority 1 (Phase 4.2.7) root-cause fix — THE mystery "orange
-      // button": leaflet-rotate adds its OWN native rotate control by
-      // default (rotateControl: true, undocumented in our own code since
-      // it's injected entirely by the library, not rendered by React —
-      // see node_modules/leaflet-rotate/src/control/Rotate.js). It's a
-      // COMPLETELY SEPARATE, rival rotation system: tapping it cycles
-      // the library's own touch-rotate / raw-device-compass "Compass
-      // mode" (turning the button literally `style.backgroundColor =
-      // 'orange'` in its own source — a plain JS colour keyword, not a
-      // CSS class, which is why it was invisible to every colour/class
-      // search of our own code) — entirely bypassing our own carefully-
-      // tuned useNavCamera pipeline (GPS-course preference, jitter
-      // smoothing, stationary lock, etc). It only ever appeared once our
-      // OWN rotation changed the bearing away from 0 (closeOnZeroBearing
-      // hides it otherwise), which is why it looked like it "came on
-      // once you started walking." There should be exactly one heading-
-      // up implementation in this app — ours — so this rival control is
-      // disabled outright rather than left to silently compete with it.
-      rotateControl={false}
+      // Priority 1 (Phase 4.3) — this native control ("the mystery orange
+      // button" from Phase 4.2.7) is now, deliberately, the ONLY
+      // heading-up UI in the app — see the L.Control.Rotate.prototype
+      // override near the top of this file for how its click/highlight
+      // behaviour is fully replaced so it drives useNavCamera's smoothed
+      // pipeline instead of the library's own raw compass-follow mode.
+      // closeOnZeroBearing is turned off here so the button never
+      // disappears mid-navigation just because the current bearing
+      // happens to read exactly 0° — visibility is governed entirely by
+      // our own nav-mode CSS instead (matching the old always-visible-
+      // during-navigation HeadingUpToggle behaviour).
+      rotateControl={{ closeOnZeroBearing: false }}
     >
-      {/* Priority 2 (Phase 4.2.7) — root cause of the brief black-map flash
-          during rapid rotation: Leaflet's default keepBuffer (2 rows/cols
-          of tiles beyond the visible viewport) is sized for an AXIS-ALIGNED
-          viewport. Once the map is rotated, the visible viewport's corners
-          sweep out well past that default margin — so a fast rotation
-          could briefly expose a tile-less (blank/black) gap at the edges
-          before new tiles load in. A larger buffer keeps enough
-          surrounding tiles already loaded that rotating into them is
-          instant, at the cost of a bit more tile memory/bandwidth — a
-          clearly worthwhile trade for a navigation map that rotates
-          continuously. updateWhenZooming=false avoids extra tile churn
-          mid-gesture (Priority 2's "avoid unnecessary camera resets /
-          minimize map redraws"). */}
+      {/* Priority 2 (Phase 4.2.7, widened Phase 4.3) — root cause of the
+          brief black-map flash during rapid rotation: Leaflet's default
+          keepBuffer (2 rows/cols of tiles beyond the visible viewport) is
+          sized for an AXIS-ALIGNED viewport. Once the map is rotated, the
+          visible viewport's corners sweep out well past that default
+          margin — so a fast rotation could briefly expose a tile-less
+          (blank/black) gap at the edges before new tiles load in. A larger
+          buffer keeps enough surrounding tiles already loaded that
+          rotating into them is instant. Widened 6→8 for Phase 4.3: now
+          that the native button drives useNavCamera's commit/cooldown
+          pipeline instead of the library's raw per-sample compass-follow,
+          rotation happens in fewer, larger jumps rather than a continuous
+          stream of tiny ones — each jump sweeps a bit further per commit,
+          so the buffer needed a little extra margin to match. Also
+          structural: the raw follow mode (the actual source of "rapid
+          phone rotation") is never entered any more at all — see the
+          L.Control.Rotate override above — so this buffer is now a safety
+          margin rather than the only line of defence. updateWhenZooming=
+          false avoids extra tile churn mid-gesture. */}
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        keepBuffer={6}
+        keepBuffer={8}
         updateWhenZooming={false}
       />
 
@@ -745,6 +806,7 @@ export default function MapView({
         recalcVersion={recalcVersion}
         routePath={routePath}
         onRotationChange={onRotationChange}
+        onToggleHeadingUp={onToggleHeadingUp}
       />
 
       {/* ── Manual drag detection (Phase 14) ────────────────────────── */}

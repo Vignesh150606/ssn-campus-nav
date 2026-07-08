@@ -3,14 +3,15 @@
  *
  * Previously this was ALSO the heading-up on/off control, gated behind
  * "Show Compass" (default OFF) — which meant the control disappeared
- * unless that setting was on. The two responsibilities are now split:
+ * unless that setting was on. The two responsibilities are split:
  *
- *   - HeadingUpToggle.jsx: the actual on/off control, always visible
- *     during navigation regardless of this setting.
+ *   - The on/off control lives on the native Leaflet rotate button now
+ *     (Phase 4.3 — see the L.Control.Rotate override in MapView.jsx),
+ *     always visible during navigation regardless of this setting.
  *   - NavCompass (this file): shown ONLY when "Show Compass" is on, purely
  *     informational, no click handler, no control over heading-up at all.
  *     Disabling "Show Compass" only hides this needle — it can never hide
- *     or disable the Heading-Up toggle, and never did the reverse either.
+ *     or disable heading-up itself, and never did the reverse either.
  *
  *   ON  (headingUp=true)  → rotating needle showing where North actually
  *                           is relative to the (rotated) screen; map

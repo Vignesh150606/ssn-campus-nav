@@ -10,7 +10,7 @@
 //  • follow_up_cancel_nav — cancel active navigation from chat
 import { copilotChat } from './copilotApi'
 import { haversine } from '../utils/geo'
-import { nearestWithFacility, nearestCanteen } from '../utils/facilities'
+import { nearestWithFacility } from '../utils/facilities'
 import { getEvents, getRoute, getRouteFromCoords, getVenueMenu } from '../api'
 import { displayLocationName } from '../constants'
 
@@ -25,12 +25,6 @@ const NEED_LABELS = {
 function distanceLabel(meters) {
   if (meters == null) return null
   return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km away` : `${Math.round(meters)} m away`
-}
-
-function etaLabel(meters) {
-  if (meters == null) return null
-  const min = Math.round(meters / 1.4 / 60)
-  return min <= 1 ? '~1 min walk' : `~${min} min walk`
 }
 
 // Priority 4 — the backend intent-classifier (utils/copilot.py) is
@@ -187,7 +181,6 @@ async function handleEventIntent(intent, position) {
 async function handleEventNearMe(position) {
   const events = await fetchVerifiedEvents()
   const today = todayStr()
-  const now = nowHHMM()
 
   // All today's + upcoming events that have a location
   let filtered = events.filter(e =>

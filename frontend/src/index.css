@@ -60,6 +60,19 @@
      in sync with the real DOM from then on (see hooks/useElementHeightVar). */
   --sheet-h: 0px;
   --fab-stack-h: 56px;
+
+  /* Priority — Safe Area Support: left/right insets for Android gesture
+     navigation + display cutouts in LANDSCAPE (top/bottom insets were
+     already handled per-element throughout this file; left/right never
+     were, since every edge-anchored floating control below used a bare
+     px offset — fine in portrait, where left/right insets are 0, but
+     wrong on a notched/curved-edge device rotated to landscape). Defined
+     once here, same pattern as --header-h/--sheet-h above, and added to
+     each edge-anchored control's existing offset via calc() rather than
+     replacing it, so portrait (the common case, where these both
+     evaluate to 0px) looks pixel-identical to before. */
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
 }
 
 [data-theme="dark"] {
@@ -247,6 +260,15 @@ input, select, textarea { font-family: inherit; color: inherit; }
    changes, which is exactly what should feel eased rather than instant. */
 .leaflet-rotate-pane {
   transition: transform 0.3s ease-out;
+  /* Priority 2 (Phase 4.3) — belt-and-braces alongside the wider
+     keepBuffer (MapView.jsx): forcing this pane onto its own GPU
+     compositor layer up front (rather than promoting/demoting it on
+     every rotate) avoids the brief black repaint some Android/Chrome
+     GPUs show when a large 2D transform lands on a layer that wasn't
+     already composited. */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
 }
 .leaflet-control-zoom {
   border: none !important;
@@ -300,7 +322,7 @@ input, select, textarea { font-family: inherit; color: inherit; }
 .leaflet-container .leaflet-top.leaflet-left {
   top: auto !important;
   left: auto !important;
-  right: 16px;
+  right: calc(16px + var(--safe-r));
   /* Same 128px fallback fix as .nav-exit-btn above, and for the same
      reason: this control is only ever visible in nav mode (Priority 4),
      which always starts at the 128px collapsed tier — matching that here
@@ -313,7 +335,7 @@ input, select, textarea { font-family: inherit; color: inherit; }
 }
 @media (max-width: 430px) {
   .leaflet-container .leaflet-top.leaflet-left {
-    right: 12px;
+    right: calc(12px + var(--safe-r));
   }
 }
 /* Priority 4 (Phase 4.2.7): hidden entirely on the Home browse screen — no
@@ -329,7 +351,7 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
 .search-overlay {
   position: absolute;
   top: max(12px, env(safe-area-inset-top, 0));
-  left: 12px; right: 12px;
+  left: calc(12px + var(--safe-l)); right: calc(12px + var(--safe-r));
   z-index: 20;
   display: flex;
   flex-direction: column;
@@ -411,7 +433,7 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
 /* ---------- Bottom sheet ---------- */
 .results-sheet {
   position: absolute;
-  left: 0; right: 0; bottom: 0;
+  left: var(--safe-l); right: var(--safe-r); bottom: 0;
   z-index: 25;
   background: var(--surface-translucent);
   backdrop-filter: blur(20px) saturate(140%);
@@ -813,7 +835,7 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
 /* ---------- Compass FAB ---------- */
 .compass-widget {
   position: absolute;
-  right: 14px;
+  right: calc(14px + var(--safe-r));
   bottom: calc(38% + 16px);
   z-index: 22;
   width: 56px; height: 56px;
@@ -998,7 +1020,7 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
 .status-bar {
   position: absolute;
   top: calc(env(safe-area-inset-top, 0) + 64px + 50px);
-  left: 12px; right: 12px;
+  left: calc(12px + var(--safe-l)); right: calc(12px + var(--safe-r));
   z-index: 22;
   display: flex;
   flex-wrap: wrap;
@@ -1057,7 +1079,7 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
 .guidance-banner {
   position: absolute;
   top: calc(env(safe-area-inset-top, 0) + 72px);
-  left: 12px; right: 12px;
+  left: calc(12px + var(--safe-l)); right: calc(12px + var(--safe-r));
   z-index: 24;
   padding: 14px 16px;
   background: var(--brand);
@@ -1097,7 +1119,7 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
 .location-permission-banner {
   position: absolute;
   top: calc(env(safe-area-inset-top, 0) + 72px);
-  left: 12px; right: 12px;
+  left: calc(12px + var(--safe-l)); right: calc(12px + var(--safe-r));
   z-index: 24;
   padding: 14px 16px;
   background: var(--warning-bg);
@@ -1151,7 +1173,7 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
 .closure-banner {
   position: absolute;
   top: calc(env(safe-area-inset-top, 0) + 130px);
-  left: 12px; right: 12px;
+  left: calc(12px + var(--safe-l)); right: calc(12px + var(--safe-r));
   z-index: 23;
   padding: 10px 14px;
   background: var(--warning-bg);
@@ -1301,7 +1323,7 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
 .nav-card {
   position: absolute;
   top: calc(env(safe-area-inset-top, 0) + 70px);
-  left: 12px; right: 12px;
+  left: calc(12px + var(--safe-l)); right: calc(12px + var(--safe-r));
   z-index: 26;
   display: flex;
   align-items: center;
@@ -1358,7 +1380,7 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
 .nav-warning {
   position: absolute;
   top: calc(env(safe-area-inset-top, 0) + 70px + 88px);
-  left: 12px; right: 12px;
+  left: calc(12px + var(--safe-l)); right: calc(12px + var(--safe-r));
   z-index: 25;
   display: flex;
   align-items: center;
@@ -1371,124 +1393,6 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
   font-size: 0.82rem;
   font-weight: 600;
   box-shadow: var(--shadow-sm);
-}
-
-/* Right-side FAB stack (compass + recenter + end) */
-.nav-fab-stack {
-  position: absolute;
-  right: 12px;
-  bottom: calc(38% + 88px);
-  z-index: 27;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  align-items: center;
-}
-.nav-fab-stack .compass-widget {
-  position: static;
-  right: auto; bottom: auto;
-}
-.nav-fab {
-  width: 48px; height: 48px;
-  border-radius: 50%;
-  background: var(--surface-translucent);
-  backdrop-filter: blur(14px) saturate(140%);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-md);
-  display: grid; place-items: center;
-  color: var(--ink);
-  font-size: 18px;
-  font-weight: 600;
-  transition: transform 0.15s ease, background 0.15s ease;
-}
-.nav-fab:active { transform: scale(0.94); }
-.nav-fab--recenter { color: var(--brand); }
-.nav-fab--end { color: var(--danger); }
-
-.nav-voice-fab {
-  position: absolute;
-  left: 12px;
-  bottom: calc(38% + 88px);
-  z-index: 27;
-  width: 44px; height: 44px;
-  border-radius: 50%;
-  background: var(--surface-translucent);
-  backdrop-filter: blur(14px) saturate(140%);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-md);
-  display: grid; place-items: center;
-  font-size: 18px;
-}
-
-/* ETA / distance strip just above the bottom sheet */
-.nav-eta-strip {
-  position: absolute;
-  left: 12px; right: 12px;
-  bottom: calc(38% + 12px);
-  z-index: 26;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 16px;
-  background: var(--surface-translucent);
-  backdrop-filter: blur(16px) saturate(160%);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  font-family: var(--font-display);
-}
-.nav-eta-strip__primary {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  color: var(--brand);
-}
-.nav-eta-strip__big {
-  font-size: 1.6rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-.nav-eta-strip__unit {
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.nav-eta-strip__sep {
-  width: 1px;
-  align-self: stretch;
-  background: var(--line);
-}
-.nav-eta-strip__col {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.nav-eta-strip__label {
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.nav-eta-strip__val {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.92rem;
-  font-weight: 700;
-  color: var(--ink);
-  letter-spacing: -0.01em;
-}
-.nav-eta-strip__dot {
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background: var(--brand);
-  box-shadow: 0 0 0 0 var(--brand);
-  animation: pulse-dot 1.8s ease-out infinite;
 }
 
 /* App-wide SSN display polish — slightly tighter tracking for headings */
@@ -2056,8 +1960,8 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
 .nav-instruction-card {
   position: fixed;
   top: calc(var(--header-h) + 10px);
-  left: 12px;
-  right: 12px;
+  left: calc(12px + var(--safe-l));
+  right: calc(12px + var(--safe-r));
   background: rgba(15, 15, 20, 0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -2143,7 +2047,7 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
      .nav-compass, so it's pushed up rather than overlapped when the
      draggable sheet reaches Fully Expanded. */
   top: min(calc(var(--header-h) + 102px), calc(100vh - var(--sheet-h, 0px) - 60px));
-  left: 12px;
+  left: calc(12px + var(--safe-l));
   background: rgba(0,0,0,0.55);
   color: #fff;
   border-radius: 999px;
@@ -2180,7 +2084,7 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
      Matching that same 128px here means the button is correctly clear of
      the sheet from the very first paint, not just after JS catches up. */
   bottom: calc(var(--sheet-h, 128px) + 20px + env(safe-area-inset-bottom, 0px));
-  left: 14px;
+  left: calc(14px + var(--safe-l));
   background: #DC2626;
   color: #fff;
   border: none;
@@ -2223,8 +2127,8 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
 .nav-bottom-sheet {
   position: fixed;
   bottom: 0;
-  left: 0;
-  right: 0;
+  left: var(--safe-l);
+  right: var(--safe-r);
   height: 86vh;
   display: flex;
   flex-direction: column;
@@ -2873,7 +2777,7 @@ html.nav-sheet-driving .map-layer {
 .photo-lightbox-close {
   position: absolute;
   top: 14px;
-  right: 14px;
+  right: calc(14px + var(--safe-r));
   width: 42px;
   height: 42px;
   background: rgba(255,255,255,0.12);
@@ -2953,8 +2857,8 @@ html.nav-sheet-driving .map-layer {
 .off-route-banner {
   position: fixed;
   top: calc(var(--header-h) + 108px);
-  left: 12px;
-  right: 12px;
+  left: calc(12px + var(--safe-l));
+  right: calc(12px + var(--safe-r));
   background: #DC2626;
   color: #fff;
   border-radius: 14px;
@@ -3187,7 +3091,7 @@ html.nav-sheet-driving .map-layer {
      there), so it gets the safer fallback; browse mode's actual sheet
      height overwrites this within one JS tick regardless. */
   bottom: calc(var(--sheet-h, 128px) + 14px + env(safe-area-inset-bottom, 0px));
-  right: 20px;
+  right: calc(20px + var(--safe-r));
   z-index: 3500;
   display: flex;
   flex-direction: column;
@@ -3269,8 +3173,8 @@ html.nav-sheet-driving .map-layer {
 /* ── Copilot sheet ── */
 .copilot-sheet {
   position: fixed;
-  left: 0;
-  right: 0;
+  left: var(--safe-l);
+  right: var(--safe-r);
   bottom: 0;
   z-index: 3499;
   max-height: 74vh;
@@ -3614,12 +3518,12 @@ select:-webkit-autofill {
 
 @media (min-width: 720px) {
   .copilot-fab-stack {
-    right: 24px;
+    right: calc(24px + var(--safe-r));
     bottom: calc(var(--sheet-h, 128px) + 18px + env(safe-area-inset-bottom, 0px));
   }
   .copilot-sheet {
     left: auto;
-    right: 24px;
+    right: calc(24px + var(--safe-r));
     bottom: 100px;   /* above the 56px Copilot FAB + 24px bottom + gap */
     width: 380px;
     max-height: 68vh;
@@ -3843,60 +3747,76 @@ select:-webkit-autofill {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── Floating nav-control column (Priority 1, Phase 4.2.7) ────────────────
-   Shared base offset for both the Heading-Up toggle (always visible) and
-   the compass needle (optional, stacks directly below it) — defined once
-   so the two never drift out of sync with each other. */
+   Base offset for the compass needle (optional). Previously shared with
+   the custom Heading-Up toggle, which sat here and pushed the compass
+   64px below it — Phase 4.3 removed that button (the native Leaflet
+   rotate control, restyled below, replaces it — but it lives in the
+   bottom-right zoom-control column, not here), so the compass now sits
+   directly at this top offset instead of below a button that no longer
+   exists. */
 :root {
   --nav-float-top: min(calc(var(--header-h) + 116px), calc(100vh - var(--sheet-h, 0px) - 70px));
 }
 
-/* ── Heading-Up toggle — Priority 1: the actual feature control, ALWAYS
-   rendered during navigation regardless of the "Show Compass" setting. ── */
-.heading-up-toggle {
-  position: fixed;
-  top: var(--nav-float-top);
-  right: 14px;
-  z-index: 810;
-  width: 52px;
-  height: 56px;
-  border-radius: 14px;
-  background: var(--surface-translucent);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  border: 1.5px solid var(--line-strong);
-  box-shadow: var(--shadow-md);
+/* ── Native Heading-Up control — Priority 1 (Phase 4.3) ───────────────────
+   leaflet-rotate's own rotate control (see the L.Control.Rotate override
+   in MapView.jsx) is now the ONLY heading-up UI — restyled here to match
+   the app theme instead of the library's plain grey triangle, and to
+   look consistent with .leaflet-control-zoom right above it. It lands in
+   the same corner container as the zoom control (both default to
+   Leaflet's "topleft" position, repositioned to bottom-right by the
+   .leaflet-container .leaflet-top.leaflet-left rule below), stacking
+   directly beneath it — same visual slot as the original "mystery
+   orange button." */
+.leaflet-control-rotate {
+  margin-top: 8px !important;
+  border: none !important;
+  box-shadow: var(--shadow-sm) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+.leaflet-control-rotate-toggle {
+  background: var(--surface) !important;
+  width: 34px !important;
+  height: 34px !important;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  padding: 6px 4px 5px;
-  cursor: pointer;
-  animation: fade-in 0.25s ease;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
-.heading-up-toggle:active { transform: scale(0.92); box-shadow: var(--shadow-sm); }
-.heading-up-toggle.active {
-  border-color: #2563EB;
-  background: color-mix(in srgb, #2563EB 10%, var(--surface-translucent));
+.leaflet-control-rotate-arrow {
+  /* Overrides the inline backgroundImage the library sets directly in
+     its onAdd() — !important beats an inline style set without it.
+     mask-image (rather than swapping background-image data-URIs) lets
+     the active/inactive colour change be a single background-color
+     flip, driven by the .heading-up-active class our _restyle override
+     toggles, instead of juggling two SVGs. Same glyph as the removed
+     HeadingUpToggle button, for visual continuity. */
+  background-image: none !important;
+  -webkit-mask-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2 L19.5 20 L12 16.2 L4.5 20 Z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2 L19.5 20 L12 16.2 L4.5 20 Z'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: 60%;
+  mask-size: 60%;
+  background-color: var(--muted);
+  transition: background-color 0.15s ease;
 }
-.heading-up-toggle-label {
-  font-family: var(--font-display);
-  font-size: 0.56rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--muted);
-  line-height: 1;
-  white-space: nowrap;
+.leaflet-control-rotate-toggle.heading-up-active {
+  background: color-mix(in srgb, var(--brand) 12%, var(--surface)) !important;
 }
-.heading-up-toggle.active .heading-up-toggle-label { color: #2563EB; }
+.leaflet-control-rotate-toggle.heading-up-active .leaflet-control-rotate-arrow {
+  background-color: var(--brand);
+}
 
 /* ── Navigation compass — purely decorative needle, shown only when
-   "Show Compass" is on, stacked directly below the Heading-Up toggle. ── */
+   "Show Compass" is on. Sits at the top-right float column on its own
+   now (Phase 4.3 — see comment on --nav-float-top above). ── */
 .nav-compass {
   position: fixed;
-  top: calc(var(--nav-float-top) + 64px);
-  right: 14px;
+  top: var(--nav-float-top);
+  right: calc(14px + var(--safe-r));
   z-index: 810;
   width: 46px;
   height: 52px;
@@ -3973,7 +3893,7 @@ select:-webkit-autofill {
   white-space: nowrap;
 }
 
-/* ── Safe-area overrides for the heading-up toggle + compass column ──────── */
+/* ── Safe-area override for the compass column ────────────────────────────── */
 @supports (padding: env(safe-area-inset-top)) {
   :root {
     --nav-float-top: min(calc(var(--header-h) + env(safe-area-inset-top, 0px) + 116px), calc(100vh - var(--sheet-h, 0px) - 70px));
@@ -4000,16 +3920,11 @@ select:-webkit-autofill {
 
 /* ── Mobile sizing ────────────────────────────────────────────────────────── */
 @media (max-width: 430px) {
-  .heading-up-toggle {
-    width: 48px;
-    height: 52px;
-    right: 12px;
-  }
   .nav-compass {
     width: 42px;
     height: 48px;
-    right: 12px;
-    top: calc(var(--nav-float-top) + 60px);
+    right: calc(12px + var(--safe-r));
+    top: var(--nav-float-top);
   }
   .recenter-btn {
     min-width: 60px;
@@ -4145,7 +4060,7 @@ select:-webkit-autofill {
 .venue-menu-tap-hint {
   position: absolute;
   bottom: 8px;
-  right: 10px;
+  right: calc(10px + var(--safe-r));
   font-size: 0.65rem;
   color: #fff;
   background: rgba(0,0,0,0.45);
@@ -4200,7 +4115,7 @@ select:-webkit-autofill {
 .poster-mgr-lightbox-close {
   position: absolute;
   top: 16px;
-  right: 16px;
+  right: calc(16px + var(--safe-r));
   width: 36px;
   height: 36px;
   border-radius: 50%;

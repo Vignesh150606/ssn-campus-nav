@@ -23,7 +23,6 @@ import RoutePreviewPanel from '../components/RoutePreviewPanel'
 import NearbyFacilities from '../components/NearbyFacilities'
 import CompassWidget from '../components/CompassWidget'
 import NavCompass from '../components/NavCompass'
-import HeadingUpToggle from '../components/HeadingUpToggle'
 import NavSettingsPanel from '../components/NavSettingsPanel'
 import ChatbotWidget from '../copilot/ChatbotWidget'
 import { getLocations, searchLocations, getRoute, getRouteFromCoords, getRoadSegments, getEvents } from '../api'
@@ -804,6 +803,7 @@ export default function Home() {
           recalcVersion={recalcVersion}
           onMapDrag={handleMapDrag}
           onRotationChange={setCurrentBearing}
+          onToggleHeadingUp={handleToggleHeadingUp}
         />
       </div>
 
@@ -1022,17 +1022,18 @@ export default function Home() {
             ✕ Exit
           </button>
 
-          {/* Priority 1 (Phase 4.2.7) — Heading-Up toggle is the actual
-              feature control: ALWAYS visible during navigation, regardless
-              of "Show Compass". It must never disappear, never be
-              replaced, and heading-up itself already auto-activates the
-              instant navCameraActive goes true (see the useNavCamera call
-              above) — this button only ever reflects/flips that state. */}
-          <HeadingUpToggle active={headingUp} onToggle={handleToggleHeadingUp} />
+          {/* Priority 1 (Phase 4.3) — the Heading-Up toggle is now the
+              native Leaflet rotate control rendered inside MapView (see
+              the L.Control.Rotate override in MapView.jsx), not a
+              separate React button here. It's always visible during
+              navigation via the existing .app-navmode CSS, and heading-up
+              itself already auto-activates the instant navCameraActive
+              goes true (see the useNavCamera call above) — the button
+              only ever reflects/flips that state, same as before. */}
 
           {/* The compass needle is a fully separate, purely informational
               overlay — "Show Compass" only ever hides/shows THIS, and can
-              never touch the Heading-Up toggle above. */}
+              never touch the Heading-Up toggle. */}
           {showCompass && (
             <NavCompass mapHeading={currentBearing} headingUp={headingUp} />
           )}
