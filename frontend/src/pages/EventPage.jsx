@@ -9,7 +9,7 @@
  */
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { getEvent, getRoute, getRouteFromCoords, eventQrUrl } from '../api'
+import { getEvent, getEvents, getRoute, getRouteFromCoords, eventQrUrl } from '../api'
 import { useLocationContext } from '../context/LocationContext'
 import { useVoiceGuidance } from '../hooks/useVoiceGuidance'
 import { haversine } from '../utils/geo'
@@ -115,15 +115,13 @@ export default function EventPage() {
   useEffect(() => {
     if (!event?.location) return
     const today = new Date().toISOString().slice(0, 10)
-    import('../api').then(({ getEvents }) =>
-      getEvents().then(evs => {
-        const nearby = evs
-          .filter(e => e.id !== event.id && e.date === today && e.location)
-          .filter(e => haversine(event.location.lat, event.location.lng, e.location.lat, e.location.lng) < 300)
-          .slice(0, 4)
-        setNearbyEvents(nearby)
-      }).catch(() => {})
-    )
+    getEvents().then(evs => {
+      const nearby = evs
+        .filter(e => e.id !== event.id && e.date === today && e.location)
+        .filter(e => haversine(event.location.lat, event.location.lng, e.location.lat, e.location.lng) < 300)
+        .slice(0, 4)
+      setNearbyEvents(nearby)
+    }).catch(() => {})
   }, [event])
 
   // ── Route preview (Phase 8) ────────────────────────────────────────────

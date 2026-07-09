@@ -36,19 +36,19 @@ def _load(name):
 def migrate_venues(client):
     locations = _load("locations.json")
     rows = []
-    for l in locations:
+    for loc in locations:
         rows.append(
             {
-                "id": l["id"],
-                "name": l["name"],
-                "category": l["category"],
-                "department": l.get("department"),
-                "lat": l["lat"],
-                "lng": l["lng"],
-                "floors": l.get("floors", 1),
-                "accessible": l.get("accessible", True),
-                "description": l.get("description"),
-                "facilities": l.get("facilities", []),
+                "id": loc["id"],
+                "name": loc["name"],
+                "category": loc["category"],
+                "department": loc.get("department"),
+                "lat": loc["lat"],
+                "lng": loc["lng"],
+                "floors": loc.get("floors", 1),
+                "accessible": loc.get("accessible", True),
+                "description": loc.get("description"),
+                "facilities": loc.get("facilities", []),
             }
         )
     if rows:

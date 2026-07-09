@@ -38,7 +38,7 @@ def haversine(lat1, lng1, lat2, lng2):
 def main():
     graph = json.load(open(GRAPH_PATH))
     locations = json.load(open(LOCATIONS_PATH))
-    loc_by_id = {l['id']: l for l in locations}
+    loc_by_id = {loc['id']: loc for loc in locations}
 
     errors = []
     warnings = []
@@ -81,16 +81,16 @@ def main():
 
     # every location must have at least one location_edge
     locs_with_edge = {e['from'] for e in graph['location_edges']}
-    for l in locations:
-        if l['id'] not in locs_with_edge:
-            errors.append(f"Location '{l['id']}' has no location_edge (unreachable)")
+    for loc in locations:
+        if loc['id'] not in locs_with_edge:
+            errors.append(f"Location '{loc['id']}' has no location_edge (unreachable)")
 
     # --- reachability + detour sanity check across all location pairs ------
     print(f"\nTesting all {len(locations) * (len(locations) - 1)} directed location pairs...")
     unreachable = []
     detour_flags = []
     n_ok = 0
-    for a, b in combinations([l['id'] for l in locations], 2):
+    for a, b in combinations([loc['id'] for loc in locations], 2):
         try:
             result = router.find_route(a, b)
         except Exception as ex:

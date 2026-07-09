@@ -32,7 +32,6 @@ let seq = 0
 export function dlog(tag, ...args) {
   seq += 1
   const t = performance.now().toFixed(1)
-  // eslint-disable-next-line no-console
   console.log(`%c[${seq}] %c+${t}ms %c[${tag}]`,
     'color:#888;font-weight:normal',
     'color:#0a84ff;font-weight:normal',
@@ -43,6 +42,5 @@ export function dlog(tag, ...args) {
 export function dwarn(tag, ...args) {
   seq += 1
   const t = performance.now().toFixed(1)
-  // eslint-disable-next-line no-console
   console.warn(`[${seq}] +${t}ms [${tag}]`, ...args)
 }

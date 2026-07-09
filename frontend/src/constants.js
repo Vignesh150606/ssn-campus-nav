@@ -20,8 +20,6 @@ export const FEST_META = {
   Instincts: { label: 'Instincts · Cultural Fest', color: '#1FB6A6' },
 }
 
-export const DEFAULT_ENTRY_ID = 'main-gate'
-
 // Priority 4 — Campus naming consistency.
 // The backend (Supabase `venues` table) still stores the old raw names for
 // a handful of venues ("TCS Auditorium (Main)", "Ashwin's Food Court",

@@ -414,7 +414,7 @@ def classify(message: str, locations: list, context: Optional[dict] = None) -> d
     # 2) Classroom code — most specific pattern, check next.
     classroom = parse_classroom_code(text)
     if classroom:
-        building = next((l for l in locations if l['id'] == classroom['dept_location_id']), None)
+        building = next((loc for loc in locations if loc['id'] == classroom['dept_location_id']), None)
         building_name = building['name'] if building else classroom['dept_location_id']
         reply = f"{classroom['room_label']} is in {building_name}."
         if classroom['floor_guess']:
@@ -453,8 +453,8 @@ def classify(message: str, locations: list, context: Optional[dict] = None) -> d
                            reply=f"Here's today's menu at {top['name']}.",
                            resolved_locations=venue_matches)
         # Generic menu query — return all food venues
-        food_venues = [l for l in locations if l.get('category') in ('food', 'dining')]
-        fv_resolved = [{'id': l['id'], 'name': l['name'], 'score': 1.0} for l in food_venues]
+        food_venues = [loc for loc in locations if loc.get('category') in ('food', 'dining')]
+        fv_resolved = [{'id': loc['id'], 'name': loc['name'], 'score': 1.0} for loc in food_venues]
         return _result('venue_menu', raw, text,
                        reply="Here are today's menus for SSN food courts.",
                        resolved_locations=fv_resolved)

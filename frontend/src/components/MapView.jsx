@@ -99,7 +99,7 @@ if (L.Control.Rotate) {
   }
 }
 
-export const CAMPUS_CENTER = [12.7510, 80.1970]
+const CAMPUS_CENTER = [12.7510, 80.1970]
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Location / destination markers
@@ -462,7 +462,7 @@ function NavigationController({
       easeLinearity: 0.5,
       noMoveStart: true,
     })
-  }, [userPosition, followUser, headingUp, heading, map])
+  }, [userPosition, followUser, headingUp, heading, map, isMapAlive])
 
   // ── Smart dynamic zoom ─────────────────────────────────────────────
   // Only changes near turns, near destination, or after rerouting.

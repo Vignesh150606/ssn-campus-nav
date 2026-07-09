@@ -4,7 +4,10 @@ Campus router — Dijkstra with:
 2. Admin road closures (segments marked closed are skipped, fallback to open graph)
 3. Full waypoint path for live turn-by-turn guidance
 """
-import json, math, heapq, os
+import json
+import math
+import heapq
+import os
 
 BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GRAPH_PATH  = os.path.join(BASE_DIR, 'data', 'walkway_graph.json')
@@ -176,7 +179,8 @@ def _nearest_node(graph, lat, lng, adj=None, to_id=None):
 def _point_dist(lat1, lng1, lat2, lng2):
     R = 6371000
     p1, p2 = math.radians(lat1), math.radians(lat2)
-    dp = math.radians(lat2 - lat1); dl = math.radians(lng2 - lng1)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lng2 - lng1)
     a = math.sin(dp/2)**2 + math.cos(p1)*math.cos(p2)*math.sin(dl/2)**2
     return 2*R*math.asin(math.sqrt(a))
 
@@ -208,7 +212,8 @@ def find_route_from_point(lat: float, lng: float, to_id: str) -> dict:
 
     seq, cur = [], to_id
     while cur in prev:
-        seq.append(cur); cur = prev[cur]
+        seq.append(cur)
+        cur = prev[cur]
     seq.append(snap_id)
     seq.reverse()
 
@@ -252,7 +257,8 @@ def find_route(from_id: str, to_id: str) -> dict:
     # Reconstruct
     seq, cur = [], to_id
     while cur in prev:
-        seq.append(cur); cur = prev[cur]
+        seq.append(cur)
+        cur = prev[cur]
     seq.append(from_id)
     seq.reverse()
 
@@ -273,11 +279,5 @@ def find_route(from_id: str, to_id: str) -> dict:
 
 
 def _path_length(pts):
-    def hav(lat1, lng1, lat2, lng2):
-        R = 6371000
-        p1, p2 = math.radians(lat1), math.radians(lat2)
-        dp = math.radians(lat2-lat1); dl = math.radians(lng2-lng1)
-        a = math.sin(dp/2)**2 + math.cos(p1)*math.cos(p2)*math.sin(dl/2)**2
-        return 2*R*math.asin(math.sqrt(a))
-    return sum(hav(pts[i]['lat'], pts[i]['lng'], pts[i+1]['lat'], pts[i+1]['lng'])
-               for i in range(len(pts)-1))
+    return sum(_point_dist(pts[i]['lat'], pts[i]['lng'], pts[i + 1]['lat'], pts[i + 1]['lng'])
+               for i in range(len(pts) - 1))

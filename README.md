@@ -1,14 +1,13 @@
 # SSN Campus Navigator
 
-> **Production backend migration:** this app now runs on Supabase
-> (Postgres + Storage) instead of local JSON files for events/locations/road
-> closures, with real per-admin login. See **[SUPABASE_MIGRATION.md](./SUPABASE_MIGRATION.md)**
-> for the full setup + deployment guide. Everything below describes the
-> original JSON-file version and is kept for local-dev/reference; the JSON
-> files in `backend/data/` are now only used as the source for the one-time
-> migration script (`backend/migrate_to_supabase.py`) and as the seed data
-> `utils/router.py` builds its graph from — they are no longer written to at
-> runtime.
+> **Production backend:** this app runs on Supabase (Postgres + Storage)
+> instead of local JSON files for events/locations/road closures, with real
+> per-admin login. See **[SUPABASE_MIGRATION.md](./SUPABASE_MIGRATION.md)**
+> for the database schema, environment variables, admin setup, and
+> deployment guide. The JSON files in `backend/data/` are kept only as
+> seed data for the one-time migration script
+> (`backend/migrate_to_supabase.py`) and as the source `utils/router.py`
+> builds its walkway graph from — nothing reads or writes them at runtime.
 
 A smart campus navigation web app for **SSN College of Engineering, Chennai** —
 built around a real use case: helping visitors from other colleges find their
@@ -36,38 +35,74 @@ gate to the venue on the campus map.
 ## Project structure
 
 ```
-campus-nav/
+nav_v2/
 ├── backend/
-│   ├── main.py            # FastAPI app — locations, search, events, route, QR
+│   ├── main.py                # FastAPI app — locations, search, events, route,
+│   │                           # QR, admin auth, road closures, venue menus
+│   ├── auth.py                 # Admin login + JWT issue/verify
+│   ├── db.py                   # Supabase client wrapper
+│   ├── data_access.py           # Read/write helpers over Supabase tables
 │   ├── requirements.txt
-│   ├── data/
-│   │   ├── locations.json # PLACEHOLDER campus locations — edit with real data
-│   │   └── events.json    # PLACEHOLDER fest events — edit with real schedule
+│   ├── data/                   # Seed data only (migrated into Supabase; not
+│   │                           # written to at runtime) — locations, events,
+│   │                           # walkway_graph, road_segments
+│   ├── scripts/
+│   │   ├── create_admin.py      # add/reset an admin login
+│   │   ├── build_walkway_graph.py
+│   │   └── validate_walkway_graph.py
 │   ├── utils/
+│   │   ├── router.py           # Dijkstra over the walkway graph
+│   │   ├── copilot.py          # Campus Copilot rule-based NLU engine
 │   │   └── qr_generator.py
-│   └── static/qr/         # generated QR code PNGs
+│   └── static/qr/               # generated QR code PNGs
 └── frontend/
-    ├── src/
-    │   ├── api.js          # talks to the FastAPI backend
-    │   ├── constants.js     # category colors, fest tags, default entry point
-    │   ├── App.jsx          # header + routing shell
-    │   ├── components/
-    │   │   ├── MapView.jsx       # Leaflet map, markers, route line
-    │   │   ├── SearchBar.jsx
-    │   │   ├── CategoryChips.jsx
-    │   │   └── LocationCard.jsx
-    │   └── pages/
-    │       ├── Home.jsx          # search + map + results
-    │       ├── EventPage.jsx     # "festival pass" — scanned via QR
-    │       └── EventsList.jsx    # full fest schedule
-    └── vite.config.js       # PWA config (offline cache, installable)
+    └── src/
+        ├── api.js               # talks to the FastAPI backend
+        ├── constants.js          # category colors, fest tags, name overrides
+        ├── App.jsx               # header + routing shell
+        ├── context/
+        │   └── LocationProvider.jsx  # shared GPS state (real watchPosition +
+        │                             # dev-mode simulated GPS)
+        ├── hooks/
+        │   ├── useNavCamera.js       # heading-up camera smoothing/fusion
+        │   ├── useCompassHeading.js
+        │   ├── useVoiceGuidance.js
+        │   ├── useDraggableSheet.js
+        │   └── useElementHeightVar.js
+        ├── copilot/
+        │   ├── ChatbotWidget.jsx     # Campus Copilot chat UI
+        │   └── copilotEngine.js
+        ├── components/
+        │   ├── MapView.jsx           # Leaflet map, markers, route line,
+        │   │                         # heading-up rotation bridge
+        │   ├── SearchBar.jsx, CategoryChips.jsx, LocationCard.jsx
+        │   ├── RoutePreviewPanel.jsx, NearbyFacilities.jsx
+        │   ├── NavCompass.jsx, CompassWidget.jsx, NavSettingsPanel.jsx
+        │   ├── VoiceSettingsPanel.jsx
+        │   ├── VenueMenuCard.jsx / VenueMenuInline.jsx / VenueMenuAdmin.jsx
+        │   ├── PosterManager.jsx     # admin event image/poster upload
+        │   ├── BootGate.jsx           # startup health-check / cold-start screen
+        │   └── DevLocationPanel.jsx  # dev-only GPS simulator (hidden in prod)
+        └── pages/
+            ├── Home.jsx               # search + map + live navigation
+            ├── EventPage.jsx          # "festival pass" — scanned via QR
+            ├── EventsList.jsx         # full fest schedule
+            ├── LocationDeepLink.jsx
+            └── AdminDashboard.jsx     # admin login + events/venues/closures
 ```
+
+See **[SUPABASE_MIGRATION.md](./SUPABASE_MIGRATION.md)** for the database schema,
+admin account setup, and deployment steps.
 
 ---
 
 ## Running it locally
 
 ### 1. Backend (FastAPI)
+
+Needs a Supabase project + `backend/.env` first — see
+[SUPABASE_MIGRATION.md §§ 1–3](./SUPABASE_MIGRATION.md) for the SQL, storage
+bucket, and environment variables.
 
 ```bash
 cd backend
@@ -94,24 +129,20 @@ VITE_API_BASE=http://127.0.0.1:8000
 
 ---
 
-## ⚠️ Replace the placeholder campus data
+## Campus data
 
-`backend/data/locations.json` currently has **draft coordinates** centered
-near SSN's known campus location (12.8404, 80.1542) — they are realistic in
-spacing but not accurate to real buildings. Before this becomes usable on
-campus:
+`backend/data/` now holds real surveyed data, not placeholders: 32 campus
+locations with real coordinates, and a walkway graph digitized from GPX/KML
+survey files (see `backend/scripts/build_walkway_graph.py` and
+`validate_walkway_graph.py`). This data was migrated into Supabase and the
+JSON files remain only as the seed/rebuild source — see
+[SUPABASE_MIGRATION.md § 6](./SUPABASE_MIGRATION.md) for how to re-run the
+migration if you change the seed data.
 
-1. Open Google Maps, find each real building (Main Building, EEE Block, CSE
-   Block, Library, Auditorium, hostels, gates, etc.)
-2. Right-click the spot → "What's here?" → copy the lat/long shown
-3. Update the `lat` / `lng` fields in `locations.json` for each entry (add
-   new entries for anything missing, using the same shape)
-
-`backend/data/events.json` has 3 **draft fest events** (Invente / Instincts)
-so the event-page + QR flow can be built and tested end to end. Replace these
-with the real fest schedule — same fields, just update `name`, `location_id`
-(must match an id in `locations.json`), `date`, `start_time`, `end_time`,
-`description`.
+Adding a new location or event now happens through the **Admin Dashboard**
+(`/admin`) once you've created an admin login — see
+[SUPABASE_MIGRATION.md](./SUPABASE_MIGRATION.md) — rather than by hand-editing
+JSON.
 
 ---
 
@@ -140,15 +171,20 @@ on the same machine — fine for local testing, not for printing.)
 
 ## Roadmap
 
-- [x] **Phase 1** — Scope, stack, data model
-- [x] **Phase 2** — Campus location + event data model (placeholder data)
-- [x] **Phase 3** — Backend API (search, locations, events, straight-line route, QR)
-- [x] **Phase 4** — Frontend: map, search, category filters, event "pass" pages
-- [x] **Phase 6 (partial)** — PWA basics: installable, offline caching of API
-      responses + map tiles
-- [ ] **Phase 5** — Real walking-path routing (currently straight-line). Will
-      use a small graph of campus walkway nodes instead of direct lat/lng lines.
-- [ ] **Phase 7 (stretch)** — Wheelchair-accessible route toggle, Tamil/English
-      language toggle, printable QR checkpoint signs for key junctions
-- [ ] **Phase 8** — Deployment (e.g. Vercel for frontend, Render/Railway for
-      backend) + final polish for demos/portfolio
+- [x] **Phase 1–2** — Scope, stack, campus location + event data model
+- [x] **Phase 3** — Supabase backend migration (Postgres + Storage, real
+      per-admin login) — see SUPABASE_MIGRATION.md
+- [x] **Phase 4** — Frontend: map, search, category filters, event "pass"
+      pages, real walking-path routing (Dijkstra over a surveyed walkway
+      graph, replacing the original straight-line routing)
+- [x] **Phase 4.x** — Admin Dashboard (events/venues/road closures/poster
+      uploads), Campus Copilot chatbot, Heading-Up navigation with live
+      compass/GPS fusion, voice guidance, QR-code navigation, food/venue
+      menus, route preview, nearby facilities
+- [x] **Phase 6** — PWA: installable, offline caching of API responses and
+      map tiles
+- [ ] **Phase 7 (stretch)** — Wheelchair-accessible route toggle, Tamil/
+      English language toggle, printable QR checkpoint signs for key
+      junctions
+- [ ] **Phase 8** — Further deployment polish (see SUPABASE_MIGRATION.md for
+      the current Render/Vercel setup already in place)

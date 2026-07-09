@@ -41,6 +41,8 @@ import data_access
 from auth import authenticate_admin, create_access_token, get_current_admin
 from db import SupabaseUnavailableError
 from utils.qr_generator import generate_event_qr
+from utils.router import find_route as _find_route, find_route_from_point as _find_route_from_point
+from utils import copilot as _copilot
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ssn-campus-nav")
@@ -178,8 +180,6 @@ def get_event_qr(event_id: str):
         generate_event_qr(event_id)
     return FileResponse(path, media_type="image/png")
 
-
-from utils.router import find_route as _find_route, find_route_from_point as _find_route_from_point
 
 # ---------------------------------------------------------------------------
 # Routing (Dijkstra over the walkway graph — untouched in this migration)
@@ -549,7 +549,6 @@ def diagnose_menu_system(admin: dict = Depends(get_current_admin)):
 # See utils/copilot.py for the engine itself — it is unmodified by this
 # migration; only where main.py gets the `locations` list from changed.
 # ---------------------------------------------------------------------------
-from utils import copilot as _copilot
 
 
 class CopilotChatRequest(BaseModel):

@@ -36,22 +36,6 @@ async function adminFetch(path, method='GET', body=null, token) {
   return res.json()
 }
 
-// Phase 3 — multipart upload straight to Supabase Storage. Separate from
-// adminFetch because the browser needs to set its own multipart
-// Content-Type (with boundary) — never set that header manually.
-async function adminUpload(path, file, token, extraFields = {}) {
-  const fd = new FormData()
-  fd.append('file', file)
-  Object.entries(extraFields).forEach(([k, v]) => fd.append(k, v))
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: fd,
-  })
-  if (!res.ok) { const d = await res.json().catch(()=>({})); throw new Error(d.detail||`Error ${res.status}`) }
-  return res.json()
-}
-
 const LOCATION_IDS = ['main-gate','parking','admin-block','central-library','eee-block',
   'cse-block','ece-block','it-block','mech-block','civil-block','biomed-block',
   'tcs-auditorium','mini-hall-1','food-rishabhs','food-snowcube','food-metro',
@@ -273,15 +257,6 @@ export default function AdminDashboard() {
     }
     catch(e) { flash(e.message,true) }
   }
-
-  async function uploadImage(eventId, file, isPoster=false) {
-    try {
-      await adminUpload(`/api/admin/events/${eventId}/images`, file, token, isPoster ? { is_poster: 'true' } : {})
-      flash(isPoster ? 'Poster uploaded.' : 'Photo uploaded.')
-      reload()
-    } catch(e) { flash(e.message,true) }
-  }
-
 
   async function toggleSegment(seg) {
     const endpoint = seg.closed ? 'open' : 'close'
