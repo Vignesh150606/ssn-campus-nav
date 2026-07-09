@@ -76,17 +76,24 @@ L.DomUtil.setPosition = function (el, ...rest) {
 //
 // Rather than run two competing systems, this native button is now the
 // ONLY heading-up UI in the app — but its behaviour is fully replaced.
-// map.compassBearing is never enabled (nothing below ever calls
-// .enable() on it, and touchRotate={false} on MapContainer keeps the
-// other rival sub-mode off too); clicking the button just calls back
-// into React via map._headingUpToggle, and its highlighted state mirrors
-// map._headingUpActive instead of map.compassBearing.enabled(). The
-// actual rotation is still applied exactly as before — by
-// NavigationController's applyBearing(), driven by useNavCamera's
-// already-smoothed mapHeading — so this is a UI/control swap, not a new
-// rotation system. This is an app-level override, not a node_modules
-// patch (same reasoning as the DomUtil wrap above), so it survives every
-// `npm install`/reinstall of leaflet-rotate.
+// By default (Smart mode), map.compassBearing is never enabled — nothing
+// below calls .enable() on it in that mode, and touchRotate={false} on
+// MapContainer keeps the other rival sub-mode off too. Clicking the
+// button just calls back into React via map._headingUpToggle, and its
+// highlighted state mirrors map._headingUpActive instead of
+// map.compassBearing.enabled(), regardless of mode. The actual rotation
+// is applied by NavigationController's applyBearing(), driven by
+// useNavCamera's already-smoothed mapHeading — so this is a UI/control
+// swap, not a new rotation system. This is an app-level override, not a
+// node_modules patch (same reasoning as the DomUtil wrap above), so it
+// survives every `npm install`/reinstall of leaflet-rotate.
+//
+// Priority 2 (Phase 4.4, test-only) — Navigation Settings now offers a
+// "Native Leaflet" mode that deliberately DOES enable map.compassBearing
+// (see the NavigationController effects below), so the sentence above
+// only holds for the default Smart mode. The button's role never
+// changes either way — it always just flips headingUp — only which
+// system answers that flip differs by mode.
 if (L.Control.Rotate) {
   L.Control.Rotate.prototype._cycleState = function () {
     if (!this._map) return
@@ -320,6 +327,7 @@ function NavigationController({
   routePath,        // full route path (for fit-bounds after reroute)
   onRotationChange, // callback(degrees) — informs parent of current bearing
   onToggleHeadingUp, // Priority 1 (Phase 4.3): callback — flips headingUp, wired to the native Leaflet button
+  headingMode = 'smart', // Priority 2 (Phase 4.4, test-only): 'smart' (default) or 'native'
 }) {
   const map = useMap()
   const lastPosRef    = useRef(null)
@@ -411,18 +419,61 @@ function NavigationController({
     applyBearingRaw(0)
   }, [map, isMapAlive, applyBearingRaw])
 
-  // ── Heading-up rotation ────────────────────────────────────────────
+  // ── Heading-up rotation (Smart mode) ────────────────────────────────
   // headingUp=false → always reset to North
   // headingUp=true + !followUser → PAUSE at current bearing (user is panning)
   // headingUp=true + followUser + heading available → rotate to heading
+  //
+  // Priority 2 (Phase 4.4) — this whole effect is Smart mode's rotation
+  // logic. In Native mode, leaflet-rotate's own compassBearing handler
+  // (enabled below) calls map.setBearing() directly off raw device
+  // orientation — so this effect must not also call applyBearing/
+  // resetBearing, or the two would fight over the same map.setBearing()
+  // call every frame. "if (!headingUp) resetBearing()" still needs to run
+  // in Native mode too (so turning Heading-Up off snaps back to North the
+  // same way in both modes) — that half is handled by the compassBearing
+  // effect below instead, since it already owns the "headingUp just went
+  // false" transition for Native mode.
   useEffect(() => {
+    if (headingMode === 'native') return
     if (!headingUp) {
       resetBearing()
       return
     }
     if (!followUser || heading == null) return   // pause — keep current bearing
     applyBearing(heading)
-  }, [heading, headingUp, followUser, applyBearing, resetBearing])
+  }, [heading, headingUp, followUser, applyBearing, resetBearing, headingMode])
+
+  // ── Heading-up rotation (Native Leaflet test mode) ──────────────────
+  // Priority 2 (Phase 4.4) — hands rotation entirely to leaflet-rotate's
+  // own L.Map.CompassBearing handler (node_modules/leaflet-rotate/src/map/
+  // handler/CompassBearing.js) instead of our commit/confidence/cooldown
+  // pipeline: raw DeviceOrientationEvent samples, ~100ms throttle only,
+  // zero smoothing — it calls map.setBearing() itself, directly, so
+  // nothing here ever calls applyBearing while this is enabled. This is
+  // exactly the code path Smart mode was built to avoid (see the
+  // L.Control.Rotate override + keepBuffer comments near the top of this
+  // file) — selecting Native is expected to reproduce that jitter/flash,
+  // which is the point of an A/B test mode.
+  useEffect(() => {
+    if (!isMapAlive() || !map.compassBearing) return
+    const wantNative = headingMode === 'native' && headingUp
+    if (wantNative) {
+      if (!map.compassBearing.enabled()) map.compassBearing.enable()
+    } else {
+      if (map.compassBearing.enabled()) map.compassBearing.disable()
+      if (!headingUp) resetBearing() // mirrors Smart mode's "headingUp off → North" behaviour
+    }
+  }, [map, isMapAlive, headingMode, headingUp, resetBearing])
+
+  // Belt-and-braces: if this instance unmounts (nav session ends) while
+  // Native mode's raw listener is still attached, detach it explicitly
+  // rather than relying only on leaflet-rotate's own teardown ordering.
+  useEffect(() => {
+    return () => {
+      if (map?._mapPane && map.compassBearing?.enabled()) map.compassBearing.disable()
+    }
+  }, [map])
 
   // ── Camera follow + look-ahead (lower-third positioning) ───────────
   useEffect(() => {
@@ -592,6 +643,9 @@ export default function MapView({
   mapHeading = null,
   /** Phase 4A: true = heading-up mode; false = north-up */
   headingUp = false,
+  /** Priority 2 (Phase 4.4, test-only): 'smart' (default) or 'native' —
+      which system drives rotation while headingUp is true */
+  headingMode = 'smart',
   /** Phase 4A: metres to next turn (smart zoom) */
   nextTurnDist = null,
   /** Phase 4A: metres remaining (smart zoom / near-destination zoom) */
@@ -794,6 +848,7 @@ export default function MapView({
       <NavigationController
         heading={mapHeading}
         headingUp={headingUp}
+        headingMode={headingMode}
         followUser={followUser}
         dynamicZoom={dynamicZoom}
         userPosition={

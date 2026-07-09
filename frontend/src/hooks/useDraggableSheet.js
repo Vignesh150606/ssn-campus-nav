@@ -19,6 +19,22 @@
  * React state (`tier`) only updates once a drag/animation settles, so
  * conditional content (which of the 3 tiers' markup is mounted) doesn't
  * thrash mid-gesture.
+ *
+ * Priority 1 (Phase 4.4) — root cause of "Exit / Campus Copilot buttons
+ * overlap the sheet in certain tiers": Home.jsx mounts THREE of these
+ * (nav / route-preview / browse), and React's rules of hooks mean all
+ * three are always live — only one sheet's DOM is ever rendered at a
+ * time, but all three instances' effects can still fire. Since every
+ * instance wrote the SAME shared `--sheet-h` var unconditionally,
+ * whichever sheet's own peeks/tier last changed (e.g. a background
+ * sheet recomputing on a viewport resize while a different sheet is the
+ * one actually visible) silently overwrote the height the floating
+ * controls were anchored to, even though its own DOM wasn't on screen.
+ * The `active` flag below scopes each instance's writes to only the
+ * currently-visible sheet, and re-asserts its own height the instant it
+ * becomes active — so a stale value left by whichever sheet was active
+ * before is corrected immediately rather than waiting for that new
+ * sheet's next drag/resize.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -27,7 +43,7 @@ const SNAP_ANIM_MS = 280
 const DRAG_ACTIVATE_PX = 4        // ignore sub-pixel jitter before committing to a drag
 const VELOCITY_FLING_PX_MS = 0.5  // fast flick threshold
 
-export function useDraggableSheet(snapPeeks, initialTier = 'collapsed') {
+export function useDraggableSheet(snapPeeks, initialTier = 'collapsed', active = true) {
   const sheetRef      = useRef(null)
   const rafRef         = useRef(null)
   const peekRef        = useRef(snapPeeks[initialTier])
@@ -44,12 +60,29 @@ export function useDraggableSheet(snapPeeks, initialTier = 'collapsed') {
 
   const maxH = Math.max(snapPeeks.collapsed, snapPeeks.half, snapPeeks.full)
 
+  const activeRef = useRef(active)
+  useEffect(() => { activeRef.current = active }, [active])
+
   const applyPeek = useCallback((peek) => {
     peekRef.current = peek
     const node = sheetRef.current
     if (node) node.style.transform = `translate3d(0, ${Math.round(maxH - peek)}px, 0)`
-    document.documentElement.style.setProperty('--sheet-h', `${Math.round(Math.max(0, peek))}px`)
+    // Priority 1 (Phase 4.4): only the currently-active/visible sheet is
+    // allowed to drive the shared --sheet-h var — see file header comment.
+    if (activeRef.current) {
+      document.documentElement.style.setProperty('--sheet-h', `${Math.round(Math.max(0, peek))}px`)
+    }
   }, [maxH])
+
+  // The moment this instance becomes the active/visible sheet, immediately
+  // re-assert ITS current height onto --sheet-h. Without this, a sheet that
+  // just became active would leave whatever value the previously-active
+  // sheet last wrote in place until its own next drag/tier/resize event.
+  useEffect(() => {
+    if (active) {
+      document.documentElement.style.setProperty('--sheet-h', `${Math.round(Math.max(0, peekRef.current))}px`)
+    }
+  }, [active])
 
   const animateTo = useCallback((targetPeek, targetTier) => {
     cancelAnimationFrame(rafRef.current)

@@ -5,7 +5,7 @@
  * was voice guidance (VoiceSettingsPanel) — Heading-Up had its own
  * separate always-visible floating toggle (NavCompass) and there was no
  * way to control the compass display or auto-recenter/dynamic-zoom
- * behaviour at all. This consolidates all five into one panel:
+ * behaviour at all. This consolidates all six into one panel:
  *
  *   Rotate Map While Walking  — headingUp preference (own state, Home.jsx).
  *                                Phase 4.3: the Heading-Up toggle itself is
@@ -15,6 +15,18 @@
  *                                navigation — this setting only decides
  *                                whether the map actually rotates, never
  *                                whether that button is shown.
+ *   Heading-Up Mode           — headingMode preference (own state, Home.jsx).
+ *                                Phase 4.4, test-only: Smart = our existing
+ *                                GPS-course/confidence/cooldown pipeline
+ *                                (default, unchanged). Native Leaflet =
+ *                                hands rotation entirely to leaflet-rotate's
+ *                                own raw compassBearing handler for direct
+ *                                A/B comparison — see MapView.jsx's
+ *                                NavigationController for how the two are
+ *                                kept from ever running at once. The button
+ *                                above still just flips headingUp either
+ *                                way; this only decides which system
+ *                                answers that toggle.
  *   Show Compass              — showCompass (own state, Home.jsx) — purely
  *                                the decorative NavCompass needle overlay;
  *                                independent of Heading-Up in both
@@ -26,7 +38,7 @@
  *   Auto Recenter             — autoRecenter (own state, Home.jsx)
  *   Dynamic Zoom              — dynamicZoom (own state, Home.jsx)
  *
- * All five are plain in-memory React state owned by Home.jsx — that's
+ * All six are plain in-memory React state owned by Home.jsx — that's
  * enough to satisfy "persist during the current navigation session"
  * (they live for as long as the app is open) without the added
  * complexity/risk of localStorage persistence, which voice guidance
@@ -34,11 +46,14 @@
  * survive across sessions.
  *
  * Reuses the existing .voice-settings-* CSS (overlay/panel/header/row
- * styling) rather than introducing a parallel set of class names.
+ * styling) rather than introducing a parallel set of class names — the
+ * one addition is .heading-mode-toggle/-btn for the Smart/Native segmented
+ * control, since nothing multi-option already existed to reuse.
  */
 export default function NavSettingsPanel({
   voice, open, onClose,
   headingUp, onToggleHeadingUp,
+  headingMode, onSetHeadingMode,
   showCompass, onToggleShowCompass,
   autoRecenter, onToggleAutoRecenter,
   dynamicZoom, onToggleDynamicZoom,
@@ -59,6 +74,38 @@ export default function NavSettingsPanel({
           <span>Rotate Map While Walking</span>
           <input type="checkbox" checked={headingUp} onChange={onToggleHeadingUp} />
         </div>
+
+        {/* Priority 2 (Phase 4.4) — test-only switch between our smoothed
+            pipeline and leaflet-rotate's own raw compass handler. See the
+            header comment above / MapView.jsx's NavigationController. */}
+        <div className="voice-settings-row">
+          <span>Heading-Up Mode</span>
+          <div className="heading-mode-toggle" role="radiogroup" aria-label="Heading-Up mode">
+            <button
+              type="button"
+              className={`heading-mode-btn${headingMode === 'smart' ? ' active' : ''}`}
+              aria-pressed={headingMode === 'smart'}
+              onClick={() => onSetHeadingMode('smart')}
+            >
+              Smart
+            </button>
+            <button
+              type="button"
+              className={`heading-mode-btn${headingMode === 'native' ? ' active' : ''}`}
+              aria-pressed={headingMode === 'native'}
+              onClick={() => onSetHeadingMode('native')}
+            >
+              Native Leaflet
+            </button>
+          </div>
+        </div>
+        {headingMode === 'native' && (
+          <p className="voice-settings-warning">
+            ⚠ Test mode: uses the raw device-orientation heading directly,
+            with no smoothing — expect more jitter and occasional rotation
+            flicker compared to Smart.
+          </p>
+        )}
 
         <div className="voice-settings-row voice-toggle-row">
           <span>Show Compass</span>

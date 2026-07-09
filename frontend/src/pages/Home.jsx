@@ -118,13 +118,19 @@ export default function Home() {
   const [navSettingsOpen, setNavSettingsOpen] = useState(false)
   // Priority 1 (Phase 4.2.4) — Navigation Settings. `headingUp` (declared
   // further down, unchanged) doubles as "Rotate Map While Walking"; these
-  // three are new. All three are plain session-lifetime state per the
+  // are new. All are plain session-lifetime state per the
   // spec ("persist during the current navigation session") — see
   // NavSettingsPanel.jsx's header comment for why that doesn't need
   // localStorage the way voice guidance does.
   const [showCompass, setShowCompass]   = useState(false) // default OFF — "Compass hidden unless explicitly enabled"
   const [autoRecenter, setAutoRecenter] = useState(false)
   const [dynamicZoom, setDynamicZoom]   = useState(true)
+  // Priority 2 (Phase 4.4) — test-mode switch between our own smoothed
+  // heading pipeline ('smart', default — unchanged) and leaflet-rotate's
+  // own raw compassBearing handler ('native'). See MapView.jsx's
+  // NavigationController for how exactly one of the two ever drives
+  // map.setBearing() at a time.
+  const [headingMode, setHeadingMode]   = useState('smart')
 
   // ── Phase 1: Navigation mode state ─────────────────────────────────────
   const [navMode, setNavMode]                     = useState(false)
@@ -206,7 +212,9 @@ export default function Home() {
       full: Math.min(Math.round(viewportH * 0.86), maxFullBeforeCollision),
     }
   }, [viewportH, turnCardBottom])
-  const navSheet = useDraggableSheet(navSheetPeeks, 'collapsed')
+  // Priority 1 (Phase 4.4): gate --sheet-h ownership to whichever sheet is
+  // actually on screen — see useDraggableSheet.js header comment for why.
+  const navSheet = useDraggableSheet(navSheetPeeks, 'collapsed', navMode)
   // Every fresh navigation session starts collapsed so the map is visible;
   // the user drags/taps up for more detail. Presentation-only — doesn't
   // touch routing/GPS.
@@ -231,7 +239,7 @@ export default function Home() {
     half: Math.round(viewportH * 0.7),
     full: Math.round(viewportH * 0.7),
   }), [viewportH])
-  const previewSheet = useDraggableSheet(previewSheetPeeks, 'collapsed')
+  const previewSheet = useDraggableSheet(previewSheetPeeks, 'collapsed', previewActive)
   // Every new route preview starts collapsed (peek) so the map — and the
   // route "Preview Route" just zoomed to — stays the primary focus; the
   // user can drag it up for landmarks/menu/etc. Never remembers the
@@ -251,7 +259,7 @@ export default function Home() {
     half: Math.round(viewportH * (SHEET_HEIGHT / 100)),
     full: Math.round(viewportH * 0.86),
   }), [viewportH])
-  const browseSheet = useDraggableSheet(browseSheetPeeks, 'half')
+  const browseSheet = useDraggableSheet(browseSheetPeeks, 'half', !navMode && !previewActive)
 
   // Priority X.2 (Phase 4.2.7) — pressing Enter/Search on the mobile
   // keyboard dismisses it (handled in SearchBar itself) and moves focus
@@ -797,6 +805,7 @@ export default function Home() {
             : null}
           mapHeading={navMode ? mapHeading : null}
           headingUp={navMode && headingUp}
+          headingMode={headingMode}
           declutter={navMode}
           nextTurnDist={navMode ? nextTurn?.distanceM ?? null : null}
           remainingDist={navMode ? remainingDist : null}
@@ -1304,6 +1313,8 @@ export default function Home() {
         onClose={() => setNavSettingsOpen(false)}
         headingUp={headingUp}
         onToggleHeadingUp={handleToggleHeadingUp}
+        headingMode={headingMode}
+        onSetHeadingMode={setHeadingMode}
         showCompass={showCompass}
         onToggleShowCompass={setShowCompass}
         autoRecenter={autoRecenter}

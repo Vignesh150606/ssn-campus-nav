@@ -1002,6 +1002,33 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
 .voice-toggle-row input[type="checkbox"]:checked { background: var(--brand); }
 .voice-toggle-row input[type="checkbox"]:checked::after { transform: translateX(18px); }
 
+/* Priority 2 (Phase 4.4) — Heading-Up Mode segmented control. No existing
+   multi-option control to reuse (everything else in this panel is a
+   checkbox or a range slider), so this is new — built from the same
+   tokens (--surface/--line/--brand/--ink) as the rest of the panel rather
+   than introducing a separate palette. */
+.heading-mode-toggle {
+  display: flex;
+  background: var(--ring);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  gap: 2px;
+}
+.heading-mode-btn {
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  border-radius: calc(var(--radius-md) - 3px);
+  transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+.heading-mode-btn.active {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
 .voice-test-btn {
   width: 100%;
   margin-top: 14px;
