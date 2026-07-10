@@ -24,7 +24,6 @@ import { MapContainer, TileLayer, Marker, Polyline, useMap, Circle } from 'react
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { CATEGORY_META } from '../constants'
-import { circDiff } from '../hooks/useNavCamera'
 
 // Root-cause hardening (post-4A crash fix): leaflet-rotate's own patches to
 // L.Marker, L.GridLayer, L.Popup, L.Tooltip and L.SVG/L.Canvas (Renderer)
@@ -89,15 +88,12 @@ L.DomUtil.setPosition = function (el, ...rest) {
 // node_modules patch (same reasoning as the DomUtil wrap above), so it
 // survives every `npm install`/reinstall of leaflet-rotate.
 //
-// Priority 2/3 (Phase 4.4 → 4.5) — Navigation Settings offers a "Native
-// Leaflet" mode that deliberately DOES enable map.compassBearing (see the
-// NavigationController effects below) — as of Phase 4.5 this is the
-// default mode, with its own dead-zone filter (NATIVE_DEADZONE_DEG below)
-// rather than being raw/unfiltered. "Smart" (this file's original
-// pipeline, useNavCamera's commit/confidence/cooldown) is still available
-// as a switchable alternative. The button's role never changes either
-// way — it always just flips headingUp — only which system answers that
-// flip differs by mode.
+// Priority 2 (Phase 4.4, test-only) — Navigation Settings now offers a
+// "Native Leaflet" mode that deliberately DOES enable map.compassBearing
+// (see the NavigationController effects below), so the sentence above
+// only holds for the default Smart mode. The button's role never
+// changes either way — it always just flips headingUp — only which
+// system answers that flip differs by mode.
 if (L.Control.Rotate) {
   L.Control.Rotate.prototype._cycleState = function () {
     if (!this._map) return
@@ -107,66 +103,6 @@ if (L.Control.Rotate) {
     if (!this._map || !this._link) return
     const active = !!this._map._headingUpActive
     L.DomUtil[active ? 'addClass' : 'removeClass'](this._link, 'heading-up-active')
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Priority 3 (Phase 4.5) — Native mode's own dead-zone filter.
-//
-// L.Map.CompassBearing._onDeviceOrientation (node_modules/leaflet-rotate/
-// src/map/handler/CompassBearing.js — read directly, not guessed) calls
-// map.setBearing() on every raw, ~100ms-throttled device-orientation
-// sample with zero filtering. That is the actual source of Native mode's
-// jitter. This overrides that one function rather than reimplementing
-// useNavCamera's full commit/confidence/cooldown pipeline here — that
-// pipeline is Smart mode's job, and duplicating it would defeat the point
-// of Native mode using leaflet's own rotation:
-//
-//   1. Bug fix: the original does `e.webkitCompassHeading || e.alpha`.
-//      `||` treats an actual 0° (true north) reading as falsy, silently
-//      falling through to `e.alpha` — a different reference frame
-//      entirely (device-relative rotation, not absolute compass heading).
-//      That mismatch is a plausible cause of "the map doesn't rotate to
-//      match a real turn" whenever the turn happens to end facing north.
-//      Fixed here with an explicit `typeof ... === 'number'` check.
-//   2. Dead-zone: map.setBearing() is only called when the new angle
-//      differs from the last angle actually applied by more than
-//      NATIVE_DEADZONE_DEG — small wrist/hand jitter never reaches the
-//      map. There is deliberately no cooldown or multi-sample
-//      confirmation buffer on top of that (unlike Smart mode) — once a
-//      sample clears the dead-zone it is applied on the very next
-//      throttled tick, so a genuine turn is still felt immediately, not
-//      after a delay.
-//
-// This is an app-level prototype override (same pattern as the
-// L.Control.Rotate override above), not a node_modules patch, so it
-// survives every `npm install`/reinstall of leaflet-rotate.
-const NATIVE_DEADZONE_DEG = 10 // tune here if it feels too jumpy or too sluggish
-
-if (L.Map.CompassBearing) {
-  L.Map.CompassBearing.prototype._onDeviceOrientation = function (e) {
-    const hasWebkitHeading = typeof e.webkitCompassHeading === 'number'
-    let angle = hasWebkitHeading ? e.webkitCompassHeading : e.alpha
-    if (typeof angle !== 'number') return // no usable orientation data in this sample
-
-    let deviceOrientation = 0
-
-    // Safari iOS
-    if (!e.absolute && hasWebkitHeading) {
-      angle = 360 - angle
-    }
-    // Older browsers
-    if (!e.absolute && typeof window.orientation !== 'undefined') {
-      deviceOrientation = window.orientation
-    }
-
-    const bearing = ((angle - deviceOrientation) % 360 + 360) % 360
-
-    if (this._lastAppliedAngle != null && Math.abs(circDiff(this._lastAppliedAngle, bearing)) < NATIVE_DEADZONE_DEG) {
-      return // within the dead-zone — wrist jitter / standing-still noise, ignore
-    }
-    this._lastAppliedAngle = bearing
-    this._map.setBearing(bearing)
   }
 }
 
@@ -391,7 +327,7 @@ function NavigationController({
   routePath,        // full route path (for fit-bounds after reroute)
   onRotationChange, // callback(degrees) — informs parent of current bearing
   onToggleHeadingUp, // Priority 1 (Phase 4.3): callback — flips headingUp, wired to the native Leaflet button
-  headingMode = 'native', // Phase 4.5: 'native' (default, dead-zone filtered) or 'smart'
+  headingMode = 'smart', // Priority 2 (Phase 4.4, test-only): 'smart' (default) or 'native'
 }) {
   const map = useMap()
   const lastPosRef    = useRef(null)
@@ -508,17 +444,17 @@ function NavigationController({
     applyBearing(heading)
   }, [heading, headingUp, followUser, applyBearing, resetBearing, headingMode])
 
-  // ── Heading-up rotation (Native Leaflet mode — default, Phase 4.5) ──
-  // Hands rotation to leaflet-rotate's own L.Map.CompassBearing handler
-  // (node_modules/leaflet-rotate/src/map/handler/CompassBearing.js)
-  // instead of our commit/confidence/cooldown pipeline — it calls
-  // map.setBearing() itself, directly, so nothing here ever calls
-  // applyBearing while this is enabled. As of Phase 4.5, that handler's
-  // _onDeviceOrientation is overridden (see NATIVE_DEADZONE_DEG near the
-  // top of this file) to fix a falsy-zero heading bug and ignore
-  // sub-threshold wrist/hand jitter — it is no longer raw/unfiltered, just
-  // a lighter-weight filter than Smart mode's (no multi-sample confidence
-  // buffer or cooldown, so genuine turns are felt immediately).
+  // ── Heading-up rotation (Native Leaflet test mode) ──────────────────
+  // Priority 2 (Phase 4.4) — hands rotation entirely to leaflet-rotate's
+  // own L.Map.CompassBearing handler (node_modules/leaflet-rotate/src/map/
+  // handler/CompassBearing.js) instead of our commit/confidence/cooldown
+  // pipeline: raw DeviceOrientationEvent samples, ~100ms throttle only,
+  // zero smoothing — it calls map.setBearing() itself, directly, so
+  // nothing here ever calls applyBearing while this is enabled. This is
+  // exactly the code path Smart mode was built to avoid (see the
+  // L.Control.Rotate override + keepBuffer comments near the top of this
+  // file) — selecting Native is expected to reproduce that jitter/flash,
+  // which is the point of an A/B test mode.
   useEffect(() => {
     if (!isMapAlive() || !map.compassBearing) return
     const wantNative = headingMode === 'native' && headingUp
@@ -707,9 +643,9 @@ export default function MapView({
   mapHeading = null,
   /** Phase 4A: true = heading-up mode; false = north-up */
   headingUp = false,
-  /** Phase 4.5: 'native' (default, dead-zone filtered) or 'smart' —
+  /** Priority 2 (Phase 4.4, test-only): 'smart' (default) or 'native' —
       which system drives rotation while headingUp is true */
-  headingMode = 'native',
+  headingMode = 'smart',
   /** Phase 4A: metres to next turn (smart zoom) */
   nextTurnDist = null,
   /** Phase 4A: metres remaining (smart zoom / near-destination zoom) */
