@@ -125,12 +125,13 @@ export default function Home() {
   const [showCompass, setShowCompass]   = useState(false) // default OFF — "Compass hidden unless explicitly enabled"
   const [autoRecenter, setAutoRecenter] = useState(false)
   const [dynamicZoom, setDynamicZoom]   = useState(true)
-  // Priority 2 (Phase 4.4) — test-mode switch between our own smoothed
-  // heading pipeline ('smart', default — unchanged) and leaflet-rotate's
-  // own raw compassBearing handler ('native'). See MapView.jsx's
-  // NavigationController for how exactly one of the two ever drives
-  // map.setBearing() at a time.
-  const [headingMode, setHeadingMode]   = useState('smart')
+  // Priority 3 (Phase 4.5) — mode switch between leaflet-rotate's own
+  // compassBearing handler ('native', default as of Phase 4.5 — now has
+  // its own dead-zone filter, see MapView.jsx's NATIVE_DEADZONE_DEG) and
+  // our own smoothed heading pipeline ('smart', still available as a
+  // switchable alternative). See MapView.jsx's NavigationController for
+  // how exactly one of the two ever drives map.setBearing() at a time.
+  const [headingMode, setHeadingMode]   = useState('native')
 
   // ── Phase 1: Navigation mode state ─────────────────────────────────────
   const [navMode, setNavMode]                     = useState(false)

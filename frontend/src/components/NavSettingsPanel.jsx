@@ -16,12 +16,13 @@
  *                                whether the map actually rotates, never
  *                                whether that button is shown.
  *   Heading-Up Mode           — headingMode preference (own state, Home.jsx).
- *                                Phase 4.4, test-only: Smart = our existing
- *                                GPS-course/confidence/cooldown pipeline
- *                                (default, unchanged). Native Leaflet =
- *                                hands rotation entirely to leaflet-rotate's
- *                                own raw compassBearing handler for direct
- *                                A/B comparison — see MapView.jsx's
+ *                                Phase 4.5: Native Leaflet = leaflet-rotate's
+ *                                own compassBearing handler, dead-zone
+ *                                filtered at the app level (default — see
+ *                                MapView.jsx's NATIVE_DEADZONE_DEG). Smart =
+ *                                our GPS-course/confidence/cooldown
+ *                                pipeline, still available as a switchable
+ *                                alternative — see MapView.jsx's
  *                                NavigationController for how the two are
  *                                kept from ever running at once. The button
  *                                above still just flips headingUp either
@@ -75,9 +76,11 @@ export default function NavSettingsPanel({
           <input type="checkbox" checked={headingUp} onChange={onToggleHeadingUp} />
         </div>
 
-        {/* Priority 2 (Phase 4.4) — test-only switch between our smoothed
-            pipeline and leaflet-rotate's own raw compass handler. See the
-            header comment above / MapView.jsx's NavigationController. */}
+        {/* Priority 3 (Phase 4.5) — switch between leaflet-rotate's own
+            compassBearing handler (Native, default, dead-zone filtered —
+            see MapView.jsx's NATIVE_DEADZONE_DEG) and our own smoothed
+            pipeline (Smart). See the header comment above / MapView.jsx's
+            NavigationController. */}
         <div className="voice-settings-row">
           <span>Heading-Up Mode</span>
           <div className="heading-mode-toggle" role="radiogroup" aria-label="Heading-Up mode">
@@ -99,11 +102,12 @@ export default function NavSettingsPanel({
             </button>
           </div>
         </div>
-        {headingMode === 'native' && (
+        {headingMode === 'smart' && (
           <p className="voice-settings-warning">
-            ⚠ Test mode: uses the raw device-orientation heading directly,
-            with no smoothing — expect more jitter and occasional rotation
-            flicker compared to Smart.
+            Uses a heavier smoothing pipeline (GPS-course preference,
+            multi-sample confidence check, brief cooldown after each turn)
+            — steadier in some conditions, but reacts to turns slightly
+            slower than Native.
           </p>
         )}
 

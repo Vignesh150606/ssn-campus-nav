@@ -232,6 +232,7 @@ def get_route(
         "path":        result["path"],
         "source":      result.get("source", "local"),
         "warning":     result.get("warning"),
+        "snap_distance_m": result.get("snap_distance_m"),
     }
 
 

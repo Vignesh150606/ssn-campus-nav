@@ -106,6 +106,16 @@ def _stitch(adj, seq):
 NEAREST_NODE_CANDIDATES = 8  # how many closest-by-distance nodes to weigh by total route cost
 SNAP_MARGIN_M = 30           # only weigh candidates within this many extra metres of the single closest node
 
+# If the live GPS point is farther than this from its snapped node, do not
+# draw a straight bridge segment from the raw point to the node — start the
+# displayed route at the snapped node instead. A short bridge (a few metres,
+# the common case of just being slightly off the path) is a safe, expected
+# nicety. A long one usually means GPS drift (common near large buildings)
+# rather than a real physical gap, and drawing it as a straight line risks
+# cutting across terrain — e.g. through a building — where no walkway
+# exists. Tune this if it's too aggressive/lax for the campus's node density.
+SNAP_BRIDGE_MAX_M = 15.0
+
 
 def _nearest_node(graph, lat, lng, adj=None, to_id=None):
     """Nearest walkway node to an arbitrary GPS point.
@@ -190,11 +200,17 @@ def find_route_from_point(lat: float, lng: float, to_id: str) -> dict:
     instead of a named location id — used for automatic reroute-on-deviation,
     where the user's live position is rarely exactly on a graph node.
 
-    The user's exact coordinate is snapped to the nearest walkway node,
-    Dijkstra runs from that node, and the snap segment (straight line from
-    the live GPS point to the snapped node) is prepended to the returned
-    path so the polyline starts exactly where the user is standing rather
-    than a few metres off on the nearest path.
+    The user's exact coordinate is snapped to the nearest walkway node and
+    Dijkstra runs from that node. If the snap distance is within
+    SNAP_BRIDGE_MAX_M, a straight bridge segment (live GPS point -> snapped
+    node) is prepended to the returned path so the polyline starts exactly
+    where the user is standing rather than a few metres off on the nearest
+    path. If the snap distance exceeds SNAP_BRIDGE_MAX_M, that bridge is not
+    drawn — the returned path starts at the snapped node itself — since a
+    long straight line risks cutting across terrain (e.g. through a
+    building) where no walkway exists. Either way, `distance_m`/`eta_minutes`
+    account for the full snap distance, and `snap_distance_m` is always
+    returned so the caller can inspect what happened.
     """
     graph, segs = _load()
     adj         = _build_adj(graph, segs, to_id)
@@ -219,9 +235,15 @@ def find_route_from_point(lat: float, lng: float, to_id: str) -> dict:
 
     full_path, real_dist = _stitch(adj, seq)
 
-    # Prepend the live GPS point -> snapped node segment.
+    # Prepend the live GPS point -> snapped node segment, but only if it's
+    # short enough to safely draw as a straight line. Routing/ETA below
+    # always account for the full snap distance regardless of this choice.
     snap_node = next(n for n in graph['nodes'] if n['id'] == snap_id)
-    full_path = [{'lat': lat, 'lng': lng}, {'lat': snap_node['lat'], 'lng': snap_node['lng']}] + full_path[1:]
+    if snap_dist <= SNAP_BRIDGE_MAX_M:
+        full_path = [{'lat': lat, 'lng': lng}, {'lat': snap_node['lat'], 'lng': snap_node['lng']}] + full_path[1:]
+    # else: full_path already starts at the snapped node's own coordinate
+    # (the first point _stitch produced for the snap_id -> ... edge), so no
+    # bridge segment is drawn across unknown terrain.
     real_dist += snap_dist
 
     eta = round(real_dist / WALKING_MPS / 60, 1)
