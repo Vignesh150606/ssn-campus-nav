@@ -338,7 +338,15 @@ input, select, textarea { font-family: inherit; color: inherit; }
     calc(var(--sheet-h, 128px) + var(--fab-stack-h, 56px) + 14px + env(safe-area-inset-bottom, 0px)),
     calc(100dvh - var(--header-h, 60px) - 120px)
   );
-  transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Priority 1 (Phase 4.7) root-cause fix — see .nav-exit-btn and
+     .copilot-fab-stack below for the full explanation: `bottom` here is
+     driven by --sheet-h / --fab-stack-h, both written every animation
+     frame while a sheet is being dragged or snapping. A CSS transition on
+     `bottom` fights those per-frame writes and makes this control visibly
+     lag behind (and briefly overlap) the sheet it's meant to clear. All
+     three sheets (nav/preview/browse) are now the same JS-driven
+     useDraggableSheet, so nothing left needs a CSS-eased `bottom` here —
+     removed instead of retuning the duration/easing yet again. */
 }
 @media (max-width: 430px) {
   .leaflet-container .leaflet-top.leaflet-left {
@@ -2136,7 +2144,17 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, bottom 0.3s cubic-bezier(0.4,0,0.2,1);
+  /* Priority 1 (Phase 4.7) root-cause fix — `bottom` is driven by
+     --sheet-h, which useDraggableSheet writes every animation frame while
+     the sheet is being dragged or snapping between tiers. Transitioning
+     `bottom` on top of that per-frame write means this button is always
+     chasing a moving target ~300ms behind, which is exactly what let it
+     briefly overlap the sheet's real (instant, transform-only) edge —
+     worse on a real touch device, where drags fire far more pointermove
+     events than a mouse-driven test ever does. Keep the press-feedback
+     transitions; drop `bottom` so the button tracks the sheet with zero
+     lag instead of a smoothed guess. */
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .nav-exit-btn:active {
   transform: scale(0.95);
@@ -3146,7 +3164,14 @@ html.nav-sheet-driving .map-layer {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Priority 1 (Phase 4.7) root-cause fix — same issue as .nav-exit-btn
+     and the zoom-control container above: `bottom` tracks --sheet-h,
+     written every animation frame during a drag/snap, so a CSS
+     transition here fights those writes and lags the stack behind the
+     sheet's real edge (worse on a real device, where touch drags fire
+     many more pointermove events than a mouse ever does). Removed rather
+     than retuned — no code path needs a CSS-eased `bottom` any more, now
+     that nav/preview/browse are all the same JS-driven draggable sheet. */
 }
 
 /* ── Copilot FAB ── */

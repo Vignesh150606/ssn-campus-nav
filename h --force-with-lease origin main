@@ -1,0 +1,11 @@
+* [33m2d879c3[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m improve nav and panel
+[31m|[m * [33m64f27e0[m[33m ([m[1;31morigin/main[m[33m)[m Phase for route bug and leafllet default on
+[31m|[m[31m/[m  
+* [33m1fe373b[m return to before as route recal was taking time
+* [33m3362c72[m Phase to solve the route bug
+* [33mfb408ef[m Phase4 2 7 with leaftlet ad fixes
+* [33m63d3cb6[m Phase 4 leaflet try
+* [33m195de8c[m Phase 427 fixes with leaflet
+* [33mcfea1ba[m Phase 427 from 426 with own headsup nav
+* [33m9c2ca41[m Phase 427 fix from 426
+* [33mf3ff91f[m Phase 426 to 7
