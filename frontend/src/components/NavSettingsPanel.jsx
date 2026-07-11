@@ -16,17 +16,20 @@
  *                                whether the map actually rotates, never
  *                                whether that button is shown.
  *   Heading-Up Mode           — headingMode preference (own state, Home.jsx).
- *                                Phase 4.4, test-only: Smart = our existing
- *                                GPS-course/confidence/cooldown pipeline
- *                                (default, unchanged). Native Leaflet =
- *                                hands rotation entirely to leaflet-rotate's
- *                                own raw compassBearing handler for direct
- *                                A/B comparison — see MapView.jsx's
- *                                NavigationController for how the two are
- *                                kept from ever running at once. The button
- *                                above still just flips headingUp either
- *                                way; this only decides which system
- *                                answers that toggle.
+ *                                Phase 4.5: Native Leaflet (default) hands
+ *                                rotation to leaflet-rotate's own
+ *                                compassBearing handler, wrapped with a
+ *                                small dead-zone + light smoothing around
+ *                                map.setBearing() to blunt magnetometer
+ *                                jitter. Smart = our own GPS-course/
+ *                                confidence/cooldown fusion pipeline,
+ *                                still selectable for anyone who wants
+ *                                its heavier stabilization — see
+ *                                MapView.jsx's NavigationController for
+ *                                how the two are kept from ever running
+ *                                at once. The button above still just
+ *                                flips headingUp either way; this only
+ *                                decides which system answers that toggle.
  *   Show Compass              — showCompass (own state, Home.jsx) — purely
  *                                the decorative NavCompass needle overlay;
  *                                independent of Heading-Up in both
@@ -75,20 +78,13 @@ export default function NavSettingsPanel({
           <input type="checkbox" checked={headingUp} onChange={onToggleHeadingUp} />
         </div>
 
-        {/* Priority 2 (Phase 4.4) — test-only switch between our smoothed
-            pipeline and leaflet-rotate's own raw compass handler. See the
-            header comment above / MapView.jsx's NavigationController. */}
+        {/* Priority 1 (Phase 4.5) — switch between the default Native
+            rotation (leaflet-rotate's own compass handler, lightly
+            debounced) and our Smart fusion pipeline. See the header
+            comment above / MapView.jsx's NavigationController. */}
         <div className="voice-settings-row">
           <span>Heading-Up Mode</span>
           <div className="heading-mode-toggle" role="radiogroup" aria-label="Heading-Up mode">
-            <button
-              type="button"
-              className={`heading-mode-btn${headingMode === 'smart' ? ' active' : ''}`}
-              aria-pressed={headingMode === 'smart'}
-              onClick={() => onSetHeadingMode('smart')}
-            >
-              Smart
-            </button>
             <button
               type="button"
               className={`heading-mode-btn${headingMode === 'native' ? ' active' : ''}`}
@@ -97,13 +93,21 @@ export default function NavSettingsPanel({
             >
               Native Leaflet
             </button>
+            <button
+              type="button"
+              className={`heading-mode-btn${headingMode === 'smart' ? ' active' : ''}`}
+              aria-pressed={headingMode === 'smart'}
+              onClick={() => onSetHeadingMode('smart')}
+            >
+              Smart
+            </button>
           </div>
         </div>
-        {headingMode === 'native' && (
+        {headingMode === 'smart' && (
           <p className="voice-settings-warning">
-            ⚠ Test mode: uses the raw device-orientation heading directly,
-            with no smoothing — expect more jitter and occasional rotation
-            flicker compared to Smart.
+            ℹ Smart adds fuller GPS-course fusion and stationary-lock
+            smoothing on top of the compass — steadier in some spots, but
+            reacts a little slower to turns than Native (default).
           </p>
         )}
 

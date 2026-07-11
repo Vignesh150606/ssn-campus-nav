@@ -88,12 +88,14 @@ L.DomUtil.setPosition = function (el, ...rest) {
 // node_modules patch (same reasoning as the DomUtil wrap above), so it
 // survives every `npm install`/reinstall of leaflet-rotate.
 //
-// Priority 2 (Phase 4.4, test-only) — Navigation Settings now offers a
-// "Native Leaflet" mode that deliberately DOES enable map.compassBearing
-// (see the NavigationController effects below), so the sentence above
-// only holds for the default Smart mode. The button's role never
-// changes either way — it always just flips headingUp — only which
-// system answers that flip differs by mode.
+// Priority 1 (Phase 4.5) — Native Leaflet is now the DEFAULT heading-up
+// mode: it enables map.compassBearing directly (see the
+// NavigationController effects below), wrapped with a small dead-zone +
+// light smoothing around map.setBearing() to blunt magnetometer jitter
+// without rebuilding Smart mode's full pipeline. Smart mode (this file's
+// own GPS/compass fusion) stays selectable in Navigation Settings. The
+// button's role never changes either way — it always just flips
+// headingUp — only which system answers that flip differs by mode.
 if (L.Control.Rotate) {
   L.Control.Rotate.prototype._cycleState = function () {
     if (!this._map) return
@@ -327,7 +329,7 @@ function NavigationController({
   routePath,        // full route path (for fit-bounds after reroute)
   onRotationChange, // callback(degrees) — informs parent of current bearing
   onToggleHeadingUp, // Priority 1 (Phase 4.3): callback — flips headingUp, wired to the native Leaflet button
-  headingMode = 'smart', // Priority 2 (Phase 4.4, test-only): 'smart' (default) or 'native'
+  headingMode = 'native', // Priority 1 (Phase 4.5): 'native' (default) or 'smart'
 }) {
   const map = useMap()
   const lastPosRef    = useRef(null)
@@ -444,34 +446,96 @@ function NavigationController({
     applyBearing(heading)
   }, [heading, headingUp, followUser, applyBearing, resetBearing, headingMode])
 
-  // ── Heading-up rotation (Native Leaflet test mode) ──────────────────
-  // Priority 2 (Phase 4.4) — hands rotation entirely to leaflet-rotate's
-  // own L.Map.CompassBearing handler (node_modules/leaflet-rotate/src/map/
+  // ── Heading-up rotation (Native Leaflet mode — default) ─────────────
+  // Priority 1 (Phase 4.5) — hands rotation to leaflet-rotate's own
+  // L.Map.CompassBearing handler (node_modules/leaflet-rotate/src/map/
   // handler/CompassBearing.js) instead of our commit/confidence/cooldown
-  // pipeline: raw DeviceOrientationEvent samples, ~100ms throttle only,
-  // zero smoothing — it calls map.setBearing() itself, directly, so
-  // nothing here ever calls applyBearing while this is enabled. This is
-  // exactly the code path Smart mode was built to avoid (see the
-  // L.Control.Rotate override + keepBuffer comments near the top of this
-  // file) — selecting Native is expected to reproduce that jitter/flash,
-  // which is the point of an A/B test mode.
+  // pipeline: raw DeviceOrientationEvent samples, ~100ms throttle, and it
+  // calls map.setBearing() itself — so nothing here ever calls
+  // applyBearing while this is enabled. This IS the code path Smart mode
+  // was originally built to avoid (see the L.Control.Rotate override
+  // comment near the top of this file): CompassBearing on its own has no
+  // dead-zone, so stationary magnetometer noise (~1-3°) reaches
+  // setBearing() every throttle tick.
+  //
+  // Per the spec, the only optimizations allowed here are ones that don't
+  // "significantly change the native behaviour" — no confidence windows,
+  // no GPS-course fusion, no cooldowns, same ~100ms native cadence. So
+  // instead of replacing CompassBearing, we wrap the single choke point
+  // it calls through — map.setBearing() itself — with a continuous
+  // adaptive-gain filter (see below) that damps small/continuous deltas
+  // (noise, wrist wobble, walking sway) while passing a genuine turn
+  // through immediately. The wrapper is installed only while Native mode
+  // + headingUp are both active, and fully restored the instant either
+  // turns off, so Smart mode's own direct map.setBearing() calls
+  // (applyBearingRaw) are never touched by it.
   useEffect(() => {
     if (!isMapAlive() || !map.compassBearing) return
     const wantNative = headingMode === 'native' && headingUp
+
     if (wantNative) {
+      if (!map._nativeBearingPatched) {
+        const originalSetBearing = map.setBearing.bind(map)
+        // Phase 4.6 — the previous version used a hard dead-zone: deltas
+        // under 1.5° were dropped entirely (no state change at all). That
+        // works for pure noise around a fixed heading, but while actually
+        // walking the true heading drifts continuously in small steps
+        // (gait sway, a gently curving path) — each individual ~100ms
+        // sample can easily be under 1.5°, so the old code kept discarding
+        // them against a stale baseline until the accumulated drift
+        // finally cleared the threshold in one go, then jumped. That
+        // stair-step-then-jump pattern is what read as "jittery" on a
+        // real device, not smooth. Fixed by never fully freezing: every
+        // sample above the sensor noise floor now commits, just with a
+        // gain that depends on its size — small deltas get heavily damped
+        // (continuous smooth follow, no discrete jump), a single-sample
+        // delta big enough to only be a genuine turn passes through at
+        // full gain immediately. Still just reshaping the one native
+        // setBearing() call — same ~100ms cadence, no multi-sample memory,
+        // no confidence window, no cooldown timer.
+        const NOISE_FLOOR_DEG = 0.5   // below this: true sensor quantization noise, ignore
+        const TURN_DEG        = 12    // a single ~100ms-tick jump this big can only be a real turn
+        const SLOW_GAIN        = 0.12  // damping applied to small/continuous deltas (wrist wobble, gait sway)
+        let smoothed = null
+        map.setBearing = (theta) => {
+          const wrapped = ((theta % 360) + 360) % 360
+          if (smoothed == null) {
+            smoothed = wrapped
+            originalSetBearing(wrapped)
+            return
+          }
+          let delta = wrapped - smoothed
+          if (delta > 180) delta -= 360
+          if (delta < -180) delta += 360
+          const absDelta = Math.abs(delta)
+          if (absDelta < NOISE_FLOOR_DEG) return // genuinely negligible — no-op
+          const gain = absDelta >= TURN_DEG ? 1 : SLOW_GAIN
+          smoothed = (((smoothed + delta * gain) % 360) + 360) % 360
+          originalSetBearing(smoothed)
+        }
+        map._nativeBearingPatched = true
+        map._nativeBearingRestore = () => {
+          map.setBearing = originalSetBearing
+          map._nativeBearingPatched = false
+          map._nativeBearingRestore = null
+        }
+      }
       if (!map.compassBearing.enabled()) map.compassBearing.enable()
     } else {
       if (map.compassBearing.enabled()) map.compassBearing.disable()
+      map._nativeBearingRestore?.() // undo the wrapper before any direct setBearing call below
       if (!headingUp) resetBearing() // mirrors Smart mode's "headingUp off → North" behaviour
     }
   }, [map, isMapAlive, headingMode, headingUp, resetBearing])
 
   // Belt-and-braces: if this instance unmounts (nav session ends) while
-  // Native mode's raw listener is still attached, detach it explicitly
-  // rather than relying only on leaflet-rotate's own teardown ordering.
+  // Native mode's raw listener (and/or its setBearing wrapper) is still
+  // attached, detach both explicitly rather than relying only on
+  // leaflet-rotate's own teardown ordering.
   useEffect(() => {
     return () => {
       if (map?._mapPane && map.compassBearing?.enabled()) map.compassBearing.disable()
+      map?._nativeBearingRestore?.()
     }
   }, [map])
 
@@ -643,9 +707,9 @@ export default function MapView({
   mapHeading = null,
   /** Phase 4A: true = heading-up mode; false = north-up */
   headingUp = false,
-  /** Priority 2 (Phase 4.4, test-only): 'smart' (default) or 'native' —
+  /** Priority 1 (Phase 4.5): 'native' (default) or 'smart' —
       which system drives rotation while headingUp is true */
-  headingMode = 'smart',
+  headingMode = 'native',
   /** Phase 4A: metres to next turn (smart zoom) */
   nextTurnDist = null,
   /** Phase 4A: metres remaining (smart zoom / near-destination zoom) */
