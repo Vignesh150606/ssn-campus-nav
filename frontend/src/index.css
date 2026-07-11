@@ -318,7 +318,14 @@ input, select, textarea { font-family: inherit; color: inherit; }
    34px chip height + 2px top/bottom padding) = 108px, so 96px left it
    juuust short of fully clearing the category chips on short screens.
    120px (108px content + 12px breathing margin) is the evidence-based
-   value. */
+   value.
+   Priority 2 (Phase 4.6): this ceiling used static vh while --sheet-h
+   (and everything else in this formula) is measured against the dynamic
+   viewport — same root cause as .nav-bottom-sheet's fix above, just not
+   in scope to touch there since this cluster (Zoom + native Heading-Up
+   button) wasn't reported broken at the time. It is now: switched to
+   dvh so this ceiling agrees with --sheet-h on a real device with a
+   collapsing browser toolbar. */
 .leaflet-container .leaflet-top.leaflet-left {
   top: auto !important;
   left: auto !important;
@@ -329,7 +336,7 @@ input, select, textarea { font-family: inherit; color: inherit; }
      avoids a first-frame flash lower than its correct resting position. */
   bottom: min(
     calc(var(--sheet-h, 128px) + var(--fab-stack-h, 56px) + 14px + env(safe-area-inset-bottom, 0px)),
-    calc(100vh - var(--header-h, 60px) - 120px)
+    calc(100dvh - var(--header-h, 60px) - 120px)
   );
   transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -453,7 +460,7 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
    reflow while dragging). Replaces the old content-sized `height: auto;
    max-height: 75%` which had no collapsed state at all. */
 .results-sheet.preview-mode {
-  height: 70vh;
+  height: 70dvh;
   max-height: none;
   display: flex;
   flex-direction: column;
@@ -461,8 +468,9 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
   /* Priority 3: matches previewSheetPeeks.collapsed (160px) in Home.jsx —
      this is only the same-paint-frame fallback before useDraggableSheet's
      own mount effect takes over (see the comment on .nav-bottom-sheet
-     above), so it must stay in sync with that value. */
-  transform: translate3d(0, calc(70vh - 160px), 0);
+     above), so it must stay in sync with that value.
+     dvh (not vh) — see the root-cause note on .nav-bottom-sheet. */
+  transform: translate3d(0, calc(70dvh - 160px), 0);
 }
 .results-sheet.preview-mode.dragging .nav-sheet-scroll { pointer-events: none; }
 
@@ -472,15 +480,16 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
    fixed to the tallest tier so useDraggableSheet only ever translates it,
    never resizes it — no layout reflow while dragging). */
 .results-sheet.browse-mode {
-  height: 86vh;
+  height: 86dvh;
   max-height: none;
   display: flex;
   flex-direction: column;
   will-change: transform;
   /* Same-paint-frame fallback before useDraggableSheet's mount effect
      takes over — approximates the default 'half' tier (~38% of viewport,
-     matching the old fixed SHEET_HEIGHT) so there's no visible jump. */
-  transform: translate3d(0, 48vh, 0);
+     matching the old fixed SHEET_HEIGHT) so there's no visible jump.
+     dvh (not vh) — see the root-cause note on .nav-bottom-sheet. */
+  transform: translate3d(0, 48dvh, 0);
 }
 .results-sheet.browse-mode.empty { height: 0; padding: 0; border: none; box-shadow: none; }
 .results-sheet.browse-mode.dragging .nav-sheet-scroll { pointer-events: none; }
@@ -2142,7 +2151,7 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
    PHASE 4A section is removed — search PHASE 4A for the up-to-date rule. ── */
 
 /* ── Phase 4.2.2: Draggable 3-snap-point navigation bottom sheet ──
-   Height is a FIXED 86vh (== the 'full' snap point, the tallest of the
+   Height is a FIXED 86dvh (== the 'full' snap point, the tallest of the
    three) so JS never resizes the box — it only translates it via
    transform, which is compositor-only (no layout reflow) so dragging and
    the snap animation stay smooth regardless of how much content is
@@ -2150,13 +2159,26 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
    --sheet-h custom property; this stylesheet just lays out the content
    and gives every state (idle / dragging / each tier) its look. The
    inline transform below is only a same-paint-frame fallback so there's
-   no flash of the wrong position before the hook's mount effect runs. */
+   no flash of the wrong position before the hook's mount effect runs.
+   Priority 3 root cause: this box previously used static vh while
+   useDraggableSheet computes its translateY (and --sheet-h) from JS
+   window.innerHeight, which real mobile browsers keep in sync with the
+   *dynamic* viewport (shrinks/grows as the URL bar collapses). Static vh
+   resolves against the large viewport instead, so on a physical device
+   the two disagreed by however much the browser chrome was currently
+   showing — the sheet's real visible edge would sit above where
+   --sheet-h said it was, and the Exit / Copilot buttons (positioned from
+   --sheet-h) would end up under it. dvh tracks the same dynamic
+   reference as window.innerHeight, so box height and translateY now
+   agree. Desktop devtools device emulation doesn't reproduce a real
+   collapsing toolbar, which is why this didn't show up until testing on
+   an actual Android device. */
 .nav-bottom-sheet {
   position: fixed;
   bottom: 0;
   left: var(--safe-l);
   right: var(--safe-r);
-  height: 86vh;
+  height: 86dvh;
   display: flex;
   flex-direction: column;
   background: var(--surface);
@@ -2165,7 +2187,7 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
   z-index: 750;
   overflow: hidden;
   will-change: transform;
-  transform: translate3d(0, calc(86vh - 128px), 0);
+  transform: translate3d(0, calc(86dvh - 128px), 0);
 }
 .nav-bottom-sheet.dragging { box-shadow: 0 -8px 40px rgba(0,0,0,0.22); }
 
