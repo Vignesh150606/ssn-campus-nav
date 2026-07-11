@@ -58,19 +58,6 @@ const GPS_HARD_REJECT_M       = 1000
 const GPS_SOFT_REPLACE_M      = 150
 // ACQUIRING_THRESHOLD_M : below this the dot turns green and route logic activates.
 const GPS_ACCURACY_THRESHOLD_M = 50
-// Priority 2 (Phase 4.7) — root cause of "marker starts in the wrong spot
-// then slides to the right one": the very first fix of a session used to
-// be displayed immediately even while still isAcquiring (i.e. coarser than
-// GPS_ACCURACY_THRESHOLD_M) — often a WiFi/cell-tower estimate hundreds of
-// metres off, corrected a few seconds later once real GPS locks on. That
-// correction is exactly the reported jump. GPS_ACQUIRE_GRACE_MS bounds how
-// long the first fix is withheld while waiting for a genuinely accurate
-// one: long enough to cover a typical phone GPS lock (~1-5s with a warm
-// almanac/ephemeris), short enough that a user with persistently poor
-// signal (indoors, etc.) still sees a position rather than a blank map
-// indefinitely — "maintain fast startup while avoiding incorrect initial
-// positioning" from both ends.
-const GPS_ACQUIRE_GRACE_MS = 6000
 
 const RECALC_COOLDOWN_MS = 4000      // Phase 2: 3-5 second cooldown per spec
 const RECALC_MIN_REMAINING_M = 15    // don't bother rerouting if basically already there
@@ -165,17 +152,6 @@ export function LocationProvider({ children }) {
   const bestAccuracyRef     = useRef(null)
   // Timestamp of the last accepted GPS fix — used to detect stale positions.
   const lastPositionAtRef   = useRef(null)
-  // Priority 2 (Phase 4.7): deadline (Date.now()-based) until which the
-  // very first fix of a session is withheld from display if it's still
-  // "acquiring" — see GPS_ACQUIRE_GRACE_MS above. null means no grace
-  // window is active (e.g. simulated GPS, or before tracking has started),
-  // which is treated as "already expired" so nothing is ever blocked by
-  // default — ungated is the original/fail-open behaviour.
-  const acquireDeadlineRef  = useRef(null)
-  // True once a position has actually been shown to the user this
-  // session — latches like goodFixReceivedRef, so the grace window can
-  // only ever withhold the FIRST displayed fix, never a later one.
-  const shownPositionRef    = useRef(false)
 
   // ---------------------------------------------------------------------
   // Feature 1 — automatic route recalculation when off-route.
@@ -272,26 +248,10 @@ export function LocationProvider({ children }) {
                         accuracyM > GPS_ACCURACY_THRESHOLD_M
     if (!isAcquiring) goodFixReceivedRef.current = true
 
-    // Keep the accuracy readout / "Obtaining your location…" status text
-    // live for the whole acquiring window, regardless of whether we're
-    // about to withhold the position itself below.
-    setAccuracy(accuracyM)
-    setAcquiringGps(isAcquiring)
-
-    // Priority 2 (Phase 4.7) root cause — see GPS_ACQUIRE_GRACE_MS above.
-    // Only the FIRST fix of a session can ever be withheld here
-    // (shownPositionRef latches true the instant anything is displayed),
-    // and only while still isAcquiring AND the grace window hasn't
-    // expired yet — so this never delays a genuinely accurate fix, and
-    // never blocks longer than GPS_ACQUIRE_GRACE_MS even on poor signal.
-    if (isAcquiring && !shownPositionRef.current) {
-      const deadline = acquireDeadlineRef.current
-      if (deadline != null && now < deadline) return // still narrowing in — nothing to show yet
-    }
-    shownPositionRef.current = true
-
     // Store TRUE GPS coordinate — never snapped, never adjusted.
     setPosition({ lat, lng })
+    setAccuracy(accuracyM)
+    setAcquiringGps(isAcquiring)
 
     // Priority 2 — only trust course-over-ground while actually walking;
     // a valid-looking `heading` at near-zero speed is usually stale/noise
@@ -378,8 +338,6 @@ export function LocationProvider({ children }) {
     goodFixReceivedRef.current = false  // reset so acquiring state fires for new session
     bestAccuracyRef.current   = null      // reset best-accuracy tracking
     lastPositionAtRef.current = null
-    shownPositionRef.current  = false                    // Priority 2 (Phase 4.7)
-    acquireDeadlineRef.current = Date.now() + GPS_ACQUIRE_GRACE_MS  // Priority 2 (Phase 4.7)
     watchId.current = navigator.geolocation.watchPosition(
       (pos) => processPosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.speed, pos.coords.heading),
       (err) => {
@@ -430,8 +388,6 @@ export function LocationProvider({ children }) {
     goodFixReceivedRef.current = false
     bestAccuracyRef.current    = null
     lastPositionAtRef.current  = null
-    shownPositionRef.current   = false                    // Priority 2 (Phase 4.7)
-    acquireDeadlineRef.current = null                      // Priority 2 (Phase 4.7)
     routeRef.current = null
     destRef.current = null
     setActiveDestination(null)
