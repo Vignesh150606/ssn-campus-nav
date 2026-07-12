@@ -510,7 +510,41 @@ function NavigationController({
           const absDelta = Math.abs(delta)
           if (absDelta < NOISE_FLOOR_DEG) return // genuinely negligible — no-op
           const gain = absDelta >= TURN_DEG ? 1 : SLOW_GAIN
+          const prevSmoothed = smoothed
           smoothed = (((smoothed + delta * gain) % 360) + 360) % 360
+
+          // Root-cause fix for the black-flash-on-large-turns bug (verified
+          // against node_modules/leaflet-rotate source, not guessed):
+          // leaflet-rotate's real setBearing() always wraps theta into
+          // [0°,360°) (L.Util.wrapNum) before writing it onto
+          // .leaflet-rotate-pane as `transform: ... rotate(Xrad)`
+          // (src/dom/DomUtil.js). That pane has `transition: transform
+          // 0.3s ease-out` (index.css, Phase 4.2.4). CSS transitions
+          // interpolate a rotate() argument numerically, not circularly —
+          // so a commit that crosses the 0°/360° seam (e.g. 358° → 2°, a
+          // real 4° turn) animates the raw 356° gap the *long* way
+          // instead. leaflet-rotate's GridLayer patch only recomputes tile
+          // bounds once per setBearing() call, off the map's 'rotate'
+          // event (src/layer/tile/GridLayer.js) — not per animation frame
+          // — so during that spurious 0.3s spin the intermediate frames
+          // sweep the viewport across orientations nothing was ever
+          // positioned for, exposing the bare .leaflet-container
+          // background (#09090b in dark mode: index.css). Smart mode's
+          // applyBearingRaw() (above, this file) already guards against
+          // exactly this by disabling the pane transition for one frame
+          // whenever rawJump > 180 — Native mode's setBearing wrapper
+          // never had that guard, which is the actual bug. Same fix,
+          // applied at Native mode's own choke point.
+          const rawJump = Math.abs(smoothed - prevSmoothed)
+          if (rawJump > 180) {
+            const pane = map.getPane('rotatePane')
+            if (pane) {
+              pane.style.transition = 'none'
+              void pane.offsetHeight // force reflow so transition:none applies before setBearing
+              requestAnimationFrame(() => { pane.style.transition = '' })
+            }
+          }
+
           originalSetBearing(smoothed)
         }
         map._nativeBearingPatched = true
