@@ -184,7 +184,7 @@ export function LocationProvider({ children }) {
   // distance as plain arguments (rather than reading state) so this stays
   // a stable, dependency-free callback — it never needs to be recreated,
   // which in turn keeps processPosition's identity stable too.
-  const maybeRecalculate = useCallback((lat, lng, currentRemainingM) => {
+  const maybeRecalculate = useCallback((lat, lng, currentRemainingM, accuracyM) => {
     if (!destRef.current?.id) return                 // need a routable destination id
     if (recalculatingRef.current) return              // a reroute is already in flight
     if (currentRemainingM != null && currentRemainingM < RECALC_MIN_REMAINING_M) return
@@ -195,7 +195,15 @@ export function LocationProvider({ children }) {
     lastRecalcAtRef.current  = now
     setRecalculating(true)
 
-    getRouteFromCoords(lat, lng, destRef.current.id)
+    // Root cause of the CSE-Annexure shortcut bug (proven against the real
+    // graph — see utils/router.py _nearest_node docstring): a reroute fired
+    // from a single noisy-but-accepted fix near IT Block/CSE Annexure could
+    // snap onto the destination's own connector node and return an
+    // artificially short "shortcut" whose snap segment actually cut through
+    // the building gap between them. accuracyM is this exact fix's own
+    // measured uncertainty — passing it through lets the backend bound its
+    // snap tie-break by it instead of always using its wider flat default.
+    getRouteFromCoords(lat, lng, destRef.current.id, accuracyM)
       .then((r) => {
         routeRef.current  = r.path
         announced.current = new Set() // fresh route -> distance thresholds can fire again
@@ -336,7 +344,7 @@ export function LocationProvider({ children }) {
     setLiveEta(Math.round((remDist / 1.4 / 60) * 10) / 10)
 
     if (isOffRoute) {
-      maybeRecalculate(lat, lng, remDist)
+      maybeRecalculate(lat, lng, remDist, accuracyM)
     }
 
     // Phase 9 (Q7): dynamic arrival — uses max(15m, GPS accuracy)

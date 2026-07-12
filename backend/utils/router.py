@@ -107,7 +107,7 @@ NEAREST_NODE_CANDIDATES = 8  # how many closest-by-distance nodes to weigh by to
 SNAP_MARGIN_M = 30           # only weigh candidates within this many extra metres of the single closest node
 
 
-def _nearest_node(graph, lat, lng, adj=None, to_id=None):
+def _nearest_node(graph, lat, lng, adj=None, to_id=None, accuracy_m=None):
     """Nearest walkway node to an arbitrary GPS point.
 
     465 nodes on this campus graph, so a plain scan (no spatial index) is
@@ -118,22 +118,52 @@ def _nearest_node(graph, lat, lng, adj=None, to_id=None):
     closest node by straight-line distance — among nodes within
     SNAP_MARGIN_M of that closest node (so still genuinely nearby — this is
     a tie-break between close options, not a search for a better node
-    anywhere on campus), it picks whichever minimizes (snap distance +
-    remaining Dijkstra distance from that node to to_id). A node a few
-    metres closer to the user but *behind* their direction of travel costs
-    more in total this way than a slightly-farther-but-still-nearby node
-    that's actually ahead on the path, because routing through the
+    anywhere on campus), it picks whichever minimizes (snap
+    distance + remaining Dijkstra distance from that node to to_id). A node
+    a few metres closer to the user but *behind* their direction of travel
+    costs more in total this way than a slightly-farther-but-still-nearby
+    node that's actually ahead on the path, because routing through the
     "closer" one means walking back to it and then forward again. This is
     exactly the snap-behind-the-user case that caused the reported
-    zig-zag/backtrack routes. The margin cap matters: without it, a node
-    much farther away can occasionally look cheaper purely because its
-    graph distance to the destination happens to be marginally shorter,
-    which would replace a small backtrack with a much worse, visually
-    jarring long jump across campus — worth avoiding even though it
-    technically minimizes total path length. Running a handful of extra
-    Dijkstra passes over a graph this size is still sub-millisecond work,
-    and this only runs on an on-demand reroute (already cooldown-limited
-    on the frontend), not on every request.
+    zig-zag/backtrack routes.
+
+    Root cause of the CSE-Annexure-shortcut bug (proven against the real
+    graph, not guessed — see the routing-bug investigation for the full
+    trace): the "snap distance" `d` fed into that sum is a raw straight-line
+    distance — it is never checked against anything walkable, it's simply
+    rendered as a straight segment onto the returned path. That assumption
+    is safe for the single closest node (by definition the *shortest*
+    possible straight line onto the network, essentially always open
+    ground). It stops being safe for a farther shortlisted candidate,
+    because a longer straight line is far more likely to cross a building.
+    Nodes that sit right next to a *destination* (its own location_edge
+    connector, e.g. 'it-block' -> n_177, 27m) are the worst case: their
+    route-to-destination is tiny by construction, so they win the
+    total-cost comparison even when their own snap segment is 3-4x longer
+    than the closest candidate's — i.e. even when reaching them at all
+    requires walking through whatever's physically in the way. That's
+    exactly how a single noisy-but-"accurate-enough" fix near IT Block/CSE
+    Annexure (a classic multipath spot between two adjacent buildings) got
+    shortlisted next to n_177/n_178 and won.
+
+    Two things distinguish that failure from a legitimate win (also proven
+    against the real graph): in the bug, the candidate's total-cost
+    improvement over the closest-by-distance node (14.4m) was *smaller*
+    than the extra straight-line distance needed to reach it (27.6m) — i.e.
+    trusting that unverified segment cost more than it saved. Compare a
+    genuine case elsewhere on this graph where the closest-by-distance node
+    happens to sit on a dead-end branch: the alternative there saves 479m
+    for only 22m of extra unverified distance — an overwhelming, clearly
+    legitimate win. `accuracy_m`, when supplied (the GPS fix's own reported
+    accuracy — already collected and already treated as authoritative
+    elsewhere in this codebase, not a new invented figure), gates *when*
+    this sanity check applies at all: for a candidate no farther than
+    accuracy_m past the closest node, the extra distance is inside this
+    fix's own measurement noise and isn't worth second-guessing; only a
+    candidate confidently farther than that (by more than the fix's own
+    uncertainty) has its total-cost win checked against what it actually
+    cost to reach it. Callers without an accuracy figure (e.g. the named
+    from_id path) get the previous, unchanged behaviour.
 
     Without `adj`/`to_id` (e.g. called for something other than routing
     toward a specific destination), falls back to plain nearest-by-distance.
@@ -156,14 +186,26 @@ def _nearest_node(graph, lat, lng, adj=None, to_id=None):
     shortlist = [c for c in candidates[:NEAREST_NODE_CANDIDATES] if c[0] <= nearest_dist + SNAP_MARGIN_M]
 
     best_id, best_total, best_snap_dist = None, None, None
+    closest_id, closest_total, closest_snap_dist = None, None, None  # the single nearest-by-distance candidate, if reachable
     for d, node_id in shortlist:
         dist, _ = _dijkstra(adj, node_id, to_id)
         route_dist = dist.get(to_id)
         if route_dist is None:
             continue  # this candidate can't reach the destination at all
         total = d + route_dist
+        if closest_id is None:  # shortlist is sorted by distance, so the first reachable one is the closest
+            closest_id, closest_total, closest_snap_dist = node_id, total, d
         if best_total is None or total < best_total:
             best_id, best_total, best_snap_dist = node_id, total, d
+
+    # Sanity-check a win that isn't the closest-by-distance candidate — see
+    # docstring above for the worked examples this is derived from.
+    if (accuracy_m is not None and best_id is not None and closest_id is not None
+            and best_id != closest_id):
+        extra_snap  = best_snap_dist - closest_snap_dist
+        improvement = closest_total - best_total
+        if extra_snap > accuracy_m and improvement < extra_snap:
+            best_id, best_total, best_snap_dist = closest_id, closest_total, closest_snap_dist
 
     if best_id is None:
         # None of the nearby candidates can reach to_id — fall back to the
@@ -185,7 +227,7 @@ def _point_dist(lat1, lng1, lat2, lng2):
     return 2*R*math.asin(math.sqrt(a))
 
 
-def find_route_from_point(lat: float, lng: float, to_id: str) -> dict:
+def find_route_from_point(lat: float, lng: float, to_id: str, accuracy_m: float = None) -> dict:
     """Same as find_route(), but starts from an arbitrary GPS coordinate
     instead of a named location id — used for automatic reroute-on-deviation,
     where the user's live position is rarely exactly on a graph node.
@@ -195,6 +237,17 @@ def find_route_from_point(lat: float, lng: float, to_id: str) -> dict:
     the live GPS point to the snapped node) is prepended to the returned
     path so the polyline starts exactly where the user is standing rather
     than a few metres off on the nearest path.
+
+    `accuracy_m`, when supplied, is the GPS fix's own reported accuracy —
+    passed straight through to `_nearest_node`, where it gates a sanity
+    check on the candidate tie-break: a shortlisted node confidently
+    farther away than this fix's own measured uncertainty only wins if its
+    total-cost improvement actually exceeds the extra unverified straight-
+    line distance needed to reach it. See `_nearest_node`'s docstring for
+    the full derivation and worked examples: without it, a single noisy-
+    but-"accurate-enough" fix near a destination's own connector node can
+    win the tie-break on paper while its snap segment silently cuts through
+    whatever's physically in the way.
     """
     graph, segs = _load()
     adj         = _build_adj(graph, segs, to_id)
@@ -202,7 +255,7 @@ def find_route_from_point(lat: float, lng: float, to_id: str) -> dict:
     if to_id not in adj:
         raise ValueError(f"No road connection for '{to_id}'")
 
-    snap_id, snap_dist = _nearest_node(graph, lat, lng, adj, to_id)
+    snap_id, snap_dist = _nearest_node(graph, lat, lng, adj, to_id, accuracy_m)
     if snap_id is None:
         raise ValueError("Walkway graph has no nodes to snap to")
 

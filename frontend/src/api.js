@@ -49,9 +49,17 @@ export function getRoute(fromId, toId) {
 
 /** Same as getRoute, but starting from a live GPS coordinate instead of a
  *  named location — used to recalculate a route once the user has drifted
- *  off the original path. */
-export function getRouteFromCoords(lat, lng, toId) {
-  return getJSON(`/api/route?from_lat=${lat}&from_lng=${lng}&to_id=${encodeURIComponent(toId)}`)
+ *  off the original path.
+ *
+ *  `accuracyM`, when available, is passed through so the backend's nearest-
+ *  node snap can't trust a farther candidate any more than this specific
+ *  fix's own measured uncertainty allows — see utils/router.py
+ *  _nearest_node's docstring for why (root cause of the CSE-Annexure
+ *  shortcut bug). Omit it and the backend falls back to its previous,
+ *  unchanged default margin. */
+export function getRouteFromCoords(lat, lng, toId, accuracyM) {
+  const acc = accuracyM != null ? `&accuracy=${accuracyM}` : ''
+  return getJSON(`/api/route?from_lat=${lat}&from_lng=${lng}&to_id=${encodeURIComponent(toId)}${acc}`)
 }
 
 /** Road segments (with open/closed state) — reused on the frontend to

@@ -570,7 +570,7 @@ export default function Home() {
       routeFromFallbackRef.current = usedFallback
       const r = usedFallback
         ? await getRoute(ENTRY_ID, loc.id)
-        : await getRouteFromCoords(position.lat, position.lng, loc.id)
+        : await getRouteFromCoords(position.lat, position.lng, loc.id, accuracy)
       const landmarks = landmarksAlongPath(r.path, locations, roadSegments, [ENTRY_ID, loc.id])
       setPreviewRoutes([{ distanceM: r.distance_m, etaMinutes: r.eta_minutes, landmarks }])
       setRoutePath(r.path)
@@ -647,7 +647,7 @@ export default function Home() {
     let cancelled = false
     ;(async () => {
       try {
-        const r = await getRouteFromCoords(position.lat, position.lng, previewLoc.id)
+        const r = await getRouteFromCoords(position.lat, position.lng, previewLoc.id, accuracy)
         if (cancelled) return
         setRoutePath(r.path)
         setRouteDist(r.distance_m)
@@ -663,7 +663,7 @@ export default function Home() {
       }
     })()
     return () => { cancelled = true }
-  }, [position, previewLoc, navMode, setRoute])
+  }, [position, accuracy, previewLoc, navMode, setRoute])
 
   // Campus Copilot (Phase 1): start navigation directly from a chat card,
   // skipping the preview-panel step. Mirrors handleDirections +
@@ -682,7 +682,7 @@ export default function Home() {
       routeFromFallbackRef.current = usedFallback
       const r = usedFallback
         ? await getRoute(ENTRY_ID, loc.id)
-        : await getRouteFromCoords(position.lat, position.lng, loc.id)
+        : await getRouteFromCoords(position.lat, position.lng, loc.id, accuracy)
       voice.resetForNewRoute()
       setDestination(loc.id)
       setPreviewLoc(loc)

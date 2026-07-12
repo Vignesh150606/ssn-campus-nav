@@ -191,6 +191,7 @@ def get_route(
     to_id: str = Query(..., description="Destination location id, e.g. 'eee-block'"),
     from_lat: Optional[float] = Query(None, description="Live GPS latitude — used instead of from_id for on-the-move rerouting."),
     from_lng: Optional[float] = Query(None, description="Live GPS longitude — used instead of from_id for on-the-move rerouting."),
+    accuracy: Optional[float] = Query(None, description="Reported accuracy (metres) of from_lat/from_lng, if known. Used to sanity-check the nearest-node snap against a farther-but-cheaper-looking candidate — see utils/router.py _nearest_node."),
 ):
     """
     Walking route to a campus location.
@@ -213,7 +214,7 @@ def get_route(
 
     try:
         if using_coords:
-            result = _find_route_from_point(from_lat, from_lng, to_id)
+            result = _find_route_from_point(from_lat, from_lng, to_id, accuracy_m=accuracy)
             from_payload = {"id": None, "name": "Current location", "lat": from_lat, "lng": from_lng}
         else:
             a = data_access.get_location(from_id)
