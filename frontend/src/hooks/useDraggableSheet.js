@@ -43,7 +43,7 @@ const SNAP_ANIM_MS = 280
 const DRAG_ACTIVATE_PX = 4        // ignore sub-pixel jitter before committing to a drag
 const VELOCITY_FLING_PX_MS = 0.5  // fast flick threshold
 
-export function useDraggableSheet(snapPeeks, initialTier = 'collapsed', active = true) {
+export function useDraggableSheet(snapPeeks, initialTier = 'collapsed', active = true, boxHeight) {
   const sheetRef      = useRef(null)
   const rafRef         = useRef(null)
   const peekRef        = useRef(snapPeeks[initialTier])
@@ -58,7 +58,24 @@ export function useDraggableSheet(snapPeeks, initialTier = 'collapsed', active =
   const [tier, setTier]         = useState(initialTier)
   const [dragging, setDragging] = useState(false)
 
-  const maxH = Math.max(snapPeeks.collapsed, snapPeeks.half, snapPeeks.full)
+  // Priority 1 (Phase 4.8) root-cause fix — proven via runtime instrumentation
+  // (real Chrome, real drag, getBoundingClientRect vs --sheet-h at every
+  // frame): `maxH` here is the pivot for `translateY = maxH - peek`, so it
+  // must equal the sheet's TRUE, fixed CSS box height (`height: 86dvh` for
+  // the nav sheet) — that's the only thing translateY is actually measured
+  // against. It used to be inferred as `Math.max(collapsed, half, full)`,
+  // which is only correct if `full` always equals the box's real height.
+  // That assumption broke the moment the nav sheet's `full` tier started
+  // being capped below its natural 86dvh to avoid covering the turn-by-turn
+  // card (maxFullBeforeCollision in Home.jsx) — the capped `full` got used
+  // as the transform pivot too, so EVERY tier's rendered peek ended up
+  // taller than intended by exactly (true box height − capped full), with
+  // the floating controls' `bottom: calc(var(--sheet-h) + gap)` anchored to
+  // the (correct, uncapped) intended peek — hence a real, constant,
+  // gap-sized-or-larger overlap, confirmed at ~21px on a capped session.
+  // Callers whose `full` tier is never capped (preview/browse sheets) don't
+  // pass `boxHeight`, so they keep the exact previous (correct) behaviour.
+  const maxH = boxHeight ?? Math.max(snapPeeks.collapsed, snapPeeks.half, snapPeeks.full)
 
   const activeRef = useRef(active)
   useEffect(() => { activeRef.current = active }, [active])

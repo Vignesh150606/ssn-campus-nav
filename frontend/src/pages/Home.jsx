@@ -102,6 +102,11 @@ export default function Home() {
   const [routeEta, setRouteEta]           = useState(null)
   const [routeWarning, setRouteWarning]   = useState(null)
   const [routeError, setRouteError]       = useState(null)
+  // Priority 2 (Phase 4.8) — set whenever handleDirections/
+  // startNavigationFromCopilot had to fall back to routing from Main Gate
+  // because live GPS position wasn't available yet at request time. See
+  // the correction effect below (near handleStartNavigation) for why.
+  const routeFromFallbackRef              = useRef(false)
   const [followUser, setFollowUser]       = useState(false)
   const [loadError, setLoadError]         = useState(null)
   const [roadSegments, setRoadSegments]   = useState([])
@@ -215,9 +220,21 @@ export default function Home() {
       full: Math.min(Math.round(viewportH * 0.86), maxFullBeforeCollision),
     }
   }, [viewportH, turnCardBottom])
+  // Priority 1 (Phase 4.8) root-cause fix — the transform pivot passed to
+  // useDraggableSheet below must always be the sheet's TRUE, fixed CSS box
+  // height (`.nav-bottom-sheet { height: 86dvh }`), never the `full` tier's
+  // OWN peek target, because that target is deliberately capped just above
+  // (maxFullBeforeCollision) to keep the fully-expanded sheet clear of the
+  // turn-by-turn card — a completely different concern from "how tall is
+  // the box the transform is measured against". Conflating the two used to
+  // silently shrink the transform pivot for every tier (not just full),
+  // rendering the sheet measurably taller than any given peek intended —
+  // proven via runtime instrumentation, see useDraggableSheet.js. This is
+  // the same 86dvh expression as the sheet's own CSS, so it always matches.
+  const navSheetBoxHeight = Math.round(viewportH * 0.86)
   // Priority 1 (Phase 4.4): gate --sheet-h ownership to whichever sheet is
   // actually on screen — see useDraggableSheet.js header comment for why.
-  const navSheet = useDraggableSheet(navSheetPeeks, 'collapsed', navMode)
+  const navSheet = useDraggableSheet(navSheetPeeks, 'collapsed', navMode, navSheetBoxHeight)
   // Every fresh navigation session starts collapsed so the map is visible;
   // the user drags/taps up for more detail. Presentation-only — doesn't
   // touch routing/GPS.
@@ -549,9 +566,11 @@ export default function Home() {
     setRouteWarning(null)
     setRouteError(null)
     try {
-      const r = (tracking && position)
-        ? await getRouteFromCoords(position.lat, position.lng, loc.id)
-        : await getRoute(ENTRY_ID, loc.id)
+      const usedFallback = !(tracking && position)
+      routeFromFallbackRef.current = usedFallback
+      const r = usedFallback
+        ? await getRoute(ENTRY_ID, loc.id)
+        : await getRouteFromCoords(position.lat, position.lng, loc.id)
       const landmarks = landmarksAlongPath(r.path, locations, roadSegments, [ENTRY_ID, loc.id])
       setPreviewRoutes([{ distanceM: r.distance_m, etaMinutes: r.eta_minutes, landmarks }])
       setRoutePath(r.path)
@@ -606,6 +625,46 @@ export default function Home() {
     requestCompassPermission()
   }
 
+  // Priority 2 (Phase 4.8) root-cause fix — proven via runtime instrumentation:
+  // handleDirections/startNavigationFromCopilot above fall back to routing
+  // FROM MAIN GATE whenever the user taps a destination before their live
+  // GPS position has resolved. That's a common race, not an edge case —
+  // tracking starts the moment the app launches (see the effect below that
+  // calls startTracking() on mount), but a first fix can take several
+  // seconds on a real device, and a user who already knows where they're
+  // going often taps a destination well within that window. The
+  // Main-Gate-anchored route was never corrected once the real position
+  // did arrive, which is what actually produced "my location/route looks
+  // wrong at the start of navigation, then corrects a few seconds later" —
+  // confirmed by instrumenting the exact /api/route request made in that
+  // race. Fix: the instant `position` transitions from unavailable to
+  // available while the CURRENT route was actually built from that
+  // fallback, re-request it from the real position. This is event-driven
+  // off the position update itself — no guessed delay, no polling.
+  useEffect(() => {
+    if (!position || !routeFromFallbackRef.current || !previewLoc) return
+    routeFromFallbackRef.current = false
+    let cancelled = false
+    ;(async () => {
+      try {
+        const r = await getRouteFromCoords(position.lat, position.lng, previewLoc.id)
+        if (cancelled) return
+        setRoutePath(r.path)
+        setRouteDist(r.distance_m)
+        setRouteEta(r.eta_minutes)
+        setRouteWarning(r.warning || null)
+        // Only push into the live GPS-tracked route if navigation is
+        // actually underway — during the preview step there's no live
+        // route yet to update, just the preview numbers above.
+        if (navMode) setRoute(r.path, previewLoc.lat, previewLoc.lng, previewLoc.id)
+      } catch {
+        // Keep the existing (fallback) route rather than surface an error
+        // for a correction the user didn't explicitly ask for.
+      }
+    })()
+    return () => { cancelled = true }
+  }, [position, previewLoc, navMode, setRoute])
+
   // Campus Copilot (Phase 1): start navigation directly from a chat card,
   // skipping the preview-panel step. Mirrors handleDirections +
   // handleStartNavigation above but fetches the route and applies it in
@@ -619,9 +678,11 @@ export default function Home() {
     // user-gesture call stack.
     requestCompassPermission()
     try {
-      const r = (tracking && position)
-        ? await getRouteFromCoords(position.lat, position.lng, loc.id)
-        : await getRoute(ENTRY_ID, loc.id)
+      const usedFallback = !(tracking && position)
+      routeFromFallbackRef.current = usedFallback
+      const r = usedFallback
+        ? await getRoute(ENTRY_ID, loc.id)
+        : await getRouteFromCoords(position.lat, position.lng, loc.id)
       voice.resetForNewRoute()
       setDestination(loc.id)
       setPreviewLoc(loc)
