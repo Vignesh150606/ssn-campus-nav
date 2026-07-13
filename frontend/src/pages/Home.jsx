@@ -379,12 +379,16 @@ export default function Home() {
     return { icon: '✅', text: 'Navigation Ready' }
   }, [navMode, position, accuracy, headingUp, rawHeading, gpsCourse, compassSupported, compassNeedsPermission, compassPermissionState])
 
-  // Reset voice dedup on recalculation
+  // Reset voice dedup on recalculation — pass remainingPath so a turn that's
+  // still the immediate upcoming one after the reroute isn't re-announced
+  // (see useVoiceGuidance.js resetForNewRoute for the full reasoning).
   const prevRecalcVersionRef = useRef(recalcVersion)
+  const remainingPathRef = useRef(remainingPath)
+  remainingPathRef.current = remainingPath
   useEffect(() => {
     if (recalcVersion !== prevRecalcVersionRef.current) {
       prevRecalcVersionRef.current = recalcVersion
-      voice.resetForNewRoute()
+      voice.resetForNewRoute(remainingPathRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recalcVersion, voice.resetForNewRoute])

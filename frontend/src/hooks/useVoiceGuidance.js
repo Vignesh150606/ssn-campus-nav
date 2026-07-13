@@ -82,10 +82,39 @@ export function useVoiceGuidance({ tracking, hasRoute, remainingDist, remainingP
     return () => { if (supported) window.speechSynthesis.cancel() }
   }, [supported])
 
-  const resetForNewRoute = useCallback(() => {
-    spokenKeys.current = new Set()
+  // Bug found during production verification, reproducible from the code
+  // (not observed live): a reroute can legitimately fire while a turn is
+  // already inside its PRE_ANNOUNCE_M/CONFIRM_ANNOUNCE_M window — cutting a
+  // corner during a turn is exactly the kind of deviation that trips
+  // off-route detection, so this isn't a rare edge case, it's the most
+  // likely moment for a reroute to happen. If the recalculated route still
+  // has the same immediate upcoming turn (same point, which it usually
+  // does — a reroute around a temporary deviation typically rejoins the
+  // same path), wiping the whole spokenKeys set here causes that turn's
+  // pre-announcement or confirm ("Turn left now") to fire a second time
+  // seconds after the first, which sounds like a bug to the user even
+  // though each individual announcement was itself correctly deduplicated.
+  //
+  // Fix: prune away keys for turns that are no longer upcoming (so a
+  // genuinely new route still announces its new turns fresh), but keep
+  // keys tied to whichever turn is still the immediate upcoming one, so
+  // that turn isn't re-announced just because the route object changed.
+  const resetForNewRoute = useCallback((newRemainingPath) => {
+    const currentTurn = newRemainingPath ? computeUpcomingTurn(newRemainingPath) : null
+    const currentKey = currentTurn ? `${currentTurn.lat.toFixed(5)},${currentTurn.lng.toFixed(5)}` : null
+    const preserve = new Set(['nav-started'])
+    if (currentKey) {
+      preserve.add(`pre-${currentKey}`)
+      preserve.add(`confirm-${currentKey}`)
+    }
+    spokenKeys.current = new Set([...spokenKeys.current].filter(k => preserve.has(k)))
     offRouteSpoken.current = false
-    lastHadTurnRef.current = null
+    // Same reasoning as above: if we already know whether the new path is
+    // currently in a turn or a straight stretch, reflect that directly
+    // instead of resetting to null, which would otherwise re-fire
+    // "Continue straight" immediately after a reroute that didn't actually
+    // change the straight-vs-turn state.
+    lastHadTurnRef.current = newRemainingPath ? !!currentTurn : null
   }, [])
 
   const announceNavigationStart = useCallback(() => {

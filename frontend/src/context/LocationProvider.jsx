@@ -268,6 +268,11 @@ export function LocationProvider({ children }) {
     }
 
     // ── ACCEPT ─────────────────────────────────────────────────────────────
+    // A valid fix reaching here proves the watch has recovered from any
+    // prior transient error (see the watchPosition error handler above),
+    // so clear a stale "GPS: timeout" message rather than leaving it
+    // displayed after GPS has actually come back.
+    setError(null)
     if (accuracyM !== null) {
       if (bestAccuracyRef.current === null || accuracyM < bestAccuracyRef.current) {
         bestAccuracyRef.current = accuracyM
@@ -392,9 +397,30 @@ export function LocationProvider({ children }) {
       (pos) => processPosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.speed, pos.coords.heading),
       (err) => {
         setError(`GPS: ${err.message}`)
-        setTracking(false)
-        // code 1 === GeolocationPositionError.PERMISSION_DENIED
-        setPermissionDenied(err.code === 1)
+        // Bug found during production verification (Section 4 — GPS loss /
+        // recovery), reproducible from the code: watchPosition's error
+        // callback can fire for a transient condition (code 2
+        // POSITION_UNAVAILABLE, code 3 TIMEOUT — both common indoors or
+        // near buildings) without the underlying watch actually stopping;
+        // per the Geolocation API, the browser keeps calling this same
+        // watch and can resume firing the success callback once a fix is
+        // available again. But processPosition (the success callback)
+        // never sets `tracking` back to true or clears `error` — nothing
+        // does, anywhere, except the various start()-style functions. So
+        // flipping `tracking` off here for a transient error left the UI
+        // (voice guidance, heading-up, live route updates, the "Tracking"
+        // indicator — all gated on `tracking`) permanently believing GPS
+        // had failed even after it silently recovered, until the user
+        // noticed and manually re-toggled tracking.
+        //
+        // code 1 === GeolocationPositionError.PERMISSION_DENIED is
+        // different — the browser will never call this watch again
+        // without the user re-granting permission, so tracking really has
+        // stopped and turning it off here is correct.
+        if (err.code === 1) {
+          setTracking(false)
+          setPermissionDenied(true)
+        }
       },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
     )
