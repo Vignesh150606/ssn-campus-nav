@@ -105,9 +105,10 @@ def _stitch(adj, seq):
 
 NEAREST_NODE_CANDIDATES = 8  # how many closest-by-distance nodes to weigh by total route cost
 SNAP_MARGIN_M = 30           # only weigh candidates within this many extra metres of the single closest node
+STICKY_MIN_MARGIN_M = 20     # an alternative must beat the in-progress route's node by more than this to win
 
 
-def _nearest_node(graph, lat, lng, adj=None, to_id=None, accuracy_m=None):
+def _nearest_node(graph, lat, lng, adj=None, to_id=None, accuracy_m=None, prefer_node_id=None):
     """Nearest walkway node to an arbitrary GPS point.
 
     465 nodes on this campus graph, so a plain scan (no spatial index) is
@@ -168,6 +169,36 @@ def _nearest_node(graph, lat, lng, adj=None, to_id=None, accuracy_m=None):
     Without `adj`/`to_id` (e.g. called for something other than routing
     toward a specific destination), falls back to plain nearest-by-distance.
 
+    `prefer_node_id`, when supplied, is the node the *currently in-progress*
+    route was already snapped to (see find_route_from_point's caller in
+    LocationProvider.jsx — it remembers the last reroute's `snapped_to` and
+    passes it back in on the next one). This addresses a second, distinct
+    failure mode found via a follow-up bug report in this exact IT Block /
+    CSE Annexure area, after the fix above: two node clusters (e.g. one
+    reached via n_126, the other via n_47) can have comparable — but not
+    identical — total cost to the same destination, on either side of a
+    walkway that has no single obviously-closest entry point (the true
+    nearest node, e.g. n_190 here, is itself a poor/long route and never
+    wins; the real contest is between two *other* shortlisted candidates).
+    Because SNAP_MARGIN_M shortlisting is a hard cutoff, a several-metre
+    GPS-noise shift is enough for one of those candidates to fall in or out
+    of range of "within SNAP_MARGIN_M of the closest node" — and the moment
+    it does, the total-cost winner can flip by more than the position
+    actually moved (measured against the real graph: n_126 vs n_47 swap for
+    a ~12m total-cost gap on a ~5m position shift). The existing sanity
+    check above doesn't catch this, because it only compares the single
+    closest-by-distance node against the winner — here the closest-by-
+    distance node (n_190) is neither the previous nor the new winner, it's
+    a third candidate that loses to both. Root-cause fix: once a route is
+    already committed to a node, don't hand it to a different one for a
+    marginal win — require the alternative to beat it by more than
+    STICKY_MIN_MARGIN_M (chosen with headroom above that ~12m observed
+    swing). The preferred node still has to be a real, currently-nearby,
+    reachable candidate (within SNAP_MARGIN_M of the closest node, same as
+    every other candidate) — this is a tie-breaker among genuinely close
+    options, not a way to keep routing through a node the user has since
+    walked away from.
+
     Returns (node_id, distance_m) or (None, None) if the graph has no nodes.
     """
     candidates = []
@@ -207,6 +238,25 @@ def _nearest_node(graph, lat, lng, adj=None, to_id=None, accuracy_m=None):
         if extra_snap > accuracy_m and improvement < extra_snap:
             best_id, best_total, best_snap_dist = closest_id, closest_total, closest_snap_dist
 
+    # Route-continuity stickiness — see docstring above for the follow-up
+    # failure mode this addresses (candidate-set-membership instability
+    # between two comparably-costed branches, distinct from the
+    # closest-vs-best check just above). Only kicks in once we already have
+    # a route in progress (prefer_node_id supplied) and only holds onto it
+    # while it's still a genuinely nearby, reachable candidate — this is a
+    # tie-breaker among close options, not a way to keep routing through a
+    # node the user has actually walked away from.
+    if prefer_node_id is not None and best_id is not None and prefer_node_id != best_id:
+        prefer_entry = next((c for c in candidates if c[1] == prefer_node_id), None)
+        if prefer_entry is not None and prefer_entry[0] <= nearest_dist + SNAP_MARGIN_M:
+            prefer_d = prefer_entry[0]
+            prefer_dist, _ = _dijkstra(adj, prefer_node_id, to_id)
+            prefer_route_dist = prefer_dist.get(to_id)
+            if prefer_route_dist is not None:
+                prefer_total = prefer_d + prefer_route_dist
+                if best_total >= prefer_total - STICKY_MIN_MARGIN_M:
+                    best_id, best_total, best_snap_dist = prefer_node_id, prefer_total, prefer_d
+
     if best_id is None:
         # None of the nearby candidates can reach to_id — fall back to the
         # plain closest node so we still return *something* usable; the
@@ -227,7 +277,8 @@ def _point_dist(lat1, lng1, lat2, lng2):
     return 2*R*math.asin(math.sqrt(a))
 
 
-def find_route_from_point(lat: float, lng: float, to_id: str, accuracy_m: float = None) -> dict:
+def find_route_from_point(lat: float, lng: float, to_id: str, accuracy_m: float = None,
+                           prefer_node_id: str = None) -> dict:
     """Same as find_route(), but starts from an arbitrary GPS coordinate
     instead of a named location id — used for automatic reroute-on-deviation,
     where the user's live position is rarely exactly on a graph node.
@@ -248,6 +299,14 @@ def find_route_from_point(lat: float, lng: float, to_id: str, accuracy_m: float 
     but-"accurate-enough" fix near a destination's own connector node can
     win the tie-break on paper while its snap segment silently cuts through
     whatever's physically in the way.
+
+    `prefer_node_id`, when supplied, is the node the in-progress route was
+    last snapped to (the caller's own previous `snapped_to`) — also passed
+    straight through to `_nearest_node`, where it prevents a route from
+    flipping between two comparably-costed branches on nothing more than a
+    few metres of GPS noise. See `_nearest_node`'s docstring for the
+    worked example (the IT Block / CSE Annexure area again — a follow-up
+    report after the fix above).
     """
     graph, segs = _load()
     adj         = _build_adj(graph, segs, to_id)
@@ -255,7 +314,7 @@ def find_route_from_point(lat: float, lng: float, to_id: str, accuracy_m: float 
     if to_id not in adj:
         raise ValueError(f"No road connection for '{to_id}'")
 
-    snap_id, snap_dist = _nearest_node(graph, lat, lng, adj, to_id, accuracy_m)
+    snap_id, snap_dist = _nearest_node(graph, lat, lng, adj, to_id, accuracy_m, prefer_node_id)
     if snap_id is None:
         raise ValueError("Walkway graph has no nodes to snap to")
 

@@ -56,10 +56,20 @@ export function getRoute(fromId, toId) {
  *  fix's own measured uncertainty allows — see utils/router.py
  *  _nearest_node's docstring for why (root cause of the CSE-Annexure
  *  shortcut bug). Omit it and the backend falls back to its previous,
- *  unchanged default margin. */
-export function getRouteFromCoords(lat, lng, toId, accuracyM) {
-  const acc = accuracyM != null ? `&accuracy=${accuracyM}` : ''
-  return getJSON(`/api/route?from_lat=${lat}&from_lng=${lng}&to_id=${encodeURIComponent(toId)}${acc}`)
+ *  unchanged default margin.
+ *
+ *  `preferNodeId`, when available, is the walkway node the in-progress
+ *  route was last snapped to (this call's response also returns
+ *  `snapped_to` — callers doing live rerouting should hold onto it and
+ *  pass it back in here next time). This stops a route from flipping
+ *  between two similarly-costed branches on a few metres of GPS noise
+ *  alone — see the same docstring for the follow-up bug this fixes. Omit
+ *  it for a fresh, one-off route request (nothing to stay consistent
+ *  with yet). */
+export function getRouteFromCoords(lat, lng, toId, accuracyM, preferNodeId) {
+  const acc    = accuracyM != null ? `&accuracy=${accuracyM}` : ''
+  const prefer = preferNodeId ? `&prefer_node=${encodeURIComponent(preferNodeId)}` : ''
+  return getJSON(`/api/route?from_lat=${lat}&from_lng=${lng}&to_id=${encodeURIComponent(toId)}${acc}${prefer}`)
 }
 
 /** Road segments (with open/closed state) — reused on the frontend to

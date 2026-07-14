@@ -149,6 +149,14 @@ export function LocationProvider({ children }) {
   const simPositionRef   = useRef(null)  // mirrors simPosition for sync reads
   const recalculatingRef = useRef(false) // guards against overlapping reroute requests
   const lastRecalcAtRef  = useRef(0)     // Date.now() of the last reroute attempt (cooldown)
+  // The walkway node the most recent reroute snapped to (see main.py's
+  // route response `snapped_to`) — fed back into the next reroute request
+  // as `prefer_node` so it doesn't flip to a different, similarly-costed
+  // branch on GPS noise alone. Reset to null whenever a route starts or
+  // ends, so a fresh navigation never inherits a stale hint from a
+  // previous one. See utils/router.py _nearest_node's docstring (the
+  // "route-continuity stickiness" section) for the bug this fixes.
+  const lastSnappedNodeRef = useRef(null)
   // Mirrors `offRoute` state for synchronous reads inside processPosition,
   // which is a stable useCallback (deps: [maybeRecalculate]) — reading the
   // `offRoute` state variable directly there would close over a stale
@@ -203,9 +211,20 @@ export function LocationProvider({ children }) {
     // the building gap between them. accuracyM is this exact fix's own
     // measured uncertainty — passing it through lets the backend bound its
     // snap tie-break by it instead of always using its wider flat default.
-    getRouteFromCoords(lat, lng, destRef.current.id, accuracyM)
+    //
+    // Follow-up bug, same area: even with the fix above, two *comparably*
+    // costed branches (e.g. one via n_126, the other via n_47) could still
+    // flip which one wins on a few metres of GPS noise, because neither is
+    // an implausible long-jump candidate — they're both perfectly
+    // reasonable, just on either side of a walkway with no single obvious
+    // closest entry point. lastSnappedNodeRef is this route's own previous
+    // snapped_to; passing it as prefer_node lets the backend hold onto it
+    // unless the alternative wins by a clear margin, instead of re-deciding
+    // that close call from scratch on every single reroute.
+    getRouteFromCoords(lat, lng, destRef.current.id, accuracyM, lastSnappedNodeRef.current)
       .then((r) => {
         routeRef.current  = r.path
+        lastSnappedNodeRef.current = r.snapped_to ?? null
         announced.current = new Set() // fresh route -> distance thresholds can fire again
         setRemainingPath(r.path)
         setRemainingDist(Math.round(r.distance_m))
@@ -479,6 +498,7 @@ export function LocationProvider({ children }) {
     acquireDeadlineRef.current = null                      // Priority 2 (Phase 4.7)
     routeRef.current = null
     destRef.current = null
+    lastSnappedNodeRef.current = null
     setActiveDestination(null)
     announced.current = new Set()
     setRemainingPath(null)
@@ -498,6 +518,7 @@ export function LocationProvider({ children }) {
     stopAutoWalkInternal()
     routeRef.current  = path
     destRef.current   = { lat: destLat, lng: destLng, id: destId ?? null }
+    lastSnappedNodeRef.current = null
     setActiveDestination(destRef.current)
     announced.current = new Set()
     walkedMetersRef.current = 0
@@ -518,6 +539,7 @@ export function LocationProvider({ children }) {
     stopAutoWalkInternal()
     routeRef.current = null
     destRef.current  = null
+    lastSnappedNodeRef.current = null
     setActiveDestination(null)
     announced.current = new Set()
     walkedMetersRef.current = 0

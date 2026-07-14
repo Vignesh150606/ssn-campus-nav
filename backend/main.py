@@ -192,6 +192,7 @@ def get_route(
     from_lat: Optional[float] = Query(None, description="Live GPS latitude — used instead of from_id for on-the-move rerouting."),
     from_lng: Optional[float] = Query(None, description="Live GPS longitude — used instead of from_id for on-the-move rerouting."),
     accuracy: Optional[float] = Query(None, description="Reported accuracy (metres) of from_lat/from_lng, if known. Used to sanity-check the nearest-node snap against a farther-but-cheaper-looking candidate — see utils/router.py _nearest_node."),
+    prefer_node: Optional[str] = Query(None, description="The walkway node id the in-progress route was last snapped to (its own previous 'snapped_to'), if any. Used to avoid flipping between two comparably-costed branches on GPS noise alone — see utils/router.py _nearest_node."),
 ):
     """
     Walking route to a campus location.
@@ -214,7 +215,7 @@ def get_route(
 
     try:
         if using_coords:
-            result = _find_route_from_point(from_lat, from_lng, to_id, accuracy_m=accuracy)
+            result = _find_route_from_point(from_lat, from_lng, to_id, accuracy_m=accuracy, prefer_node_id=prefer_node)
             from_payload = {"id": None, "name": "Current location", "lat": from_lat, "lng": from_lng}
         else:
             a = data_access.get_location(from_id)
@@ -233,6 +234,7 @@ def get_route(
         "path":        result["path"],
         "source":      result.get("source", "local"),
         "warning":     result.get("warning"),
+        "snapped_to":  result.get("snapped_to"),
     }
 
 
