@@ -11,21 +11,8 @@ import LocationDeepLink from './pages/LocationDeepLink.jsx'
 import BootGate from './components/BootGate.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { LocationProvider } from './context/LocationProvider.jsx'
-import { dlog } from './utils/debugLog.js'
-
-// ── TEMPORARY diagnostics — see utils/debugLog.js for how to use these ──
-dlog('main.jsx', 'Module executing — about to call createRoot().render()')
 
 if ('serviceWorker' in navigator) {
-  dlog('SW', 'Initial navigator.serviceWorker.controller =', navigator.serviceWorker.controller)
-  navigator.serviceWorker.getRegistrations().then((regs) => {
-    dlog('SW', `${regs.length} registration(s) found`, regs.map(r => ({
-      scope: r.scope,
-      active: r.active?.state,
-      waiting: !!r.waiting,
-      installing: !!r.installing,
-    })))
-  })
   // Fires the moment a (possibly NEW) service worker takes control of this
   // page WITHOUT a reload — this is the exact mechanism `clientsClaim: true`
   // in vite.config.js's Workbox setup enables, and the prime suspect for
@@ -50,7 +37,6 @@ if ('serviceWorker' in navigator) {
   // guards against a reload loop if this fires more than once.
   let refreshing = false
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    dlog('SW', '⚠ controllerchange fired — a service worker just took control of this page without a reload. New controller:', navigator.serviceWorker.controller)
     if (refreshing) return
     refreshing = true
     window.location.reload()
@@ -78,5 +64,3 @@ createRoot(document.getElementById('root')).render(
     </ErrorBoundary>
   </StrictMode>,
 )
-
-dlog('main.jsx', 'render() call returned (sync render scheduled)')

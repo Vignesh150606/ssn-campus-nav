@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { API_BASE } from '../api'
 import { LOCATION_NAME_OVERRIDES } from '../constants'
-import { dlog, dwarn } from '../utils/debugLog'
 import PosterManager from '../components/PosterManager'
 import VenueMenuAdmin from '../components/VenueMenuAdmin'
 
@@ -135,8 +134,6 @@ export default function AdminDashboard() {
   // Phase 4.2: which event card has its poster manager open
   const [expandedEventId, setExpandedEventId] = useState(null)
 
-  dlog('AdminDashboard/render', 'component body executing — token:', token ? '(present)' : '(none)', 'checkingSession:', checkingSession, 'authed:', authed)
-
   function flash(text, isErr=false) {
     if (isErr) setError(text); else setMsg(text)
     setTimeout(()=>{ setError(null); setMsg(null) }, 4000)
@@ -145,42 +142,33 @@ export default function AdminDashboard() {
   // Phase 3 — if a JWT from a previous session is still in sessionStorage,
   // try it once on mount instead of forcing a fresh login every refresh.
   useEffect(() => {
-    dlog('AdminDashboard/effect', 'session-check effect started — token present:', !!token)
-    if (!token) { dlog('AdminDashboard/effect', 'no stored token — skipping verify, checkingSession=false'); setCheckingSession(false); return }
+    if (!token) { setCheckingSession(false); return }
     let cancelled = false
-    dlog('AdminDashboard/fetch', 'adminFetch GET /api/admin/events (verifying stored token)')
-    const startedAt = performance.now()
     adminFetch('/api/admin/events', 'GET', null, token)
       .then(data => {
-        const ms = (performance.now() - startedAt).toFixed(0)
-        if (cancelled) { dlog('AdminDashboard/fetch', `resolved after ${ms}ms but cancelled — ignoring`); return }
-        dlog('AdminDashboard/fetch', `✅ session verified after ${ms}ms — ${data?.length ?? 0} events, setting authed=true`)
+        if (cancelled) return
         setEvents(data); setAuthed(true)
         fetch(`${API_BASE}/api/road-segments`).then(r=>r.json()).then((s) => { if (!cancelled) setSegments(s) })
         fetch(`${API_BASE}/api/locations`).then(r=>r.json()).then((v) => { if (!cancelled) setVenues(v) })
       })
       .catch((e) => {
-        const ms = (performance.now() - startedAt).toFixed(0)
-        if (cancelled) { dwarn('AdminDashboard/fetch', `REJECTED after ${ms}ms but cancelled — ignoring:`, e.message); return }
-        dwarn('AdminDashboard/fetch', `❌ session verify REJECTED after ${ms}ms — status:`, e.status, 'message:', e.message)
+        if (cancelled) return
         // Phase 4A.1 fix: only treat this as "your session is invalid" on a
         // real 401/403 from the server. A network/cold-start failure
         // (status 0, or no status at all) means we simply couldn't ask —
         // wiping a perfectly good token in that case used to force a
         // needless re-login the moment Render's free tier was asleep.
         if (e.status === 401 || e.status === 403) {
-          dlog('AdminDashboard/fetch', '401/403 — clearing stored token')
           sessionStorage.removeItem(TOKEN_STORAGE_KEY)
           setToken('')
         } else {
-          dlog('AdminDashboard/fetch', 'non-auth failure — keeping token, showing retry message')
           flash('Could not verify your session — please retry or sign in again.', true)
         }
       })
       .finally(() => {
-        if (!cancelled) { dlog('AdminDashboard/effect', 'finally — setCheckingSession(false)'); setCheckingSession(false) }
+        if (!cancelled) setCheckingSession(false)
       })
-    return () => { dlog('AdminDashboard/effect', 'cleanup — cancelled=true'); cancelled = true }
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -293,7 +281,6 @@ export default function AdminDashboard() {
   const pill = {padding:'6px 14px',borderRadius:999,fontFamily:'var(--font-display)',fontWeight:600,fontSize:'0.78rem',cursor:'pointer'}
 
   if (checkingSession) {
-    dlog('AdminDashboard/render', '→ taking CHECKING-SESSION branch (spinner)')
     return (
     <div className="admin-fullpage">
       <div className="boot-gate-spinner" aria-hidden="true" />
@@ -302,7 +289,6 @@ export default function AdminDashboard() {
   )}
 
   if (!authed) {
-    dlog('AdminDashboard/render', '→ taking LOGIN FORM branch')
     return (
     <div className="admin-fullpage">
       <div style={{fontFamily:'var(--font-display)',fontSize:'1.3rem',fontWeight:700}}>Admin Login</div>
@@ -325,8 +311,6 @@ export default function AdminDashboard() {
       </button>
     </div>
   )}
-
-  dlog('AdminDashboard/render', `→ taking AUTHENTICATED DASHBOARD branch — ${events?.length ?? 0} events, ${segments?.length ?? 0} segments, tab=${tab}`)
 
   return (
     <div style={{height:'100%',overflow:'hidden',display:'flex',flexDirection:'column'}}>

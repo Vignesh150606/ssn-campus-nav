@@ -78,7 +78,6 @@ nav_v2/
         │   ├── SearchBar.jsx, CategoryChips.jsx, LocationCard.jsx
         │   ├── RoutePreviewPanel.jsx, NearbyFacilities.jsx
         │   ├── NavCompass.jsx, CompassWidget.jsx, NavSettingsPanel.jsx
-        │   ├── VoiceSettingsPanel.jsx
         │   ├── VenueMenuCard.jsx / VenueMenuInline.jsx / VenueMenuAdmin.jsx
         │   ├── PosterManager.jsx     # admin event image/poster upload
         │   ├── BootGate.jsx           # startup health-check / cold-start screen

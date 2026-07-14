@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { getEvents } from '../api'
 import { FEST_META, displayLocationName } from '../constants'
 import { SkeletonScheduleList } from '../components/Skeleton'
-import { dlog, dwarn } from '../utils/debugLog'
 
 const POLL_INTERVAL_MS = 20_000  // re-fetch every 20 s so new approved events appear
 
@@ -77,17 +76,10 @@ function venueName(event) {
 }
 
 export default function EventsList() {
-  const [events, setEvents] = useState(() => {
-    const cached = loadEventsCache()
-    dlog('EventsList/init', 'useState initializer — loadEventsCache() returned:', cached ? `${cached.length} cached events` : 'null (no cache)')
-    return cached || null
-  })
+  const [events, setEvents] = useState(() => loadEventsCache() || null)
   const [error, setError] = useState(null)
 
-  dlog('EventsList/render', 'component body executing — events =', events === null ? 'null' : `array(${events.length})`, ' error =', error)
-
   useEffect(() => {
-    dlog('EventsList/effect', 'mount effect started (this should fire exactly once per mount)')
     // Phase 4A.1 fix: fetchEvents now lives entirely inside this effect
     // instead of a useCallback with an empty dependency array. The old
     // version's catch handler decided which error to show by reading the
@@ -101,27 +93,15 @@ export default function EventsList() {
     let cancelled = false
 
     function fetchEvents() {
-      dlog('EventsList/fetch', 'getEvents() called — GET', '/api/events')
-      const startedAt = performance.now()
       getEvents()
         .then((data) => {
-          const ms = (performance.now() - startedAt).toFixed(0)
-          if (cancelled) {
-            dlog('EventsList/fetch', `getEvents() resolved after ${ms}ms with ${data?.length ?? 0} events, but effect was already cancelled (component unmounted/re-ran) — ignoring`)
-            return
-          }
-          dlog('EventsList/fetch', `✅ getEvents() resolved after ${ms}ms with ${data?.length ?? 0} events — calling setEvents()`)
+          if (cancelled) return
           setEvents(data)
           setError(null)
           saveEventsCache(data)
         })
         .catch((e) => {
-          const ms = (performance.now() - startedAt).toFixed(0)
-          if (cancelled) {
-            dwarn('EventsList/fetch', `getEvents() REJECTED after ${ms}ms (cancelled, ignoring):`, e.message)
-            return
-          }
-          dwarn('EventsList/fetch', `❌ getEvents() REJECTED after ${ms}ms:`, e.message, e)
+          if (cancelled) return
           // API failed — keep showing whatever's already on screen (cache
           // or a prior successful fetch) and only surface the error if
           // there's genuinely nothing to show. `cur` is the real current
@@ -141,7 +121,6 @@ export default function EventsList() {
     window.addEventListener('campus:eventApproved', handleAdminApproval)
 
     return () => {
-      dlog('EventsList/effect', 'cleanup running (unmount or re-run) — setting cancelled=true')
       cancelled = true
       clearInterval(interval)
       window.removeEventListener('campus:eventApproved', handleAdminApproval)
@@ -149,11 +128,9 @@ export default function EventsList() {
   }, [])
 
   if (error && (!events || events.length === 0)) {
-    dlog('EventsList/render', '→ taking ERROR branch:', error)
     return <div className="state-message">{error}</div>
   }
   if (!events) {
-    dlog('EventsList/render', '→ taking SKELETON branch (events is still null)')
     return (
       <div className="schedule-scroll-container">
         <div className="schedule-page">
@@ -164,7 +141,6 @@ export default function EventsList() {
     )
   }
 
-  dlog('EventsList/render', `→ taking REAL CONTENT branch with ${events.length} events`)
   return (
     // P2 — .schedule-scroll-container gives this page its own overflow-y: auto
     // so the full list scrolls naturally on mobile (no clipped cards).

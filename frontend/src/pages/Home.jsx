@@ -436,19 +436,33 @@ export default function Home() {
   // LocationDeepLink.jsx fetches the location then navigates here with
   // state.deepLinkLocation set. We pick it up once on mount and open
   // the route preview sheet exactly as if the user tapped the card.
+  //
+  // Bug found during production verification: this comment always said
+  // "wait for locations to load before calling handleDirections", but the
+  // code never actually did — it called handleDirections(loc) immediately
+  // on mount, before the getLocations() fetch below could possibly have
+  // resolved (fetches are async; they can't settle before sibling mount
+  // effects finish running). handleDirections uses locations/roadSegments
+  // to compute landmarksAlongPath() for the preview, so every
+  // /location/:id share-link open silently got an empty "Route passes"
+  // list — and since previewRoutes is only ever computed this one time,
+  // it never refilled once locations *did* load moments later. Root-cause
+  // fix: actually gate on locations having settled (loaded or failed)
+  // before consuming the deep link. deepLinkConsumedRef — not the effect's
+  // dependency array — is what keeps this a one-time action, so a later
+  // locations reload can't re-fire it and reset an unrelated in-progress
+  // preview.
+  const deepLinkConsumedRef = useRef(false)
   useEffect(() => {
     const loc = routerLocation.state?.deepLinkLocation
-    if (loc && loc.id) {
-      // Clear the state so a back-navigation doesn't re-trigger this
-      window.history.replaceState({}, '')
-      // Wait for locations to load before calling handleDirections
-      // (handleDirections itself is stable; the locations list is used
-      //  for landmark labels but isn't required for the route fetch)
-      handleDirections(loc)
-    }
-  // Only run on mount — handleDirections is defined below but is stable
+    if (!loc || !loc.id || deepLinkConsumedRef.current) return
+    if (locations.length === 0 && !loadError) return // still loading — wait
+    deepLinkConsumedRef.current = true
+    // Clear the state so a back-navigation doesn't re-trigger this
+    window.history.replaceState({}, '')
+    handleDirections(loc)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [locations, loadError])
 
   useEffect(() => {
     getRoadSegments().then(setRoadSegments).catch(() => {})

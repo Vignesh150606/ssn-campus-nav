@@ -1,7 +1,6 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom'
+import { Outlet, NavLink } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import DevLocationPanel from './components/DevLocationPanel'
-import { dlog } from './utils/debugLog'
 
 // Dark mode hook — persists to localStorage, respects system preference
 function useTheme() {
@@ -17,23 +16,12 @@ function useTheme() {
     const metas = document.querySelectorAll('meta[name="theme-color"]')
     const color = theme === 'dark' ? '#003b7a' : '#003b7a'
     metas.forEach((m) => m.setAttribute('content', color))
-    dlog('App/theme', 'Theme initialized + applied to <html data-theme>:', theme)
   }, [theme])
   return [theme, () => setTheme(t => (t === 'dark' ? 'light' : 'dark'))]
 }
 
 export default function App() {
   const [theme, toggleTheme] = useTheme()
-  const location = useLocation()
-
-  // Fires on every client-side route change (including the very first
-  // render's "navigation"). Confirms the Router has actually settled on a
-  // path and App + its children are about to render for that path.
-  useEffect(() => {
-    dlog('App/router', 'Route is now:', location.pathname)
-  }, [location.pathname])
-
-  dlog('App/render', 'App component body executing for path:', location.pathname)
 
   return (
     <div className="app-shell">

@@ -381,6 +381,17 @@ export function LocationProvider({ children }) {
   // Real GPS
   // ---------------------------------------------------------------------
   const startRealWatch = useCallback(() => {
+    // Idempotency guard — every call site assumes start()/startTracking()
+    // is a no-op if a watch is already running, but nothing previously
+    // enforced that here. navigator.geolocation.watchPosition() does not
+    // dedupe: calling it again while a watch is already active creates a
+    // second, fully independent subscription and leaks the first one's ID
+    // (watchId.current only ever holds the latest, so stopRealWatch() can
+    // only ever clear one of them). Most call sites guard with
+    // `if (!tracking)`, but that's racy against React's async state
+    // updates, and the "Retry" button in the location-permission banner
+    // has no guard at all — reachable via an ordinary fast double-tap.
+    if (watchId.current !== null) return
     if (!navigator.geolocation) {
       setError('Geolocation not supported on this device.')
       return

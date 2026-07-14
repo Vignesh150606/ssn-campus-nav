@@ -22,7 +22,6 @@
  */
 import { useEffect, useState } from 'react'
 import { checkHealth } from '../api'
-import { dlog } from '../utils/debugLog'
 
 const SLOW_MESSAGE_AFTER_MS = 22_000
 const GIVE_UP_AFTER_MS = 60_000
@@ -35,41 +34,30 @@ const EVENTS_CACHE_KEY = 'ssn_campus_events_v1'
 
 function seedEventsCache() {
   const base = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'
-  dlog('BootGate/seed', 'background-fetching /api/events to warm the cache before EventsList ever mounts')
   fetch(`${base}/api/events`)
     .then((r) => (r.ok ? r.json() : null))
     .then((data) => {
-      if (!Array.isArray(data) || data.length === 0) {
-        dlog('BootGate/seed', 'prefetch returned no usable data — not caching')
-        return
-      }
+      if (!Array.isArray(data) || data.length === 0) return
       try {
         localStorage.setItem(EVENTS_CACHE_KEY, JSON.stringify({ data, ts: Date.now() }))
-        dlog('BootGate/seed', `✅ cached ${data.length} events ahead of time`)
       } catch { /* storage quota — silently ignore */ }
     })
-    .catch((e) => dlog('BootGate/seed', 'prefetch failed (non-fatal, EventsList will fetch normally):', e.message))
+    .catch(() => { /* non-fatal — EventsList will fetch normally */ })
 }
 
 export default function BootGate({ children }) {
   const [status, setStatus] = useState('checking') // checking | slow | ready | failed
   const [retryKey, setRetryKey] = useState(0)
 
-  dlog('BootGate/render', 'status =', status)
-
   useEffect(() => {
-    dlog('BootGate', 'mounted — starting health check loop (retryKey=' + retryKey + ')')
     let cancelled = false
     let attemptTimer = null
 
     async function attempt() {
       if (cancelled) return
-      dlog('BootGate', 'health check attempt starting…')
       const ok = await checkHealth(ATTEMPT_TIMEOUT_MS)
       if (cancelled) return
-      dlog('BootGate', 'health check result:', ok)
       if (ok) {
-        dlog('BootGate', '✅ READY — about to render children (App/Router/Home etc.)')
         seedEventsCache()
         setStatus('ready')
         return

@@ -16,7 +16,6 @@
  * narrows the search to the data/fetch layer instead.
  */
 import { Component } from 'react'
-import { dwarn } from '../utils/debugLog'
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -26,11 +25,6 @@ export default class ErrorBoundary extends Component {
 
   static getDerivedStateFromError(error) {
     return { error }
-  }
-
-  componentDidCatch(error, info) {
-    // TEMPORARY diagnostic — see utils/debugLog.js
-    dwarn('ErrorBoundary', 'CAUGHT A RENDER CRASH:', error?.message || error, info?.componentStack)
   }
 
   render() {
