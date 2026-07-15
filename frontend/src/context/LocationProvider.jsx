@@ -221,7 +221,10 @@ export function LocationProvider({ children }) {
     // snapped_to; passing it as prefer_node lets the backend hold onto it
     // unless the alternative wins by a clear margin, instead of re-deciding
     // that close call from scratch on every single reroute.
-    getRouteFromCoords(lat, lng, destRef.current.id, accuracyM, lastSnappedNodeRef.current)
+    // Phase X — meta.isReroute tags this specific call (the only automatic,
+    // on-route recalculation in the app) for analytics purposes only; it
+    // has no effect on the request itself or on any routing behaviour.
+    getRouteFromCoords(lat, lng, destRef.current.id, accuracyM, lastSnappedNodeRef.current, { isReroute: true })
       .then((r) => {
         routeRef.current  = r.path
         lastSnappedNodeRef.current = r.snapped_to ?? null

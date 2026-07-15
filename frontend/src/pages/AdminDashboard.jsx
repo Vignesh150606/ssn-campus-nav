@@ -1,8 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { API_BASE } from '../api'
 import { LOCATION_NAME_OVERRIDES } from '../constants'
 import PosterManager from '../components/PosterManager'
 import VenueMenuAdmin from '../components/VenueMenuAdmin'
+
+// Phase X — lazy-loaded (PERFORMANCE: "lazy-load heavy admin pages"). Public
+// users never download either of these; even admins only do on demand.
+const AdminAnalytics = lazy(() => import('./admin/AdminAnalytics'))
+const AdminFeedback  = lazy(() => import('./admin/AdminFeedback'))
 
 const STATUS_COLOR = { verified:'#2E9E5B', pending:'#E07414', rejected:'#D7263D' }
 
@@ -316,7 +321,7 @@ export default function AdminDashboard() {
     <div style={{height:'100%',overflow:'hidden',display:'flex',flexDirection:'column'}}>
       {/* Tab bar */}
       <div style={{display:'flex',gap:8,padding:'12px 16px',borderBottom:'1px solid var(--line)',flexShrink:0,flexWrap:'wrap'}}>
-        {[['events',`Events (${events.length})`],['roads','Road Closures'],['menus','🍽 Menus'],['add','+ Add Event']].map(([t,label])=>(
+        {[['events',`Events (${events.length})`],['roads','Road Closures'],['menus','🍽 Menus'],['analytics','📊 Analytics'],['feedback','💬 Feedback'],['add','+ Add Event']].map(([t,label])=>(
           <button key={t} onClick={()=>setTab(t)} style={{...pill,
             background:tab===t?'var(--ink)':'transparent',
             color:tab===t?'var(--canvas)':'var(--ink)',
@@ -397,6 +402,20 @@ export default function AdminDashboard() {
           </div>
           <VenueMenuAdmin venues={venues} token={token} />
         </div>
+      )}
+
+      {/* Phase X — Analytics */}
+      {tab==='analytics' && (
+        <Suspense fallback={<div className="state-message" style={{padding:16}}>Loading analytics…</div>}>
+          <AdminAnalytics token={token} />
+        </Suspense>
+      )}
+
+      {/* Phase X — Route Feedback */}
+      {tab==='feedback' && (
+        <Suspense fallback={<div className="state-message" style={{padding:16}}>Loading feedback…</div>}>
+          <AdminFeedback token={token} />
+        </Suspense>
       )}
 
       {/* Road closures */}

@@ -281,3 +281,43 @@ TABLE` statements that drop/rename columns aren't idempotent the way the
 `CREATE TABLE IF NOT EXISTS` statements are. Write new schema changes as a
 separate, dated file (e.g. `backend/supabase/migrations/2026-07-01_add_x.sql`)
 and review it before running it in the SQL Editor.
+
+## 9. Phase X — Offline-First, Analytics, Route Feedback
+
+Three additions on top of everything above — no existing table, bucket, or
+env var changes.
+
+**SQL:** run `backend/supabase/phaseX_analytics_feedback_migration.sql` in
+the SQL Editor (after §1). Adds two tables: `analytics_events` (anonymous,
+aggregate-only — see the comment at the top of that file for exactly what
+it does and doesn't store) and `route_feedback`.
+
+**Storage bucket:** one more, same steps as §2 —
+- Name: **`route-feedback-screenshots`**
+- Public bucket: **ON** (same reasoning as `event-images`: the admin
+  feedback dashboard loads these directly into `<img>` tags; URLs are
+  random UUIDs and are never linked from any public page)
+
+**No new environment variables.** The offline bundle, analytics, and
+feedback endpoints all reuse the existing `SUPABASE_URL` /
+`SUPABASE_SERVICE_ROLE_KEY` / admin-JWT setup from §3.
+
+**New endpoints** (all in `backend/main.py`, all reuse `data_access.py`
+patterns already established above):
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `GET /api/offline/bundle` | none | Locations + events + road segments + walkway graph, for the frontend's offline cache |
+| `POST /api/analytics/events` | none | Batched, anonymized analytics ingestion |
+| `GET /api/admin/analytics/summary` | admin | Aggregated analytics for the admin dashboard |
+| `POST /api/feedback` | none | Submit route feedback |
+| `POST /api/feedback/{id}/screenshot` | none | Optional screenshot attach |
+| `GET /api/admin/feedback` | admin | List/filter feedback |
+| `PATCH /api/admin/feedback/{id}` | admin | Update status/resolution |
+
+**Verify:** `GET /api/offline/bundle` should return locations/events/
+road_segments/graph/version; submit a test row via `POST /api/feedback`
+and confirm it shows up in the Admin → Feedback tab; open Admin →
+Analytics and confirm the cards render (they'll all read zero until real
+traffic generates events).
+

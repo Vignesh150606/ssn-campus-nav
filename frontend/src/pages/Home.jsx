@@ -37,6 +37,8 @@ import { displayLocationName } from '../constants'
 import { useDraggableSheet } from '../hooks/useDraggableSheet'
 import VenueMenuCard from '../components/VenueMenuCard'
 import VenueMenuInline from '../components/VenueMenuInline'
+import RouteFeedbackDialog from '../components/RouteFeedbackDialog'
+import { track } from '../analytics/analyticsClient'
 
 const SHEET_HEIGHT = 38
 const ENTRY_ID     = 'main-gate'
@@ -156,6 +158,13 @@ export default function Home() {
   const [currentBearing, setCurrentBearing] = useState(0)
   // Phase 4.2: clipboard feedback for share button (non-Web-Share browsers)
   const [shareCopied, setShareCopied] = useState(false)
+  // Phase X — Feature 3 (Route Feedback) + Feature 2 (Analytics): trip
+  // start time (for trip duration) and the feedback dialog's own state.
+  // tripStartRef is a ref (not state) since it's write-once-per-trip and
+  // read only at the moment the trip ends — no re-render needed for it.
+  const tripStartRef = useRef(null)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [feedbackContext, setFeedbackContext] = useState(null)
 
   const {
     position, accuracy, acquiringGps, tracking, error: gpsError,
@@ -620,6 +629,9 @@ export default function Home() {
     setNavMode(true)
     setArrived(false)
     setUserManuallyPanned(false)
+    // Phase X — Feature 2 (Analytics)
+    tripStartRef.current = Date.now()
+    track('trip_started', { destination_id: previewLoc.id, distance_m: routeDist })
     // Priority 4 (Phase 4.2.5): heading-up begins automatically as a
     // NATURAL CONSEQUENCE of headingUp already being true (default ON,
     // see its useState above) — not by force-setting it here. Forcing it
@@ -721,6 +733,9 @@ export default function Home() {
       // Priority 4 (Phase 4.2.5): don't force headingUp true here either —
       // see the matching comment in handleStartNavigation above.
       if (eventInfo) setNavEventInfo(eventInfo)
+      // Phase X — Feature 2 (Analytics)
+      tripStartRef.current = Date.now()
+      track('trip_started', { destination_id: loc.id, distance_m: r.distance_m })
     } catch (e) {
       setRouteError(e.message)
     }
@@ -736,6 +751,30 @@ export default function Home() {
   }
 
   function handleClear() {
+    // Phase X — Feature 2 (Analytics) + Feature 3 (Route Feedback): this is
+    // the one place every "navigation is over" path already funnels
+    // through (End Navigation, the arrival screen's Done / Go Somewhere
+    // Else, the ✕ exit button, ChatbotWidget's cancel) — so it's also the
+    // single, minimal hook point for both. Only fires for an actual
+    // in-progress navigation (navMode true); clearing a not-yet-started
+    // route preview does neither. Captured BEFORE the state below is
+    // cleared, since this reads routeDist/previewLoc/destName/arrived.
+    if (navMode) {
+      const durationS = tripStartRef.current ? Math.round((Date.now() - tripStartRef.current) / 1000) : null
+      track(arrived ? 'trip_completed' : 'trip_cancelled', {
+        destination_id: previewLoc?.id ?? navDestination?.id ?? null,
+        distance_m: routeDist,
+        duration_s: durationS,
+      })
+      tripStartRef.current = null
+      setFeedbackContext({
+        destinationId: previewLoc?.id ?? navDestination?.id ?? null,
+        destinationName: destName || null,
+        distanceM: routeDist,
+        arrived,
+      })
+      setFeedbackOpen(true)
+    }
     setRoutePath(null); setRouteDist(null); setRouteEta(null)
     setRouteWarning(null); setRouteError(null); setDestination(null)
     setFollowUser(false)
@@ -1388,6 +1427,13 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* Phase X — Feature 3: Route Feedback */}
+      <RouteFeedbackDialog
+        open={feedbackOpen}
+        context={feedbackContext}
+        onClose={() => setFeedbackOpen(false)}
+      />
 
       <NavSettingsPanel
         voice={voice}

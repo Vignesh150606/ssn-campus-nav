@@ -35,7 +35,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      // Phase X (Feature 1 — Offline-First): generateSW's default
+      // globPatterns only match built js/css/html, so these public/ image
+      // assets (referenced from index.html/App.jsx/BootGate.jsx, not
+      // imported in JS) would otherwise never enter the precache manifest
+      // and would 404 offline on a first-ever page paint.
+      includeAssets: ['favicon.svg', 'icons.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'ssn-logo.png'],
       manifest: {
         name: 'SSN Campus Navigator',
         short_name: 'SSN Navigator',

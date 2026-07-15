@@ -11,6 +11,16 @@ import LocationDeepLink from './pages/LocationDeepLink.jsx'
 import BootGate from './components/BootGate.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { LocationProvider } from './context/LocationProvider.jsx'
+import { initOfflineSync } from './offline/offlineBundle.js'
+import { flushQueuedOffline } from './analytics/analyticsClient.js'
+
+// Phase X (Feature 1 — Offline-First Experience). Warms/refreshes the
+// offline cache now if online, and keeps it in sync on every future
+// reconnect — see offline/offlineBundle.js. Also resends any analytics
+// events that were queued to IndexedDB while offline (see
+// analytics/analyticsClient.js) on that same reconnect signal.
+initOfflineSync()
+window.addEventListener('online', () => { flushQueuedOffline() })
 
 if ('serviceWorker' in navigator) {
   // Fires the moment a (possibly NEW) service worker takes control of this

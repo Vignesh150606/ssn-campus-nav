@@ -187,3 +187,8 @@ on the same machine — fine for local testing, not for printing.)
       junctions
 - [ ] **Phase 8** — Further deployment polish (see SUPABASE_MIGRATION.md for
       the current Render/Vercel setup already in place)
+- [x] **Phase X** — Production experience: offline-first navigation
+      (cached graph/locations/events, offline routing + rerouting, tile
+      caching), anonymized navigation analytics with an admin dashboard,
+      and a post-navigation route feedback system — see
+      SUPABASE_MIGRATION.md §9

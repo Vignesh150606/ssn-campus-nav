@@ -10,6 +10,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getEvent, getEvents, getRoute, getRouteFromCoords, eventQrUrl } from '../api'
+import { track } from '../analytics/analyticsClient'
 import { useLocationContext } from '../context/LocationContext'
 import { useVoiceGuidance } from '../hooks/useVoiceGuidance'
 import { haversine } from '../utils/geo'
@@ -86,6 +87,16 @@ export default function EventPage() {
   // up after a refresh" symptom. EventsList already self-heals via a 20s
   // poll; this gives EventPage the equivalent — a couple of automatic
   // retries with backoff, plus a manual Retry button as a fallback below.
+  // Phase X — Feature 2 (Analytics). Event pages are reached almost
+  // exclusively by scanning the printed QR code for that event (see
+  // utils/qr_generator.py) — there's no separate "QR scan" browser event
+  // to hook, so a page view here is the proxy used for the "Most used QR
+  // codes" metric. Deliberately its own effect (not folded into the
+  // load/retry effect below) so a retry never double-counts a view.
+  useEffect(() => {
+    track('event_page_view', { event_id: eventId })
+  }, [eventId])
+
   const [retryAttempt, setRetryAttempt] = useState(0)
   useEffect(() => {
     let cancelled = false

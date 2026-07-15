@@ -239,6 +239,20 @@ def get_route(
 
 
 # ---------------------------------------------------------------------------
+# Offline bundle (Phase X — Feature 1: Offline-First Experience)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/offline/bundle")
+def get_offline_bundle():
+    """Public — everything the frontend caches (IndexedDB) on first
+    successful visit so navigation keeps working with no internet:
+    locations, verified events, road-closure state, and the walkway graph.
+    Read-only — does not touch the routing engine itself; see
+    data_access.get_offline_bundle for what this reuses vs. reads fresh."""
+    return data_access.get_offline_bundle()
+
+
+# ---------------------------------------------------------------------------
 # Static files (QR codes, campus image overlay for the map, etc.)
 # ---------------------------------------------------------------------------
 
@@ -259,6 +273,11 @@ def root():
             "/api/events/{id}",
             "/api/events/{id}/qr",
             "/api/route?from_id=&to_id=",
+            "/api/offline/bundle",
+            "/api/analytics/events",
+            "/api/admin/analytics/summary",
+            "/api/feedback",
+            "/api/admin/feedback",
             "/api/admin/login",
             "/api/health",
         ],
@@ -538,6 +557,110 @@ def diagnose_menu_system(admin: dict = Depends(get_current_admin)):
     inferring it from the generic 503 the public endpoints intentionally
     return. See data_access.diagnose_menu_system's docstring."""
     return data_access.diagnose_menu_system()
+
+
+# ---------------------------------------------------------------------------
+# Analytics (Phase X — Feature 2: Navigation Analytics)
+#
+# Anonymous, aggregate-only — no auth on the ingest side because there is no
+# identity to authenticate: session_id is a random id the frontend mints
+# fresh per app open and never persists across visits. See
+# data_access.py's Analytics section for exactly what is (and isn't) stored.
+# ---------------------------------------------------------------------------
+
+class AnalyticsEvent(BaseModel):
+    event_type: str
+    payload: Optional[dict] = None
+
+
+class AnalyticsBatch(BaseModel):
+    session_id: Optional[str] = None
+    events: List[AnalyticsEvent]
+
+
+@app.post("/api/analytics/events")
+def ingest_analytics(body: AnalyticsBatch):
+    """Public — batched analytics ingestion (the frontend queues events and
+    flushes periodically / on reconnect rather than one request per event).
+    Never fails a whole batch over one bad event — unrecognized event types
+    are silently dropped server-side."""
+    inserted = data_access.record_analytics_events(
+        [e.model_dump() for e in body.events], body.session_id
+    )
+    return {"inserted": inserted}
+
+
+@app.get("/api/admin/analytics/summary")
+def analytics_summary(days: int = Query(30, ge=1, le=365), admin: dict = Depends(get_current_admin)):
+    """Admin — aggregated analytics for the dashboard: top searches, top
+    destinations/starting points, daily/weekly/monthly usage, reroute and
+    cancellation hotspots, GPS weak-signal zones, success rate, etc."""
+    return data_access.get_analytics_summary(days)
+
+
+# ---------------------------------------------------------------------------
+# Route feedback (Phase X — Feature 3: Route Feedback System)
+# ---------------------------------------------------------------------------
+
+class FeedbackCreate(BaseModel):
+    destination_id: Optional[str] = None
+    destination_name: Optional[str] = None
+    rating: Optional[int] = None
+    accurate: Optional[bool] = None
+    categories: Optional[List[str]] = []
+    comment: Optional[str] = None
+    distance_m: Optional[float] = None
+    arrived: bool = False
+
+
+class FeedbackStatusUpdate(BaseModel):
+    status: Optional[str] = None
+    resolution: Optional[str] = None
+    admin_notes: Optional[str] = None
+
+
+@app.post("/api/feedback")
+def submit_feedback(body: FeedbackCreate):
+    """Public — submit route feedback (shown when navigation ends or the
+    destination is reached). Returns the new feedback id so the frontend
+    can optionally follow up with POST /api/feedback/{id}/screenshot."""
+    row = data_access.create_feedback(body.model_dump())
+    return {"message": "Thanks for the feedback!", "feedback_id": row.get("id")}
+
+
+@app.post("/api/feedback/{feedback_id}/screenshot")
+async def upload_feedback_screenshot(feedback_id: str, file: UploadFile = File(...)):
+    """Public — optional screenshot attach. Same create-then-attach pattern
+    as the existing event-image upload flow above."""
+    content = await file.read()
+    try:
+        public_url, storage_path = data_access.upload_feedback_screenshot_file(
+            feedback_id, file.filename or "screenshot", content,
+            file.content_type or "application/octet-stream",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    row = data_access.attach_feedback_screenshot(feedback_id, public_url, storage_path)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Feedback '{feedback_id}' not found")
+    return {"url": public_url}
+
+
+@app.get("/api/admin/feedback")
+def list_feedback(status: Optional[str] = Query(None), admin: dict = Depends(get_current_admin)):
+    """Admin — list route feedback, optionally filtered by status
+    (pending / reviewed / resolved), newest first."""
+    return data_access.list_feedback_admin(status)
+
+
+@app.patch("/api/admin/feedback/{feedback_id}")
+def update_feedback(feedback_id: str, body: FeedbackStatusUpdate, admin: dict = Depends(get_current_admin)):
+    """Admin — move feedback through pending -> reviewed -> resolved and
+    record accepted / rejected / fixed once actioned."""
+    row = data_access.update_feedback_status(feedback_id, body.status, body.resolution, body.admin_notes)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Feedback '{feedback_id}' not found")
+    return row
 
 
 # ---------------------------------------------------------------------------

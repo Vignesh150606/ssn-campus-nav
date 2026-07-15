@@ -22,6 +22,7 @@
  */
 import { useEffect, useState } from 'react'
 import { checkHealth } from '../api'
+import { hasCachedBundleSync } from '../offline/offlineBundle'
 
 const SLOW_MESSAGE_AFTER_MS = 22_000
 const GIVE_UP_AFTER_MS = 60_000
@@ -61,6 +62,20 @@ export default function BootGate({ children }) {
         seedEventsCache()
         setStatus('ready')
         return
+      }
+      // Phase X (Feature 1 — Offline-First Experience): "If the user has
+      // already opened the campus once, navigation should continue even
+      // when internet connectivity is lost" — this is the literal
+      // precondition for that. Without this bypass, a device with no
+      // signal would sit on this boot screen forever (or until "failed"),
+      // never reaching the cached app underneath. Only applies when we're
+      // actually offline (not just a slow/cold-starting server, which
+      // should keep showing its normal retry screen) AND this device has
+      // cached campus data from a previous successful visit. Polling
+      // continues in the background regardless, so a genuine reconnect
+      // still seeds the freshest events cache the moment it succeeds.
+      if (!navigator.onLine && hasCachedBundleSync()) {
+        setStatus('ready')
       }
       attemptTimer = setTimeout(attempt, RETRY_INTERVAL_MS)
     }

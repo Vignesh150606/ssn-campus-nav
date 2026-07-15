@@ -16,7 +16,7 @@ Two things are deliberately NOT here, by design (see SUPABASE_MIGRATION.md):
 """
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from db import SupabaseUnavailableError, get_client
@@ -706,4 +706,325 @@ def list_event_images(event_id: str) -> List[dict]:
             .execute()
         )
         return result.data or []
+    return _wrap(_run)
+
+
+# ---------------------------------------------------------------------------
+# Offline bundle (Phase X — Feature 1: Offline-First Experience)
+#
+# Serves everything the frontend caches once (IndexedDB, on first successful
+# visit) so navigation keeps working with no internet. locations/events/
+# road_segments reuse the exact same Supabase-backed functions above; the
+# walkway graph is read straight from the same static JSON file
+# utils/router.py already reads at import time — untouched, read-only, never
+# written to here. Nothing in this section modifies the routing engine.
+# ---------------------------------------------------------------------------
+
+WALKWAY_GRAPH_PATH = os.path.join(DATA_DIR, "walkway_graph.json")
+
+
+def get_walkway_graph() -> dict:
+    import json
+    with open(WALKWAY_GRAPH_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def get_offline_bundle_version() -> str:
+    """Cheap version stamp (file mtime + size) for the offline cache — changes
+    whenever scripts/build_walkway_graph.py regenerates the graph, so a
+    stale client-side cache invalidates automatically without hashing the
+    whole file on every request."""
+    try:
+        st = os.stat(WALKWAY_GRAPH_PATH)
+        return f"{int(st.st_mtime)}-{st.st_size}"
+    except OSError:
+        return "0"
+
+
+def get_offline_bundle() -> dict:
+    """Everything the frontend needs to cache for offline navigation
+    continuity: locations, verified events, road-closure state, and the
+    walkway graph. Raises SupabaseUnavailableError (via the functions it
+    calls) if Supabase is unreachable, same as every other endpoint."""
+    return {
+        "version": get_offline_bundle_version(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "locations": get_locations(),
+        "events": list_public_events(),
+        "road_segments": get_road_segments(),
+        "graph": get_walkway_graph(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Analytics (Phase X — Feature 2: Navigation Analytics)
+#
+# Anonymous and aggregate-only by construction: analytics_events never has a
+# name, device id, IP, or persistent cross-visit identifier column at all
+# (see phaseX_analytics_feedback_migration.sql). `session_id` is a random id
+# the frontend mints fresh per app open (sessionStorage) purely to group a
+# burst of events from one visit — it is never linked to a person.
+#
+# GPS accuracy / "weak signal zone" metrics deliberately do NOT come from a
+# separate continuous location-sampling stream (that would mean hooking into
+# the live GPS pipeline, which is explicitly out of scope, and would be a
+# much bigger privacy footprint). Instead they're derived from the accuracy
+# figure + snapped walkway node already produced as a side effect of a
+# route_requested/reroute call — incidental, coarse (nearest walkway node,
+# not a raw coordinate), and only ever a handful of samples per trip.
+# ---------------------------------------------------------------------------
+
+ANALYTICS_EVENT_TYPES = {
+    "search", "route_requested", "reroute", "trip_started", "trip_completed",
+    "trip_cancelled", "event_page_view", "offline_usage",
+}
+MAX_ANALYTICS_BATCH = 50
+WEAK_SIGNAL_THRESHOLD_M = 30
+
+
+def record_analytics_events(events: List[dict], session_id: Optional[str]) -> int:
+    """Insert a batch of anonymized analytics events. Silently drops any
+    event whose type isn't recognized (e.g. an older/newer cached frontend
+    build) rather than failing the whole batch. Returns rows inserted."""
+    rows = []
+    for e in (events or [])[:MAX_ANALYTICS_BATCH]:
+        event_type = e.get("event_type")
+        if event_type not in ANALYTICS_EVENT_TYPES:
+            continue
+        payload = e.get("payload") if isinstance(e.get("payload"), dict) else {}
+        rows.append({"event_type": event_type, "session_id": session_id, "payload": payload})
+    if not rows:
+        return 0
+
+    def _run():
+        client = get_client()
+        client.table("analytics_events").insert(rows).execute()
+        return len(rows)
+
+    return _wrap(_run)
+
+
+def _count_by(rows: List[dict], key_fn, top: Optional[int] = None) -> List[dict]:
+    """Count occurrences of key_fn(row) across rows, sorted descending.
+    Backs every 'Top N' list in the analytics summary below."""
+    counts: dict = {}
+    for r in rows:
+        k = key_fn(r)
+        if k is None or k == "":
+            continue
+        counts[k] = counts.get(k, 0) + 1
+    ordered = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
+    if top:
+        ordered = ordered[:top]
+    return [{"key": k, "count": c} for k, c in ordered]
+
+
+def _parse_ts(raw: Optional[str]):
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def get_analytics_summary(days: int = 30) -> dict:
+    """Aggregate analytics for the admin dashboard, over the last `days`
+    days. Fetches raw events once (capped) and aggregates in Python —
+    simplest thing that works at campus scale (a few thousand events/day at
+    most), and keeps every aggregation reviewable in one place instead of
+    scattered hand-written SQL views."""
+    days = max(1, min(days, 365))
+
+    def _run():
+        client = get_client()
+        since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        return (
+            client.table("analytics_events")
+            .select("event_type, payload, created_at")
+            .gte("created_at", since)
+            .order("created_at", desc=True)
+            .limit(20000)
+            .execute()
+        ).data or []
+
+    rows = _wrap(_run)
+
+    by_type: dict = {}
+    for r in rows:
+        by_type.setdefault(r["event_type"], []).append(r)
+
+    def payload(r):
+        return r.get("payload") or {}
+
+    searches         = by_type.get("search", [])
+    route_reqs       = by_type.get("route_requested", [])
+    reroutes         = by_type.get("reroute", [])
+    trip_started     = by_type.get("trip_started", [])
+    trip_completed   = by_type.get("trip_completed", [])
+    trip_cancelled   = by_type.get("trip_cancelled", [])
+    page_views       = by_type.get("event_page_view", [])
+    offline_usage    = by_type.get("offline_usage", [])
+
+    distances = [payload(r).get("distance_m") for r in trip_completed if isinstance(payload(r).get("distance_m"), (int, float))]
+    durations = [payload(r).get("duration_s") for r in trip_completed if isinstance(payload(r).get("duration_s"), (int, float))]
+
+    gps_rows = route_reqs + reroutes
+    accuracies = [payload(r).get("accuracy_m") for r in gps_rows if isinstance(payload(r).get("accuracy_m"), (int, float))]
+    weak_signal_rows = [r for r in gps_rows if isinstance(payload(r).get("accuracy_m"), (int, float)) and payload(r)["accuracy_m"] > WEAK_SIGNAL_THRESHOLD_M]
+
+    no_result_searches = [r for r in searches if (payload(r).get("result_count") or 0) == 0]
+    total_trips_ended = len(trip_completed) + len(trip_cancelled)
+    success_rate = (len(trip_completed) / total_trips_ended) if total_trips_ended else None
+
+    def _bucket_counts(events, fmt):
+        buckets: dict = {}
+        for r in events:
+            dt = _parse_ts(r.get("created_at"))
+            if dt is None:
+                continue
+            key = dt.strftime(fmt)
+            buckets[key] = buckets.get(key, 0) + 1
+        return sorted(({"period": k, "count": v} for k, v in buckets.items()), key=lambda x: x["period"])
+
+    return {
+        "range_days": days,
+        "totals": {
+            "searches": len(searches),
+            "route_requests": len(route_reqs),
+            "reroutes": len(reroutes),
+            "trips_started": len(trip_started),
+            "trips_completed": len(trip_completed),
+            "trips_cancelled": len(trip_cancelled),
+            "event_page_views": len(page_views),
+            "offline_sessions": len(offline_usage),
+            "no_result_searches": len(no_result_searches),
+            "navigation_success_rate": round(success_rate, 3) if success_rate is not None else None,
+            "avg_trip_distance_m": round(sum(distances) / len(distances), 1) if distances else None,
+            "avg_trip_duration_s": round(sum(durations) / len(durations), 1) if durations else None,
+            "avg_gps_accuracy_m": round(sum(accuracies) / len(accuracies), 1) if accuracies else None,
+        },
+        "top_searched":              _count_by(searches, lambda r: (payload(r).get("query") or "").strip().lower() or None, top=15),
+        "no_result_search_terms":    _count_by(no_result_searches, lambda r: (payload(r).get("query") or "").strip().lower() or None, top=15),
+        "top_destinations":          _count_by(trip_started, lambda r: payload(r).get("destination_id"), top=15),
+        "top_starting_points":       _count_by(route_reqs, lambda r: payload(r).get("from_id") or ("Live GPS" if payload(r).get("from_gps") else None), top=15),
+        "most_rerouted_destinations": _count_by(reroutes, lambda r: payload(r).get("destination_id"), top=15),
+        "most_cancelled_destinations": _count_by(trip_cancelled, lambda r: payload(r).get("destination_id"), top=15),
+        "most_viewed_events":        _count_by(page_views, lambda r: payload(r).get("event_id"), top=15),
+        "gps_weak_signal_zones":     _count_by(weak_signal_rows, lambda r: payload(r).get("snapped_to"), top=15),
+        "daily_usage":   _bucket_counts(trip_started, "%Y-%m-%d"),
+        "weekly_usage":  _bucket_counts(trip_started, "%G-W%V"),
+        "monthly_usage": _bucket_counts(trip_started, "%Y-%m"),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Route feedback (Phase X — Feature 3: Route Feedback System)
+# ---------------------------------------------------------------------------
+
+FEEDBACK_SCREENSHOTS_BUCKET = "route-feedback-screenshots"
+FEEDBACK_CATEGORIES = {
+    "incorrect_route", "blocked_path", "construction", "wrong_destination",
+    "poor_gps", "voice_issue", "other",
+}
+_FEEDBACK_COLUMNS = (
+    "id, destination_id, destination_name, rating, accurate, categories, "
+    "comment, screenshot_url, distance_m, arrived, status, resolution, "
+    "admin_notes, created_at, updated_at"
+)
+
+
+def create_feedback(payload: dict) -> dict:
+    """Public — submit route feedback. `payload` is pre-validated by the
+    FeedbackCreate pydantic model in main.py; any category not in
+    FEEDBACK_CATEGORIES is silently dropped (not rejected) so an older
+    cached frontend build can never hard-fail a submission."""
+    def _run():
+        client = get_client()
+        categories = [c for c in (payload.get("categories") or []) if c in FEEDBACK_CATEGORIES]
+        row = {
+            "destination_id":   payload.get("destination_id"),
+            "destination_name": payload.get("destination_name"),
+            "rating":           payload.get("rating"),
+            "accurate":         payload.get("accurate"),
+            "categories":       categories,
+            "comment":          ((payload.get("comment") or "").strip()[:2000]) or None,
+            "distance_m":       payload.get("distance_m"),
+            "arrived":          bool(payload.get("arrived")),
+        }
+        result = client.table("route_feedback").insert(row).execute()
+        return result.data[0] if result.data else row
+
+    return _wrap(_run)
+
+
+def attach_feedback_screenshot(feedback_id: str, url: str, storage_path: str) -> Optional[dict]:
+    def _run():
+        client = get_client()
+        result = (
+            client.table("route_feedback")
+            .update({"screenshot_url": url, "screenshot_storage_path": storage_path})
+            .eq("id", feedback_id)
+            .execute()
+        )
+        return result.data[0] if result.data else None
+
+    return _wrap(_run)
+
+
+def upload_feedback_screenshot_file(feedback_id: str, filename: str, content: bytes, content_type: str) -> tuple:
+    """Same validation + Storage-upload pattern already used for event and
+    menu images above."""
+    if content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
+        raise ValueError(f"Unsupported image type '{content_type}'. Allowed: jpeg, png, webp, gif.")
+    if len(content) > MAX_IMAGE_BYTES:
+        raise ValueError(f"Image too large ({len(content)} bytes). Max {MAX_IMAGE_BYTES} bytes.")
+
+    def _run():
+        client = get_client()
+        safe_name = "".join(c for c in filename if c.isalnum() or c in "._-") or "screenshot"
+        storage_path = f"{feedback_id}/{uuid.uuid4().hex}_{safe_name}"
+        client.storage.from_(FEEDBACK_SCREENSHOTS_BUCKET).upload(
+            storage_path, content, file_options={"content-type": content_type}
+        )
+        public = client.storage.from_(FEEDBACK_SCREENSHOTS_BUCKET).get_public_url(storage_path)
+        if isinstance(public, dict):
+            public_url = (public.get("publicUrl") or public.get("publicURL")
+                          or public.get("data", {}).get("publicUrl"))
+        else:
+            public_url = public
+        if not public_url:
+            raise SupabaseUnavailableError("Storage upload succeeded but no public URL was returned.")
+        return public_url, storage_path
+
+    return _wrap(_run)
+
+
+def list_feedback_admin(status: Optional[str] = None, limit: int = 200) -> List[dict]:
+    def _run():
+        client = get_client()
+        q = client.table("route_feedback").select(_FEEDBACK_COLUMNS).order("created_at", desc=True).limit(limit)
+        if status:
+            q = q.eq("status", status)
+        return q.execute().data or []
+
+    return _wrap(_run)
+
+
+def update_feedback_status(feedback_id: str, status: Optional[str], resolution: Optional[str],
+                           admin_notes: Optional[str]) -> Optional[dict]:
+    def _run():
+        client = get_client()
+        updates = {}
+        if status is not None:
+            updates["status"] = status
+        if resolution is not None:
+            updates["resolution"] = resolution
+        if admin_notes is not None:
+            updates["admin_notes"] = admin_notes
+        if not updates:
+            return None
+        result = client.table("route_feedback").update(updates).eq("id", feedback_id).execute()
+        return result.data[0] if result.data else None
+
     return _wrap(_run)
