@@ -28,6 +28,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { LocationContext } from './LocationContext'
 import { pathLength, nearestIndex, destinationPoint, pointAtDistanceAlongPath } from '../utils/geo'
 import { getRouteFromCoords } from '../api'
+// TEMPORARY — see utils/rerouteDebug.js. Remove once the live-navigation
+// "route through CSE Annexure" investigation concludes.
+import { logRerouteEvent } from '../utils/rerouteDebug'
 
 // Hysteresis on off-route detection: flag off-route only once past
 // OFF_ROUTE_ENTER_M, and don't clear it again until back within
@@ -192,16 +195,44 @@ export function LocationProvider({ children }) {
   // distance as plain arguments (rather than reading state) so this stays
   // a stable, dependency-free callback — it never needs to be recreated,
   // which in turn keeps processPosition's identity stable too.
-  const maybeRecalculate = useCallback((lat, lng, currentRemainingM, accuracyM) => {
-    if (!destRef.current?.id) return                 // need a routable destination id
-    if (recalculatingRef.current) return              // a reroute is already in flight
-    if (currentRemainingM != null && currentRemainingM < RECALC_MIN_REMAINING_M) return
+  const maybeRecalculate = useCallback((lat, lng, currentRemainingM, accuracyM, speedMS = null, courseDeg = null) => {
+    // TEMPORARY (see utils/rerouteDebug.js) — GPS snapshot at the moment
+    // this reroute was considered. This pipeline never smooths/snaps the
+    // coordinate value itself (see processPosition's "Store TRUE GPS
+    // coordinate — never snapped, never adjusted" comment); the only
+    // filtering that happens is hard/soft-reject deciding whether a
+    // reading is used AT ALL (and maybeRecalculate is only ever called
+    // with one that was) — so "filtered" here means exactly that: this
+    // exact coordinate, confirmed to have already passed that gate.
+    const debugBase = {
+      rawLat: lat, rawLng: lng,
+      filteredLat: lat, filteredLng: lng,
+      passedGpsFilter: true,
+      gpsAccuracyM: accuracyM, gpsSpeedMS: speedMS, gpsHeadingDeg: courseDeg,
+      currentRemainingM,
+    }
+    if (!destRef.current?.id) { logRerouteEvent({ ...debugBase, skipped: 'no-destination' }); return }
+    if (recalculatingRef.current) { logRerouteEvent({ ...debugBase, skipped: 'already-in-flight' }); return }
+    if (currentRemainingM != null && currentRemainingM < RECALC_MIN_REMAINING_M) {
+      logRerouteEvent({ ...debugBase, skipped: 'below-min-remaining', minRemainingM: RECALC_MIN_REMAINING_M })
+      return
+    }
     const now = Date.now()
-    if (now - lastRecalcAtRef.current < RECALC_COOLDOWN_MS) return // avoid recalculation loops
+    if (now - lastRecalcAtRef.current < RECALC_COOLDOWN_MS) {
+      logRerouteEvent({ ...debugBase, skipped: 'cooldown', cooldownMsRemaining: RECALC_COOLDOWN_MS - (now - lastRecalcAtRef.current) })
+      return // avoid recalculation loops
+    }
 
     recalculatingRef.current = true
     lastRecalcAtRef.current  = now
     setRecalculating(true)
+
+    // TEMPORARY — mirrors getRouteFromCoords' own query-string construction
+    // (api.js) purely for logging; does not affect the real request below.
+    const preferNodeId = lastSnappedNodeRef.current
+    const requestUrl = `/api/route?from_lat=${lat}&from_lng=${lng}&to_id=${encodeURIComponent(destRef.current.id)}`
+      + (accuracyM != null ? `&accuracy=${accuracyM}` : '')
+      + (preferNodeId ? `&prefer_node=${encodeURIComponent(preferNodeId)}` : '')
 
     // Root cause of the CSE-Annexure shortcut bug (proven against the real
     // graph — see utils/router.py _nearest_node docstring): a reroute fired
@@ -226,6 +257,21 @@ export function LocationProvider({ children }) {
     // has no effect on the request itself or on any routing behaviour.
     getRouteFromCoords(lat, lng, destRef.current.id, accuracyM, lastSnappedNodeRef.current, { isReroute: true })
       .then((r) => {
+        // TEMPORARY — see utils/rerouteDebug.js. `source` is the field that
+        // matters most: 'local' means this genuinely came from /api/route
+        // just now; 'offline' means it never reached the backend at all —
+        // it was served client-side from offlineRouter.js against whatever
+        // graph is cached in this device's IndexedDB.
+        logRerouteEvent({
+          ...debugBase,
+          requestUrl,
+          preferNodeSent: preferNodeId,
+          responseSource: r.source ?? null,
+          responseDistanceM: r.distance_m,
+          responseSnappedTo: r.snapped_to ?? null,
+          responsePathLength: Array.isArray(r.path) ? r.path.length : null,
+          responseWarning: r.warning ?? null,
+        })
         routeRef.current  = r.path
         lastSnappedNodeRef.current = r.snapped_to ?? null
         announced.current = new Set() // fresh route -> distance thresholds can fire again
@@ -241,7 +287,12 @@ export function LocationProvider({ children }) {
         setGuidance('✅ Route recalculated')
         setTimeout(() => setGuidance(null), 2500)
       })
-      .catch(() => {
+      .catch((e) => {
+        // TEMPORARY — see utils/rerouteDebug.js. Reaching here means BOTH
+        // the live request and the offline fallback failed (getRouteFromCoords
+        // only rejects when neither could produce a route) — genuinely no
+        // route available right now, not the bug under investigation.
+        logRerouteEvent({ ...debugBase, requestUrl, preferNodeSent: preferNodeId, error: String(e?.message ?? e) })
         // Couldn't reach the routing API — leave the off-route state as is;
         // the next GPS tick will retry automatically once the cooldown passes.
       })
@@ -371,7 +422,7 @@ export function LocationProvider({ children }) {
     setLiveEta(Math.round((remDist / 1.4 / 60) * 10) / 10)
 
     if (isOffRoute) {
-      maybeRecalculate(lat, lng, remDist, accuracyM)
+      maybeRecalculate(lat, lng, remDist, accuracyM, speedMS, courseDeg)
     }
 
     // Phase 9 (Q7): dynamic arrival — uses max(15m, GPS accuracy)
