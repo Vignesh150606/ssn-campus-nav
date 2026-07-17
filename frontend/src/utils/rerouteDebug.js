@@ -27,13 +27,10 @@
  *
  * THE SINGLE MOST IMPORTANT FIELD in each entry is `source` — the backend
  * (main.py) stamps every response "local" (walked live from the on-disk
- * graph, whatever /api/route actually returned) or "offline" (never
- * reached the backend at all — served entirely client-side from
- * offlineRouter.js against whatever graph happens to be cached in this
- * device's IndexedDB, which is only refreshed opportunistically and could
- * predate any backend fix). If `source` is ever "offline" during a
- * reproduction of the bug, that is the root cause, full stop — everything
- * else in the entry is there to confirm why the offline path was taken.
+ * graph, whatever /api/route actually returned). If `source` is ever
+ * anything other than "local" during a reproduction of the bug, that's
+ * worth investigating on its own — everything else in the entry is there
+ * to help confirm why.
  */
 
 const REROUTE_LOG_KEY = 'ssn-reroute-debug-log'

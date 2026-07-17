@@ -84,9 +84,9 @@ export async function flush() {
   }
 }
 
-/** Called on reconnect (see offlineBundle.js's 'online' handling, wired up
- *  in main.jsx) — resends anything queued to IndexedDB while offline, in
- *  small batches so one large backlog can't become one huge request. */
+/** Called on reconnect (see main.jsx's 'online' listener) — resends
+ *  anything queued to IndexedDB while offline, in small batches so one
+ *  large backlog can't become one huge request. */
 export async function flushQueuedOffline() {
   let entries
   try {

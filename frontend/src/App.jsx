@@ -1,7 +1,7 @@
 import { Outlet, NavLink } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import DevLocationPanel from './components/DevLocationPanel'
-import OfflineIndicator from './components/OfflineIndicator'
+import InstallPrompt from './components/InstallPrompt'
 
 // Dark mode hook — persists to localStorage, respects system preference
 function useTheme() {
@@ -35,7 +35,6 @@ export default function App() {
         <nav>
           <NavLink to="/events">Fest Schedule</NavLink>
           <NavLink to="/admin" style={{ opacity: 0.6 }}>Admin</NavLink>
-          <OfflineIndicator />
           <button
             type="button"
             className="theme-toggle"
@@ -47,6 +46,7 @@ export default function App() {
           </button>
         </nav>
       </header>
+      <InstallPrompt />
       <main className="app-main">
         <Outlet />
       </main>

@@ -4011,9 +4011,13 @@ select:-webkit-autofill {
 
 /* =====================================================================
    PHASE 4A.1 — Boot gate (startup / retry screen)
-   Shown until the backend + Supabase are confirmed reachable. Reuses the
-   .brand-mark visual language (gradient square + notch) at a larger size
-   instead of a separate image asset, so it stays theme-aware for free.
+   Shown until the backend + Supabase are confirmed reachable.
+   Priority 4 (PWA polish) — always a plain white background with the
+   blue SSN logo centered above the wordmark, matching the app icon and
+   the native install splash screen (manifest background_color) rather
+   than following the light/dark theme canvas. This is the first thing a
+   user ever sees, before the in-app theme toggle is even meaningful, so
+   it stays fixed to the brand presentation regardless of theme.
 ===================================================================== */
 .boot-gate {
   position: fixed;
@@ -4025,50 +4029,48 @@ select:-webkit-autofill {
   justify-content: center;
   gap: 18px;
   padding: 32px;
-  background: var(--canvas);
-  color: var(--ink);
+  background: #ffffff;
+  color: var(--ssn-navy);
   text-align: center;
   animation: fade-in 0.2s ease;
 }
-/* Phase 4.2 — SSN logo: replaces the old gradient-square placeholder.
-   Always shown in its original SSN blue — never tinted or inverted.
-   The PNG has a transparent background; the drop-shadow gives it lift
-   on both light and dark canvases without changing the brand colour. */
+/* SSN logo — always shown in its original SSN blue, never tinted or
+   inverted. The PNG has a transparent background; the drop-shadow gives
+   it a little lift off the white splash background. */
 .boot-gate-logo {
   width: 140px;
   height: auto;
   object-fit: contain;
   filter: drop-shadow(0 4px 18px rgba(0,59,122,0.22));
 }
-/* No dark-mode override: the SSN blue on transparent always reads clearly
-   on the dark canvas (#15192B or similar) that --canvas resolves to in dark
-   mode. Inverting it produces an off-orange that is NOT the brand colour. */
 .boot-gate-title {
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 1.15rem;
   letter-spacing: -0.01em;
+  color: var(--ssn-navy);
 }
 .boot-gate-spinner {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  border: 3px solid var(--line-strong);
-  border-top-color: var(--brand);
+  border: 3px solid rgba(0, 59, 122, 0.14);
+  border-top-color: var(--ssn-navy);
   animation: spin 0.8s linear infinite;
 }
 .boot-gate-message {
   font-size: 0.92rem;
-  color: var(--muted);
+  color: #52525b;
   max-width: 320px;
   line-height: 1.5;
 }
 .boot-gate-message-error {
-  color: var(--danger);
+  color: #dc2626;
 }
 .boot-gate-retry-btn {
-  background: var(--brand);
+  background: var(--ssn-navy);
   color: #fff;
+  border: none;
   padding: 10px 28px;
   border-radius: 999px;
   font-family: var(--font-display);

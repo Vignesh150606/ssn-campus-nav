@@ -239,20 +239,6 @@ def get_route(
 
 
 # ---------------------------------------------------------------------------
-# Offline bundle (Phase X — Feature 1: Offline-First Experience)
-# ---------------------------------------------------------------------------
-
-@app.get("/api/offline/bundle")
-def get_offline_bundle():
-    """Public — everything the frontend caches (IndexedDB) on first
-    successful visit so navigation keeps working with no internet:
-    locations, verified events, road-closure state, and the walkway graph.
-    Read-only — does not touch the routing engine itself; see
-    data_access.get_offline_bundle for what this reuses vs. reads fresh."""
-    return data_access.get_offline_bundle()
-
-
-# ---------------------------------------------------------------------------
 # Static files (QR codes, campus image overlay for the map, etc.)
 # ---------------------------------------------------------------------------
 
@@ -273,7 +259,6 @@ def root():
             "/api/events/{id}",
             "/api/events/{id}/qr",
             "/api/route?from_id=&to_id=",
-            "/api/offline/bundle",
             "/api/analytics/events",
             "/api/admin/analytics/summary",
             "/api/feedback",

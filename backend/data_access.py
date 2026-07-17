@@ -710,53 +710,6 @@ def list_event_images(event_id: str) -> List[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Offline bundle (Phase X — Feature 1: Offline-First Experience)
-#
-# Serves everything the frontend caches once (IndexedDB, on first successful
-# visit) so navigation keeps working with no internet. locations/events/
-# road_segments reuse the exact same Supabase-backed functions above; the
-# walkway graph is read straight from the same static JSON file
-# utils/router.py already reads at import time — untouched, read-only, never
-# written to here. Nothing in this section modifies the routing engine.
-# ---------------------------------------------------------------------------
-
-WALKWAY_GRAPH_PATH = os.path.join(DATA_DIR, "walkway_graph.json")
-
-
-def get_walkway_graph() -> dict:
-    import json
-    with open(WALKWAY_GRAPH_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def get_offline_bundle_version() -> str:
-    """Cheap version stamp (file mtime + size) for the offline cache — changes
-    whenever scripts/build_walkway_graph.py regenerates the graph, so a
-    stale client-side cache invalidates automatically without hashing the
-    whole file on every request."""
-    try:
-        st = os.stat(WALKWAY_GRAPH_PATH)
-        return f"{int(st.st_mtime)}-{st.st_size}"
-    except OSError:
-        return "0"
-
-
-def get_offline_bundle() -> dict:
-    """Everything the frontend needs to cache for offline navigation
-    continuity: locations, verified events, road-closure state, and the
-    walkway graph. Raises SupabaseUnavailableError (via the functions it
-    calls) if Supabase is unreachable, same as every other endpoint."""
-    return {
-        "version": get_offline_bundle_version(),
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "locations": get_locations(),
-        "events": list_public_events(),
-        "road_segments": get_road_segments(),
-        "graph": get_walkway_graph(),
-    }
-
-
-# ---------------------------------------------------------------------------
 # Analytics (Phase X — Feature 2: Navigation Analytics)
 #
 # Anonymous and aggregate-only by construction: analytics_events never has a

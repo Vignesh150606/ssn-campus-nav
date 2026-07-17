@@ -35,24 +35,30 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      // Phase X (Feature 1 — Offline-First): generateSW's default
-      // globPatterns only match built js/css/html, so these public/ image
-      // assets (referenced from index.html/App.jsx/BootGate.jsx, not
-      // imported in JS) would otherwise never enter the precache manifest
-      // and would 404 offline on a first-ever page paint.
-      includeAssets: ['favicon.svg', 'icons.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'ssn-logo.png'],
+      // generateSW's default globPatterns only match built js/css/html, so
+      // these public/ image assets (referenced from index.html/App.jsx/
+      // BootGate.jsx, not imported in JS) would otherwise never enter the
+      // precache manifest and would 404 on a first-ever page paint with no
+      // network — this is standard PWA app-shell caching, unrelated to any
+      // per-feature data caching.
+      includeAssets: [
+        'favicon.svg',
+        'icons.svg',
+        'icons/icon-192.png',
+        'icons/icon-512.png',
+        'icons/apple-touch-icon.png',
+        'ssn-logo.png',
+      ],
       manifest: {
         name: 'SSN Campus Navigator',
         short_name: 'SSN Navigator',
         description: 'Find buildings, departments and fest events at SSN College of Engineering, with walking directions.',
         theme_color: '#003b7a',
-        // Priority 12 (Phase 4.2.7): this is what Android/Chrome actually
-        // use to generate the native install/launch splash screen from the
-        // icons below. It used to be the SAME blue as the logo itself
-        // (#003b7a on #003b7a) — Option A from the brief: dark background,
-        // blue logo, so the wordmark actually stands out instead of
-        // disappearing into its own background.
-        background_color: '#09090b',
+        // Priority 4 (PWA polish): white background behind the icon, to
+        // match the app icon itself (blue SSN logo on white) — this is
+        // what Android/Chrome use to generate the native install/launch
+        // splash screen from the icons below.
+        background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',
         icons: [

@@ -258,10 +258,8 @@ export function LocationProvider({ children }) {
     getRouteFromCoords(lat, lng, destRef.current.id, accuracyM, lastSnappedNodeRef.current, { isReroute: true })
       .then((r) => {
         // TEMPORARY — see utils/rerouteDebug.js. `source` is the field that
-        // matters most: 'local' means this genuinely came from /api/route
-        // just now; 'offline' means it never reached the backend at all —
-        // it was served client-side from offlineRouter.js against whatever
-        // graph is cached in this device's IndexedDB.
+        // matters most: it should always be 'local' (genuinely came from
+        // /api/route just now).
         logRerouteEvent({
           ...debugBase,
           requestUrl,
@@ -288,10 +286,9 @@ export function LocationProvider({ children }) {
         setTimeout(() => setGuidance(null), 2500)
       })
       .catch((e) => {
-        // TEMPORARY — see utils/rerouteDebug.js. Reaching here means BOTH
-        // the live request and the offline fallback failed (getRouteFromCoords
-        // only rejects when neither could produce a route) — genuinely no
-        // route available right now, not the bug under investigation.
+        // TEMPORARY — see utils/rerouteDebug.js. Reaching here means the
+        // live request failed — genuinely no route available right now,
+        // not the bug under investigation.
         logRerouteEvent({ ...debugBase, requestUrl, preferNodeSent: preferNodeId, error: String(e?.message ?? e) })
         // Couldn't reach the routing API — leave the off-route state as is;
         // the next GPS tick will retry automatically once the cooldown passes.

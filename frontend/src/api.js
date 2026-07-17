@@ -7,23 +7,17 @@
 // Set VITE_API_BASE in a .env file when deploying, e.g.:
 //   VITE_API_BASE=https://campus-api.yourdomain.com
 //
-// Phase X (Offline-First Experience / Navigation Analytics) — this file is
-// now also where offline fallbacks and analytics logging live, rather than
-// scattered across every screen that calls these functions. Every existing
-// export below still has the exact same signature and online behaviour it
-// always had; what's new is additive (a network failure now falls back to
-// cached data when there's cached data to fall back to, and a few call
-// sites log an anonymized analytics event). See ./offline/offlineBundle.js,
-// ./offline/offlineRouter.js and ./analytics/analyticsClient.js.
+// Phase X (Navigation Analytics) — this file is also where analytics
+// logging lives, rather than scattered across every screen that calls
+// these functions. See ./analytics/analyticsClient.js.
+//
+// The offline-routing fallbacks this file used to also carry (a network
+// failure falling back to an on-device cached graph/location bundle) have
+// been removed — the app is intended for on-campus use where connectivity
+// is assumed, and every export below now has the exact same signature and
+// behaviour it had before that offline-first experience was added.
 
 import { API_BASE } from './apiBase'
-import {
-  getCachedBundle,
-  bundleLocationsById,
-  searchLocationsOffline,
-  cachedEventsOffline,
-} from './offline/offlineBundle'
-import { routeBetweenLocations, routeFromPoint } from './offline/offlineRouter'
 import { track } from './analytics/analyticsClient'
 
 async function getJSON(path) {
@@ -37,139 +31,54 @@ async function getJSON(path) {
   return res.json()
 }
 
-// Feature 1 (Offline-First) — true for a fetch that failed because the
-// network/server was unreachable (offline, DNS, cold-start timeout), as
-// opposed to a real HTTP error response from a server that IS reachable
-// (fetch() rejects with a TypeError only in the former case). Only a
-// genuine network-reason failure should ever fall back to cached data; a
-// real 404/500 should surface to the caller exactly as it always has.
-function isNetworkError(e) {
-  return e instanceof TypeError || (typeof navigator !== 'undefined' && navigator.onLine === false)
-}
-
 export async function getLocations(category) {
   const q = category ? `?category=${encodeURIComponent(category)}` : ''
-  try {
-    return await getJSON(`/api/locations${q}`)
-  } catch (e) {
-    if (!isNetworkError(e)) throw e
-    const bundle = await getCachedBundle()
-    if (!bundle) throw e
-    track('offline_usage', { via: 'locations' })
-    const all = bundle.locations || []
-    return category ? all.filter((l) => (l.category || '').toLowerCase() === category.toLowerCase()) : all
-  }
+  return getJSON(`/api/locations${q}`)
 }
 
 export async function searchLocations(q) {
   if (!q) return []
-  try {
-    const results = await getJSON(`/api/locations/search?q=${encodeURIComponent(q)}`)
-    track('search', { query: q, result_count: results.length })
-    return results
-  } catch (e) {
-    if (!isNetworkError(e)) throw e
-    const bundle = await getCachedBundle()
-    if (!bundle) throw e
-    track('offline_usage', { via: 'search' })
-    const results = searchLocationsOffline(bundle, q)
-    track('search', { query: q, result_count: results.length, offline: true })
-    return results
-  }
+  const results = await getJSON(`/api/locations/search?q=${encodeURIComponent(q)}`)
+  track('search', { query: q, result_count: results.length })
+  return results
 }
 
 export async function getLocation(id) {
-  try {
-    return await getJSON(`/api/locations/${id}`)
-  } catch (e) {
-    if (!isNetworkError(e)) throw e
-    const bundle = await getCachedBundle()
-    const loc = bundle && bundleLocationsById(bundle).get(id)
-    if (!loc) throw e
-    track('offline_usage', { via: 'location' })
-    return loc
-  }
+  return getJSON(`/api/locations/${id}`)
 }
 
 export async function getEvents(fest) {
   const q = fest ? `?fest=${encodeURIComponent(fest)}` : ''
-  try {
-    return await getJSON(`/api/events${q}`)
-  } catch (e) {
-    if (!isNetworkError(e)) throw e
-    const cached = cachedEventsOffline()
-    if (!cached.length) throw e
-    track('offline_usage', { via: 'events' })
-    return fest ? cached.filter((ev) => (ev.fest || '').toLowerCase() === fest.toLowerCase()) : cached
-  }
+  return getJSON(`/api/events${q}`)
 }
 
 export async function getEvent(id) {
-  try {
-    return await getJSON(`/api/events/${id}`)
-  } catch (e) {
-    if (!isNetworkError(e)) throw e
-    const ev = cachedEventsOffline().find((x) => x.id === id)
-    if (!ev) throw e
-    track('offline_usage', { via: 'event' })
-    return ev
-  }
+  return getJSON(`/api/events/${id}`)
 }
 
 // ── Routing ──────────────────────────────────────────────────────────────
 //
 // Both getRoute and getRouteFromCoords hit the same /api/route endpoint and
 // get back the same response shape; `_routeQuery` below is the one place
-// that (a) falls back to the offline router (offlineRouter.js) when the
-// network call fails and a graph is cached, and (b) logs the
-// route_requested / reroute analytics event either way. `meta.isReroute`
+// that logs the route_requested / reroute analytics event. `meta.isReroute`
 // distinguishes an automatic on-route recalculation (LocationProvider.jsx,
 // the only caller that passes it) from every other, user-initiated route
 // request, so "most requested routes" and "most rerouted paths" can be
 // told apart in the analytics summary.
 async function _routeQuery(query, meta) {
-  try {
-    const r = await getJSON(`/api/route?${query}`)
-    track(meta.isReroute ? 'reroute' : 'route_requested', {
-      destination_id: meta.toId ?? null,
-      from_id: meta.fromId ?? null,
-      from_gps: !!meta.fromGps,
-      distance_m: r.distance_m,
-      eta_minutes: r.eta_minutes,
-      accuracy_m: meta.accuracyM ?? null,
-      snapped_to: r.snapped_to ?? null,
-      warning: !!r.warning,
-      offline: false,
-    })
-    return r
-  } catch (e) {
-    if (!isNetworkError(e)) throw e
-    const bundle = await getCachedBundle()
-    if (!bundle || !bundle.graph) throw e
-
-    const locationsById = bundleLocationsById(bundle)
-    const r =
-      meta.fromLat != null
-        ? routeFromPoint(bundle.graph, bundle.road_segments, locationsById, meta.fromLat, meta.fromLng, meta.toId)
-        : routeBetweenLocations(bundle.graph, bundle.road_segments, locationsById, meta.fromId, meta.toId)
-    // routeBetweenLocations/routeFromPoint throw their own Error on no-path
-    // — let that propagate as-is (same "no route" outcome the online path
-    // would give), rather than catching and re-throwing the original.
-
-    track('offline_usage', { via: 'route' })
-    track(meta.isReroute ? 'reroute' : 'route_requested', {
-      destination_id: meta.toId ?? null,
-      from_id: meta.fromId ?? null,
-      from_gps: !!meta.fromGps,
-      distance_m: r.distance_m,
-      eta_minutes: r.eta_minutes,
-      accuracy_m: meta.accuracyM ?? null,
-      snapped_to: r.snapped_to ?? null,
-      warning: !!r.warning,
-      offline: true,
-    })
-    return r
-  }
+  const r = await getJSON(`/api/route?${query}`)
+  track(meta.isReroute ? 'reroute' : 'route_requested', {
+    destination_id: meta.toId ?? null,
+    from_id: meta.fromId ?? null,
+    from_gps: !!meta.fromGps,
+    distance_m: r.distance_m,
+    eta_minutes: r.eta_minutes,
+    accuracy_m: meta.accuracyM ?? null,
+    snapped_to: r.snapped_to ?? null,
+    warning: !!r.warning,
+    offline: false,
+  })
+  return r
 }
 
 export function getRoute(fromId, toId, meta = {}) {
@@ -219,22 +128,12 @@ export function getRouteFromCoords(lat, lng, toId, accuracyM, preferNodeId, meta
 /** Road segments (with open/closed state) — reused on the frontend to
  *  surface "passes through X road" entries in the route preview panel. */
 export async function getRoadSegments() {
-  try {
-    return await getJSON('/api/road-segments')
-  } catch (e) {
-    if (!isNetworkError(e)) throw e
-    const bundle = await getCachedBundle()
-    if (!bundle) throw e
-    track('offline_usage', { via: 'road_segments' })
-    return bundle.road_segments || []
-  }
+  return getJSON('/api/road-segments')
 }
 
-/** Phase 4.2 — food court menu image for today (or a specific date).
- *  Not part of the offline bundle (menu images are day-specific and rely
- *  on Supabase Storage URLs anyway) — offline callers get the same
- *  network-error behaviour as before; UI already treats a menu fetch
- *  failure as "no menu today" rather than a hard error. */
+/** Phase 4.2 — food court menu image for today (or a specific date). UI
+ *  already treats a menu fetch failure as "no menu today" rather than a
+ *  hard error. */
 export function getVenueMenu(venueId, date) {
   const q = date ? `?date=${encodeURIComponent(date)}` : ''
   return getJSON(`/api/locations/${encodeURIComponent(venueId)}/menu${q}`)
