@@ -18,6 +18,102 @@ HOSTEL_PENALTY = 8.0
 CLOSURE_PENALTY = 999999.0  # effectively blocked but allows fallback
 WALKING_MPS    = 1.4
 
+# Mirrors CSE_ANNEXURE_OBSTACLE in backend/scripts/build_walkway_graph.py
+# (same mirrored-constant pattern already used there for HOSTEL_BBOX, which
+# mirrors road_segments.json's hostel zone). Duplicated rather than imported
+# because router.py is imported directly by main.py at request time and
+# must not depend on backend/scripts/ being on sys.path.
+#
+# This is used ONLY to keep the live-GPS -> snapped-node "connector" segment
+# (the one piece of geometry in a route response that isn't drawn from
+# validated graph/location_edges — see find_route_from_point) from being
+# rendered straight through the building. It never touches which node
+# Dijkstra treats as the route start, the graph, or any edge weight.
+CSE_ANNEXURE_OBSTACLE = [
+    (12.752056978358182, 80.19662242100897),
+    (12.751880152753605, 80.19662490453447),
+    (12.751887419561703, 80.1974121821163),
+    (12.752061822893541, 80.19739728096334),
+]
+
+# Local tangent-plane origin for the obstacle check only -- consistent with
+# build_walkway_graph.py's projection, but this is just a metres-accurate
+# flat approximation for one small polygon, not anything shared with the
+# graph itself.
+_OBS_LAT0, _OBS_LNG0 = 12.7513, 80.1975
+_OBS_M_LAT = 110540.0
+_OBS_M_LNG = 111320.0 * math.cos(math.radians(_OBS_LAT0))
+
+
+def _obs_xy(lat, lng):
+    return ((lng - _OBS_LNG0) * _OBS_M_LNG, (lat - _OBS_LAT0) * _OBS_M_LAT)
+
+
+def _point_in_obstacle_xy(pt, poly_xy):
+    x, y = pt
+    inside = False
+    n = len(poly_xy)
+    for i in range(n):
+        x1, y1 = poly_xy[i]
+        x2, y2 = poly_xy[(i + 1) % n]
+        if (y1 > y) != (y2 > y):
+            x_at_y = x1 + (y - y1) * (x2 - x1) / (y2 - y1)
+            if x < x_at_y:
+                inside = not inside
+    return inside
+
+
+def _segments_intersect_xy(p1, p2, q1, q2):
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    d1, d2 = cross(q1, q2, p1), cross(q1, q2, p2)
+    d3, d4 = cross(p1, p2, q1), cross(p1, p2, q2)
+    return ((d1 > 0) != (d2 > 0)) and ((d3 > 0) != (d4 > 0))
+
+
+def _connector_crosses_obstacle(lat1, lng1, lat2, lng2):
+    """True if the straight line from (lat1,lng1) to (lat2,lng2) enters the
+    CSE Annexure footprint. Used only for the raw-GPS connector segment."""
+    poly_xy = [_obs_xy(lat, lng) for lat, lng in CSE_ANNEXURE_OBSTACLE]
+    p1, p2 = _obs_xy(lat1, lng1), _obs_xy(lat2, lng2)
+    if _point_in_obstacle_xy(p1, poly_xy) or _point_in_obstacle_xy(p2, poly_xy):
+        return True
+    n = len(poly_xy)
+    for j in range(n):
+        if _segments_intersect_xy(p1, p2, poly_xy[j], poly_xy[(j + 1) % n]):
+            return True
+    return False
+
+
+def _nearest_visible_neighbor(adj, snap_id, nodes_by_id, lat, lng):
+    """When the direct GPS -> snap_id connector is blocked by the obstacle,
+    look for the closest node directly graph-connected to snap_id (a real,
+    already-validated edge -- see backend/scripts/validate_walkway_graph.py's
+    obstacle check, which confirms no edge anywhere crosses the footprint)
+    whose own straight line from the GPS point is clear. This never touches
+    Dijkstra or the route it already chose -- it only changes how the last
+    few metres from the user's live position to that unchanged route are
+    drawn. Only real graph nodes are considered (not destination ids), so
+    the result can always be spliced onto the existing route using that
+    edge's own real geometry, not an invented line.
+
+    Returns (neighbor_node, path_neighbor_to_snap) or (None, None).
+    """
+    best = None  # (dist_from_gps, neighbor_node, path_snap_to_neighbor)
+    for neighbor_id, _w, path_snap_to_neighbor in adj.get(snap_id, []):
+        neighbor = nodes_by_id.get(neighbor_id)
+        if neighbor is None:
+            continue  # skip destination ids -- only real walkway nodes
+        if _connector_crosses_obstacle(lat, lng, neighbor['lat'], neighbor['lng']):
+            continue
+        d = _point_dist(lat, lng, neighbor['lat'], neighbor['lng'])
+        if best is None or d < best[0]:
+            best = (d, neighbor, path_snap_to_neighbor)
+    if best is None:
+        return None, None
+    _, neighbor, path_snap_to_neighbor = best
+    return neighbor, list(reversed(path_snap_to_neighbor))
+
 
 def _load():
     graph = json.load(open(GRAPH_PATH))
@@ -284,10 +380,17 @@ def find_route_from_point(lat: float, lng: float, to_id: str, accuracy_m: float 
     where the user's live position is rarely exactly on a graph node.
 
     The user's exact coordinate is snapped to the nearest walkway node,
-    Dijkstra runs from that node, and the snap segment (straight line from
-    the live GPS point to the snapped node) is prepended to the returned
-    path so the polyline starts exactly where the user is standing rather
-    than a few metres off on the nearest path.
+    Dijkstra runs from that node exactly as it always has, and a connector
+    segment from the live GPS point to that node is prepended so the
+    polyline starts where the user is actually standing. That connector is
+    the one piece of a route response that isn't drawn from validated
+    graph/location_edge geometry — see CSE_ANNEXURE_OBSTACLE above — so
+    before it's added it's checked against that footprint: if the direct
+    line would cross it, the connector routes via the nearest directly-
+    connected node with a clear line of sight instead (using that edge's
+    own real geometry), or is dropped entirely if none exists, per
+    _nearest_visible_neighbor. This never changes snap_id itself or
+    anything Dijkstra returns — only how the live point is joined to it.
 
     `accuracy_m`, when supplied, is the GPS fix's own reported accuracy —
     passed straight through to `_nearest_node`, where it gates a sanity
@@ -331,11 +434,34 @@ def find_route_from_point(lat: float, lng: float, to_id: str, accuracy_m: float 
 
     full_path, real_dist = _stitch(adj, seq)
 
-    # Prepend the live GPS point -> snapped node segment.
+    # Connect the live GPS point to the route Dijkstra already chose. The
+    # direct straight line to the snapped node is the default -- unchanged
+    # behaviour everywhere on campus except here -- and is only replaced
+    # when that specific line would cross the CSE Annexure obstacle.
+    # snap_id itself (which node Dijkstra treats as the route start, and
+    # therefore the whole route beyond this connector) is never touched.
     snap_node = next(n for n in graph['nodes'] if n['id'] == snap_id)
-    full_path = [{'lat': lat, 'lng': lng}, {'lat': snap_node['lat'], 'lng': snap_node['lng']}] + full_path[1:]
-    real_dist += snap_dist
 
+    if not _connector_crosses_obstacle(lat, lng, snap_node['lat'], snap_node['lng']):
+        full_path = [{'lat': lat, 'lng': lng}, {'lat': snap_node['lat'], 'lng': snap_node['lng']}] + full_path[1:]
+        connector_dist = snap_dist
+    else:
+        nodes_by_id = {n['id']: n for n in graph['nodes']}
+        neighbor, path_neighbor_to_snap = _nearest_visible_neighbor(adj, snap_id, nodes_by_id, lat, lng)
+        if neighbor is not None:
+            # Splice: GPS -> neighbor (verified clear of the obstacle) ->
+            # that edge's own real geometry (already proven obstacle-free
+            # by validate_walkway_graph.py) -> snap_id -> rest of route.
+            gps_to_neighbor = _point_dist(lat, lng, neighbor['lat'], neighbor['lng'])
+            connector_dist  = gps_to_neighbor + _path_length(path_neighbor_to_snap)
+            full_path = [{'lat': lat, 'lng': lng}] + path_neighbor_to_snap + full_path[1:]
+        else:
+            # No nearby node has a clear line of sight either -- don't draw
+            # an unverified connector at all. full_path already starts
+            # exactly at snap_node (see _stitch), so this leaves it as-is.
+            connector_dist = 0.0
+
+    real_dist += connector_dist
     eta = round(real_dist / WALKING_MPS / 60, 1)
 
     segs_closed = [s['name'] for s in segs if s.get('closed')]
@@ -348,7 +474,7 @@ def find_route_from_point(lat: float, lng: float, to_id: str, accuracy_m: float 
         'junctions':   [snap_id, to_id],
         'warning':     warning,
         'snapped_to':  snap_id,
-        'snap_distance_m': round(snap_dist, 1),
+        'snap_distance_m': round(connector_dist, 1),
     }
 
 

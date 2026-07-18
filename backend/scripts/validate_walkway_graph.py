@@ -7,6 +7,7 @@ graph-generation rebuild:
   - no self loops
   - no duplicated/overlapping geometry between distinct edges
   - no obviously unnecessary detours (route distance vs straight-line ratio)
+  - no edge crosses the CSE Annexure obstacle footprint
 
 Run from backend/:  python3 scripts/validate_walkway_graph.py
 """
@@ -18,6 +19,7 @@ from itertools import combinations
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(BASE_DIR, 'utils'))
+sys.path.insert(0, os.path.join(BASE_DIR, 'scripts'))
 sys.path.insert(0, BASE_DIR)
 
 DATA_DIR = os.path.join(BASE_DIR, 'data')
@@ -25,6 +27,7 @@ GRAPH_PATH = os.path.join(DATA_DIR, 'walkway_graph.json')
 LOCATIONS_PATH = os.path.join(DATA_DIR, 'locations.json')
 
 import router  # noqa: E402
+from build_walkway_graph import CSE_ANNEXURE_OBSTACLE, path_intersects_obstacle  # noqa: E402
 
 
 def haversine(lat1, lng1, lat2, lng2):
@@ -116,6 +119,17 @@ def main():
         for a, b, straight, route_d in sorted(detour_flags, key=lambda t: -(t[3] / t[2]))[:20]:
             print(f"    {a:24s} -> {b:24s} straight={straight:7.1f}m  route={route_d:7.1f}m  ratio={route_d/straight:.2f}x")
         warnings.append(f"{len(detour_flags)} location pairs have route/straight-line ratio > 3x (see above)")
+
+    # --- CSE Annexure obstacle check ---------------------------------------
+    obstacle_edge_hits = [e for e in graph['edges'] if path_intersects_obstacle(e['path'], CSE_ANNEXURE_OBSTACLE)]
+    obstacle_loc_hits = [e for e in graph['location_edges']
+                          if path_intersects_obstacle(e['path'], CSE_ANNEXURE_OBSTACLE)]
+    print(f"\nCSE Annexure obstacle check: {len(obstacle_edge_hits)} edge(s), "
+          f"{len(obstacle_loc_hits)} location_edge(s) crossing the footprint")
+    for e in obstacle_edge_hits:
+        errors.append(f"Edge {e['from']} -> {e['to']} crosses the CSE Annexure obstacle")
+    for e in obstacle_loc_hits:
+        errors.append(f"location_edge {e['from']} -> {e['to']} crosses the CSE Annexure obstacle")
 
     # --- geometry overlap sanity check (no two distinct edges sharing the
     #     same sub-segment, which would indicate leftover duplicate roads) --

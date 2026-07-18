@@ -87,6 +87,20 @@ EDGE_END_MARGIN = 3.0        # step 10: snap to endpoint instead of splitting if
 # (HOSTEL_PENALTY in utils/router.py) keeps working unchanged.
 HOSTEL_BBOX = {'lat_min': 12.7495, 'lat_max': 12.752, 'lng_min': 80.1985, 'lng_max': 80.2005}
 
+# Step 12.5 -- CSE Annexure building obstacle. Surveyed corners, supplied
+# directly (not derived from OSM tile imagery -- this app has no other
+# building-footprint data anywhere). Any edge whose geometry enters this
+# footprint is dropped after final graph assembly; see
+# `filter_obstacle_edges` below. This is a single, targeted obstacle for one
+# building, not a general obstacle framework -- do not generalize this into
+# a multi-building system unless a real second case shows up.
+CSE_ANNEXURE_OBSTACLE = [
+    (12.752056978358182, 80.19662242100897),
+    (12.751880152753605, 80.19662490453447),
+    (12.751887419561703, 80.1974121821163),
+    (12.752061822893541, 80.19739728096334),
+]
+
 # Local tangent-plane projection origin (campus center) -- all geometric
 # operations (distance, projection, simplification, clustering) happen in
 # this flat meters space, which is accurate enough for a ~1km-wide campus
@@ -120,6 +134,88 @@ def path_length_xy(xy):
 def path_length_latlng(path):
     return sum(haversine(path[i]['lat'], path[i]['lng'], path[i + 1]['lat'], path[i + 1]['lng'])
                for i in range(len(path) - 1))
+
+
+# ---------------------------------------------------------------------------
+# Obstacle geometry (used only by filter_obstacle_edges, step 12.5)
+# ---------------------------------------------------------------------------
+def _point_in_polygon_xy(pt, poly_xy):
+    """Ray-casting point-in-polygon test, in local xy metres."""
+    x, y = pt
+    inside = False
+    n = len(poly_xy)
+    for i in range(n):
+        x1, y1 = poly_xy[i]
+        x2, y2 = poly_xy[(i + 1) % n]
+        if (y1 > y) != (y2 > y):
+            x_at_y = x1 + (y - y1) * (x2 - x1) / (y2 - y1)
+            if x < x_at_y:
+                inside = not inside
+    return inside
+
+
+def _segments_intersect_xy(p1, p2, q1, q2):
+    """Standard 2D segment-segment intersection test (proper crossing)."""
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    d1, d2 = cross(q1, q2, p1), cross(q1, q2, p2)
+    d3, d4 = cross(p1, p2, q1), cross(p1, p2, q2)
+    return (((d1 > 0) != (d2 > 0)) and ((d3 > 0) != (d4 > 0)))
+
+
+def path_intersects_obstacle(path_latlng, obstacle_latlng):
+    """True if any point of path_latlng lies inside obstacle_latlng, or any
+    segment of the path crosses any edge of the obstacle polygon."""
+    obstacle_xy = [to_xy(lat, lng) for lat, lng in obstacle_latlng]
+    path_xy = [to_xy(p['lat'], p['lng']) for p in path_latlng]
+    for pt in path_xy:
+        if _point_in_polygon_xy(pt, obstacle_xy):
+            return True
+    n = len(obstacle_xy)
+    for i in range(len(path_xy) - 1):
+        for j in range(n):
+            if _segments_intersect_xy(path_xy[i], path_xy[i + 1], obstacle_xy[j], obstacle_xy[(j + 1) % n]):
+                return True
+    return False
+
+
+def filter_obstacle_edges(graph, obstacle_latlng=CSE_ANNEXURE_OBSTACLE, verbose=True):
+    """Step 12.5 -- drop any graph['edges'] entry whose path geometry enters
+    the given obstacle footprint. Nodes and all other edges are left exactly
+    as assembled; no replacement edges are added, so a node that loses its
+    only connection here would simply become unreachable via that edge (not
+    silently rerouted) -- surfaced by validate_walkway_graph.py's
+    reachability check, not papered over here.
+
+    location_edges are checked too but never auto-removed: deleting a
+    destination's only connector would make that destination unreachable,
+    which is a worse regression than the shortcut this exists to fix. Any
+    hit there is reported so it can be looked at directly instead.
+    """
+    def log(*a):
+        if verbose:
+            print(*a)
+
+    kept, removed = [], []
+    for e in graph['edges']:
+        if path_intersects_obstacle(e['path'], obstacle_latlng):
+            removed.append(e)
+        else:
+            kept.append(e)
+    graph['edges'] = kept
+
+    loc_hits = [e for e in graph['location_edges'] if path_intersects_obstacle(e['path'], obstacle_latlng)]
+
+    log(f"[12.5] CSE Annexure obstacle filter: removed {len(removed)} edge(s) crossing the footprint")
+    for e in removed:
+        log(f"        removed edge {e['from']} -> {e['to']} ({e['distance_m']}m)")
+    if loc_hits:
+        log(f"        WARNING: {len(loc_hits)} location_edge(s) cross the footprint and were NOT removed "
+            f"(would orphan a destination) -- needs manual review:")
+        for e in loc_hits:
+            log(f"        {e['from']} -> {e['to']}")
+
+    return graph, removed, loc_hits
 
 
 # ---------------------------------------------------------------------------
@@ -720,6 +816,8 @@ def build(verbose=True):
     log(f"[11] Tagged {hostel_count} hostel-internal edges")
     log(f"[12] Final graph: {len(graph['nodes'])} nodes, {len(graph['edges'])} edges, "
         f"{len(graph['location_edges'])} location_edges")
+
+    graph, obstacle_removed, obstacle_loc_hits = filter_obstacle_edges(graph, verbose=verbose)
 
     return graph
 
