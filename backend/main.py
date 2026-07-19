@@ -235,11 +235,6 @@ def get_route(
         "source":      result.get("source", "local"),
         "warning":     result.get("warning"),
         "snapped_to":  result.get("snapped_to"),
-        # How many points at the front of `path` are a synthetic GPS->graph
-        # connector rather than validated graph geometry -- see
-        # utils/router.py find_route_from_point's docstring. 0 for a
-        # from_id-based route (no such connector exists).
-        "connector_point_count": result.get("connector_point_count", 0),
     }
 
 

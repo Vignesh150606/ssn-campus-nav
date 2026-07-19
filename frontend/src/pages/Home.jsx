@@ -104,12 +104,6 @@ export default function Home() {
   const [routeEta, setRouteEta]           = useState(null)
   const [routeWarning, setRouteWarning]   = useState(null)
   const [routeError, setRouteError]       = useState(null)
-  // Mirrors routePath — how many leading points of it are a synthetic
-  // GPS->graph connector rather than validated graph geometry (see
-  // backend's connector_point_count). Threaded into setRoute() so
-  // LocationProvider's off-route detection excludes it. 0 for a
-  // from_id-anchored route (getRoute), which has no such connector.
-  const [routeConnectorCount, setRouteConnectorCount] = useState(0)
   // Priority 2 (Phase 4.8) — set whenever handleDirections/
   // startNavigationFromCopilot had to fall back to routing from Main Gate
   // because live GPS position wasn't available yet at request time. See
@@ -609,7 +603,6 @@ export default function Home() {
       setRoutePath(r.path)
       setRouteDist(r.distance_m)
       setRouteEta(r.eta_minutes)
-      setRouteConnectorCount(r.connector_point_count ?? 0)
       if (r.warning) setRouteWarning(r.warning)
     } catch (e) {
       setPreviewError(e.message)
@@ -626,7 +619,7 @@ export default function Home() {
   function handleStartNavigation() {
     if (!previewLoc || !routePath) return
     voice.resetForNewRoute()
-    setRoute(routePath, previewLoc.lat, previewLoc.lng, previewLoc.id, routeConnectorCount)
+    setRoute(routePath, previewLoc.lat, previewLoc.lng, previewLoc.id)
     voice.announceNavigationStart()
     if (!tracking) startTracking()
     setFollowUser(autoRecenter)
@@ -690,11 +683,10 @@ export default function Home() {
         setRouteDist(r.distance_m)
         setRouteEta(r.eta_minutes)
         setRouteWarning(r.warning || null)
-        setRouteConnectorCount(r.connector_point_count ?? 0)
         // Only push into the live GPS-tracked route if navigation is
         // actually underway — during the preview step there's no live
         // route yet to update, just the preview numbers above.
-        if (navMode) setRoute(r.path, previewLoc.lat, previewLoc.lng, previewLoc.id, r.connector_point_count ?? 0)
+        if (navMode) setRoute(r.path, previewLoc.lat, previewLoc.lng, previewLoc.id)
       } catch {
         // Keep the existing (fallback) route rather than surface an error
         // for a correction the user didn't explicitly ask for.
@@ -729,8 +721,7 @@ export default function Home() {
       setRouteEta(r.eta_minutes)
       setRouteWarning(r.warning || null)
       setRouteError(null)
-      setRouteConnectorCount(r.connector_point_count ?? 0)
-      setRoute(r.path, loc.lat, loc.lng, loc.id, r.connector_point_count ?? 0)
+      setRoute(r.path, loc.lat, loc.lng, loc.id)
       voice.announceNavigationStart()
       if (!tracking) startTracking()
       setFollowUser(autoRecenter)
@@ -757,7 +748,6 @@ export default function Home() {
     setPreviewLoc(null)
     setDestination(null)
     setRoutePath(null); setRouteDist(null); setRouteEta(null); setRouteWarning(null)
-    setRouteConnectorCount(0)
   }
 
   function handleClear() {
@@ -787,7 +777,6 @@ export default function Home() {
     }
     setRoutePath(null); setRouteDist(null); setRouteEta(null)
     setRouteWarning(null); setRouteError(null); setDestination(null)
-    setRouteConnectorCount(0)
     setFollowUser(false)
     setPreviewActive(false); setPreviewRoutes(null); setPreviewLoc(null)
     clearGpsRoute()

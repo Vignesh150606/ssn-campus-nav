@@ -143,7 +143,7 @@ export default function EventPage() {
       const r = (tracking && position)
         ? await getRouteFromCoords(position.lat, position.lng, event.location.id)
         : await getRoute(ENTRY_ID, event.location.id)
-      setRoutePreview({ path: r.path, dist: r.distance_m, eta: r.eta_minutes, connectorPointCount: r.connector_point_count ?? 0 })
+      setRoutePreview({ path: r.path, dist: r.distance_m, eta: r.eta_minutes })
       setPreviewOpen(true)
     } catch (e) {
       setRouteError(e.message)
@@ -156,7 +156,7 @@ export default function EventPage() {
   const handleStartNavigation = useCallback(() => {
     if (!routePreview || !event) return
     voice.resetForNewRoute()
-    setRoute(routePreview.path, event.location.lat, event.location.lng, event.location.id, routePreview.connectorPointCount ?? 0)
+    setRoute(routePreview.path, event.location.lat, event.location.lng, event.location.id)
     if (!tracking) startTracking()
     // Phase 11: pass room/floor/wing via router state → Home.jsx reads it on mount
     const eventInfo = {

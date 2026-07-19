@@ -22,22 +22,7 @@ export function pathLength(points) {
   return total
 }
 
-// How much straight-line "cost" (metres) is charged per metre a candidate
-// point's walking-distance-along-the-path sits away from the last matched
-// position. A candidate has to be substantially closer in a straight line
-// to win over simply continuing forward along the path already being
-// followed. Tuned so a ~10-15m parallel leg (a typical hairpin/U-turn
-// width) is never worth jumping to for a few metres of extra straight-line
-// proximity, while a genuine, large forward step (normal walking, several
-// seconds between fixes) still costs very little.
-const NEAREST_INDEX_CONTINUITY_WEIGHT = 0.5
-// If even the continuity-weighted winner is this far away in a straight
-// line, `previousIndex` context is untrustworthy (e.g. right after a
-// route swap, or the very first fix) — fall back to a plain nearest-point
-// match instead of forcing a bad one.
-const NEAREST_INDEX_FALLBACK_M = 60
-
-function plainNearest(lat, lng, path) {
+export function nearestIndex(lat, lng, path) {
   let best = 0
   let bestDist = Infinity
   for (let i = 0; i < path.length; i++) {
@@ -45,68 +30,6 @@ function plainNearest(lat, lng, path) {
     if (d < bestDist) { bestDist = d; best = i }
   }
   return { index: best, distance: bestDist }
-}
-
-/**
- * Find the closest point on `path` to (lat, lng).
- *
- * `previousIndex`, when supplied, biases the match toward continuing
- * along the path from roughly where it left off, instead of a pure
- * closest-point search. This matters anywhere the walkway graph loops or
- * folds back close to itself (a U-turn, two roughly-parallel paths a few
- * metres apart, a path that passes near an earlier stretch of itself) —
- * a plain nearest-VERTEX search has no notion of "which leg was I already
- * walking," so a few metres of GPS drift can flip the match to a
- * geometrically-close but topologically-distant vertex on the OTHER leg,
- * and slicing the path array from there draws a straight chord across to
- * it. This is generic route-progress matching, not tied to any one
- * location on campus — any route is susceptible wherever its own
- * geometry happens to fold back near itself, regardless of how densely
- * that stretch happens to be vertexed (an index-count "window" doesn't
- * reliably solve this — a tight hairpin can be only a few vertices apart
- * even though walking it is a real detour — so the bias here is instead
- * weighted by actual walking distance ALONG the path: `previousIndex`'s
- * cumulative distance vs. each candidate's, not its array index).
- *
- * Omit `previousIndex` (or pass null) for a plain unconstrained nearest-
- * point search — correct for "first fix against a brand-new route" or any
- * other one-off lookup with no prior position to be continuous with.
- */
-export function nearestIndex(lat, lng, path, previousIndex = null) {
-  if (previousIndex == null || previousIndex < 0 || previousIndex >= path.length) {
-    return plainNearest(lat, lng, path)
-  }
-
-  // Cumulative walking distance from index 0 -- computed once per call so
-  // "how far along the path is index i from index j" is an O(1) lookup
-  // for every candidate below, rather than re-walking the path per
-  // candidate.
-  const cumulative = new Array(path.length)
-  cumulative[0] = 0
-  for (let i = 1; i < path.length; i++) {
-    cumulative[i] = cumulative[i - 1] + haversine(path[i - 1].lat, path[i - 1].lng, path[i].lat, path[i].lng)
-  }
-  const prevArc = cumulative[previousIndex]
-
-  let best = 0
-  let bestScore = Infinity
-  let bestStraightDist = Infinity
-  for (let i = 0; i < path.length; i++) {
-    const straight = haversine(lat, lng, path[i].lat, path[i].lng)
-    const arcDeviation = Math.abs(cumulative[i] - prevArc)
-    const score = straight + NEAREST_INDEX_CONTINUITY_WEIGHT * arcDeviation
-    if (score < bestScore) { bestScore = score; best = i; bestStraightDist = straight }
-  }
-
-  if (bestStraightDist > NEAREST_INDEX_FALLBACK_M) {
-    // Even continuity-weighted, nothing plausible was found near the
-    // reported position -- previousIndex no longer means anything for
-    // this array (e.g. a fresh route was just swapped in). Fall back to
-    // a plain nearest-point match rather than force a distant one.
-    return plainNearest(lat, lng, path)
-  }
-
-  return { index: best, distance: bestStraightDist }
 }
 
 export function destinationPoint(lat, lng, bearingDeg, distanceM) {
