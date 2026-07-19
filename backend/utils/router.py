@@ -442,9 +442,27 @@ def find_route_from_point(lat: float, lng: float, to_id: str, accuracy_m: float 
     # therefore the whole route beyond this connector) is never touched.
     snap_node = next(n for n in graph['nodes'] if n['id'] == snap_id)
 
+    # connector_point_count: how many points at the FRONT of `full_path`
+    # are synthetic (the straight-line-ish jump from the caller's raw GPS
+    # coordinate onto the graph) rather than real, validated graph/
+    # location_edge geometry. Exactly one of two values:
+    #   1 — a synthetic point (the raw lat/lng itself) was prepended, in
+    #       either of the two branches below.
+    #   0 — nothing was prepended; full_path already starts exactly at
+    #       snap_id's own real coordinates (the "no clear line of sight"
+    #       fallback just below).
+    # This is the one piece of information a caller needs to tell "the
+    # user's live position, joined by an unverified straight line" apart
+    # from "the route Dijkstra actually computed" -- e.g. to measure
+    # distance-from-route using only validated geometry, without a stale
+    # or long connector segment silently counting as "on the path". See
+    # LocationProvider.jsx (frontend) for the consumer.
+    connector_point_count = 0
+
     if not _connector_crosses_obstacle(lat, lng, snap_node['lat'], snap_node['lng']):
         full_path = [{'lat': lat, 'lng': lng}, {'lat': snap_node['lat'], 'lng': snap_node['lng']}] + full_path[1:]
         connector_dist = snap_dist
+        connector_point_count = 1
     else:
         nodes_by_id = {n['id']: n for n in graph['nodes']}
         neighbor, path_neighbor_to_snap = _nearest_visible_neighbor(adj, snap_id, nodes_by_id, lat, lng)
@@ -455,6 +473,7 @@ def find_route_from_point(lat: float, lng: float, to_id: str, accuracy_m: float 
             gps_to_neighbor = _point_dist(lat, lng, neighbor['lat'], neighbor['lng'])
             connector_dist  = gps_to_neighbor + _path_length(path_neighbor_to_snap)
             full_path = [{'lat': lat, 'lng': lng}] + path_neighbor_to_snap + full_path[1:]
+            connector_point_count = 1
         else:
             # No nearby node has a clear line of sight either -- don't draw
             # an unverified connector at all. full_path already starts
@@ -475,6 +494,7 @@ def find_route_from_point(lat: float, lng: float, to_id: str, accuracy_m: float 
         'warning':     warning,
         'snapped_to':  snap_id,
         'snap_distance_m': round(connector_dist, 1),
+        'connector_point_count': connector_point_count,
     }
 
 
@@ -513,6 +533,11 @@ def find_route(from_id: str, to_id: str) -> dict:
         'eta_minutes': eta,
         'junctions':   [from_id, to_id],
         'warning':     warning,
+        # No synthetic GPS connector here -- from_id is a named location
+        # whose own coordinates ARE the graph/location_edge start point.
+        # See find_route_from_point's connector_point_count for why this
+        # field exists.
+        'connector_point_count': 0,
     }
 
 

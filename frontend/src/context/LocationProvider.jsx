@@ -32,16 +32,55 @@ import { getRouteFromCoords } from '../api'
 // "route through CSE Annexure" investigation concludes.
 import { logRerouteEvent } from '../utils/rerouteDebug'
 
-// Hysteresis on off-route detection: flag off-route only once past
-// OFF_ROUTE_ENTER_M, and don't clear it again until back within
-// OFF_ROUTE_CLEAR_M. A single shared threshold meant GPS jitter right at
-// that boundary could flip the flag back and forth on every tick, which
-// would re-trigger the off-route voice announcement repeatedly even
-// though the user hadn't really left and rejoined the route.
-// Phase 2 — corrected thresholds per spec:
-// Deviation < 15m → stay on route  |  Deviation > 20m → recalculate
-const OFF_ROUTE_ENTER_M = 20
-const OFF_ROUTE_CLEAR_M = 15
+// Hysteresis on off-route detection: flag off-route only once past the
+// "enter" threshold, and don't clear it again until back within the
+// (smaller) "clear" threshold. A single shared threshold meant GPS jitter
+// right at that boundary could flip the flag back and forth on every
+// tick, which would re-trigger the off-route voice announcement
+// repeatedly even though the user hadn't really left and rejoined the
+// route.
+//
+// Phase 3 — thresholds are now ADAPTIVE, scaled by this fix's own
+// reported GPS accuracy (Google Maps' own approach), instead of the flat
+// 20m/15m Phase 2 used. A noisy 40m-accuracy fix drifting 25m from the
+// route is well within its own margin of error and shouldn't reroute; a
+// crisp 5m-accuracy fix drifting the same 25m very much has left the
+// path. Floors keep a good fix from having to wander unreasonably far
+// before a real deviation is caught; ceilings keep a terrible fix from
+// disabling off-route detection altogether.
+const OFF_ROUTE_ENTER_FLOOR_M    = 15
+const OFF_ROUTE_ENTER_CEILING_M  = 60
+const OFF_ROUTE_CLEAR_FLOOR_M    = 10
+const OFF_ROUTE_CLEAR_CEILING_M  = 45
+const OFF_ROUTE_ACCURACY_FACTOR  = 1.6  // multiplier applied to accuracy to get the "enter" threshold
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
+
+/** Returns { enter, clear } distance thresholds (metres) for this GPS
+ *  fix's accuracy. `enter` > `clear` always, preserving the hysteresis
+ *  gap regardless of accuracy. Unknown accuracy falls back to the floor
+ *  (the old flat-threshold behaviour). */
+function offRouteThresholds(accuracyM) {
+  const acc   = accuracyM != null && accuracyM > 0 ? accuracyM : OFF_ROUTE_ENTER_FLOOR_M
+  const enter = clamp(acc * OFF_ROUTE_ACCURACY_FACTOR, OFF_ROUTE_ENTER_FLOOR_M, OFF_ROUTE_ENTER_CEILING_M)
+  const clear = clamp(enter * 0.7, OFF_ROUTE_CLEAR_FLOOR_M, OFF_ROUTE_CLEAR_CEILING_M)
+  return { enter, clear: Math.min(clear, enter - 2) }
+}
+
+/** Strips the synthetic GPS->graph connector point(s), if any, off the
+ *  front of a route response's path — see backend's connector_point_count
+ *  (utils/router.py find_route_from_point's docstring). What remains is
+ *  exactly the geometry Dijkstra + the validated graph produced: safe to
+ *  measure distance-from-route against without a long or stale
+ *  straight-line connector silently counting as "on the path". Used only
+ *  for off-route detection and on-route progress trimming — never swapped
+ *  in for rendering, so the map always shows the full, real path (with
+ *  its connector, if any) exactly as the backend returned it. */
+function graphOnlyPath(path, connectorPointCount) {
+  const n = connectorPointCount ?? 0
+  if (!path?.length || n <= 0 || n >= path.length) return path
+  return path.slice(n)
+}
 const AUTO_WALK_STEP_M = 15      // metres advanced per auto-walk tick
 const AUTO_WALK_INTERVAL_MS = 1000
 const OFF_ROUTE_TEST_DISTANCE_M = 80
@@ -160,6 +199,27 @@ export function LocationProvider({ children }) {
   // previous one. See utils/router.py _nearest_node's docstring (the
   // "route-continuity stickiness" section) for the bug this fixes.
   const lastSnappedNodeRef = useRef(null)
+  // The CURRENT route's validated graph geometry only — i.e. routeRef.current
+  // with any synthetic GPS->graph connector point stripped off the front
+  // (see graphOnlyPath / backend's connector_point_count). This is the one
+  // array off-route detection and on-route progress trimming are ever
+  // measured against; routeRef.current (the full, connector-included path)
+  // is reserved for rendering only. Reset together with routeRef.current
+  // everywhere a route starts, ends, or is replaced.
+  const graphPathRef = useRef(null)
+  // The index into graphPathRef.current that the last ON-ROUTE tick
+  // matched to. Fed into nearestIndex() as a progress hint so the match
+  // can't jump to a distant, only-coincidentally-nearby vertex on some
+  // other leg of the path (see geo.js). Reset to null whenever
+  // graphPathRef.current is replaced with a different array — a fresh
+  // route's indices mean nothing relative to the old one.
+  const lastMatchedIndexRef = useRef(null)
+  // A snapshot of remainingDist held from the last ON-ROUTE tick. Used as
+  // maybeRecalculate's "how much further is there to go" input while
+  // off-route, instead of re-deriving it every tick from geometry that —
+  // by definition, while off-route — no longer reflects where the user
+  // actually is.
+  const frozenRemainingDistRef = useRef(null)
   // Mirrors `offRoute` state for synchronous reads inside processPosition,
   // which is a stable useCallback (deps: [maybeRecalculate]) — reading the
   // `offRoute` state variable directly there would close over a stale
@@ -270,7 +330,14 @@ export function LocationProvider({ children }) {
           responsePathLength: Array.isArray(r.path) ? r.path.length : null,
           responseWarning: r.warning ?? null,
         })
+        // Atomic swap: routeRef (full, rendered path), graphPathRef
+        // (validated geometry only, for the next off-route check) and
+        // lastMatchedIndexRef (meaningless against a brand-new array) all
+        // change together, in this one place, so no intermediate tick can
+        // ever see a route/graphPath pair that don't belong to each other.
         routeRef.current  = r.path
+        graphPathRef.current = graphOnlyPath(r.path, r.connector_point_count)
+        lastMatchedIndexRef.current = null
         lastSnappedNodeRef.current = r.snapped_to ?? null
         announced.current = new Set() // fresh route -> distance thresholds can fire again
         setRemainingPath(r.path)
@@ -279,6 +346,7 @@ export function LocationProvider({ children }) {
         setFullPath(r.path)
         setFullDistance(r.distance_m)
         setFullEta(r.eta_minutes)
+        frozenRemainingDistRef.current = r.distance_m
         setRecalcVersion((v) => v + 1)
         offRouteRef.current = false
         setOffRoute(false)
@@ -395,32 +463,65 @@ export function LocationProvider({ children }) {
 
     // Internal routing calculations can use the snapped position if needed,
     // but the public `position` state must remain the raw GPS coordinate.
-    const { index, distance: distFromPath } = nearestIndex(lat, lng, routeRef.current)
+    //
+    // Distance-from-route is measured against graphPathRef — the current
+    // route's validated graph geometry ONLY, never routeRef.current's raw
+    // (possibly connector-prefixed) form. Measuring against a connector
+    // would mean "standing anywhere along a GPS->graph snap segment" reads
+    // as "on the path", which is exactly how a stale connector used to get
+    // silently accepted as still-valid. previousIndex biases the match
+    // toward continuing forward from where the last on-route tick left
+    // off, so a path that loops or hairpins back near itself can't cause
+    // the match to jump to a distant, only-coincidentally-close vertex.
+    const graphPath = graphPathRef.current?.length ? graphPathRef.current : routeRef.current
+    const { index, distance: distFromPath } = nearestIndex(lat, lng, graphPath, lastMatchedIndexRef.current)
+
     // Hysteresis: which threshold applies depends on the *current* state,
     // read from the ref (not the `offRoute` state value, which would be
-    // stale inside this stable callback).
+    // stale inside this stable callback). Thresholds themselves are
+    // adaptive — see offRouteThresholds() above.
+    const { enter: enterM, clear: clearM } = offRouteThresholds(accuracyM)
     const isOffRoute = offRouteRef.current
-      ? distFromPath > OFF_ROUTE_CLEAR_M  // already off-route: stay off-route until back within 40m
-      : distFromPath > OFF_ROUTE_ENTER_M  // currently on-route: only flag once beyond 60m
+      ? distFromPath > clearM  // already off-route: stay off-route until back within clearM
+      : distFromPath > enterM  // currently on-route: only flag once beyond enterM
     offRouteRef.current = isOffRoute
 
     if (isOffRoute) {
       setOffRoute(true)
       setGuidance('⚠️ Off route detected — recalculating route…')
-    } else {
-      setOffRoute(false)
+
+      // Root-cause fix — this is the one change that actually eliminates
+      // the diagonal-connector bug: remainingPath/routeRef/lastMatchedIndexRef
+      // are deliberately left untouched here. The previously-displayed
+      // route stays on screen exactly as it was on the last on-route tick
+      // until maybeRecalculate's fresh result is ready, at which point
+      // it's swapped in atomically (see its .then() above) — never a
+      // partial state re-derived from a stale array against a moving,
+      // off-route GPS fix. The old code re-ran nearestIndex + .slice()
+      // against routeRef.current unconditionally, every tick, including
+      // here — since a whole-path nearest-VERTEX search has no continuity
+      // guarantee once you're genuinely off the path, that match could
+      // land on a distant vertex and draw a straight chord to it, and
+      // because it re-ran every ~1s while off-route, the chord reshaped
+      // itself tick to tick. Freezing the display here (and only here —
+      // normal on-route trimming below is unaffected) removes the
+      // mechanism entirely, campus-wide, not just near one building.
+      maybeRecalculate(lat, lng, frozenRemainingDistRef.current, accuracyM, speedMS, courseDeg)
+      return
     }
 
-    const remaining = routeRef.current.slice(index)
+    setOffRoute(false)
+
+    // On-route: safe to trim/advance the displayed route, since `index`
+    // is a stable, progress-biased match against known-good geometry.
+    lastMatchedIndexRef.current = index
+    const remaining = graphPath.slice(index)
     setRemainingPath(remaining)
 
     const remDist = pathLength(remaining)
     setRemainingDist(Math.round(remDist))
     setLiveEta(Math.round((remDist / 1.4 / 60) * 10) / 10)
-
-    if (isOffRoute) {
-      maybeRecalculate(lat, lng, remDist, accuracyM, speedMS, courseDeg)
-    }
+    frozenRemainingDistRef.current = remDist
 
     // Phase 9 (Q7): dynamic arrival — uses max(15m, GPS accuracy)
     const arrivalM = Math.max(15, Math.min(acc ?? 15, 50))
@@ -548,6 +649,9 @@ export function LocationProvider({ children }) {
     shownPositionRef.current   = false                    // Priority 2 (Phase 4.7)
     acquireDeadlineRef.current = null                      // Priority 2 (Phase 4.7)
     routeRef.current = null
+    graphPathRef.current = null
+    lastMatchedIndexRef.current = null
+    frozenRemainingDistRef.current = null
     destRef.current = null
     lastSnappedNodeRef.current = null
     setActiveDestination(null)
@@ -565,9 +669,19 @@ export function LocationProvider({ children }) {
     setRecalculating(false)
   }, [stopRealWatch, stopAutoWalkInternal])
 
-  const setRoute = useCallback((path, destLat, destLng, destId) => {
+  // `connectorPointCount` (optional, defaults to 0) is the same field a
+  // route response's `connector_point_count` carries — see backend's
+  // find_route_from_point docstring. Callers building a route from a live
+  // GPS coordinate (getRouteFromCoords) should pass it through so
+  // off-route detection measures against validated graph geometry only
+  // from the very first tick, not just after the first automatic reroute.
+  // Callers using a named from_id (getRoute) can omit it — 0 is correct,
+  // there's no synthetic connector in that response.
+  const setRoute = useCallback((path, destLat, destLng, destId, connectorPointCount = 0) => {
     stopAutoWalkInternal()
     routeRef.current  = path
+    graphPathRef.current = graphOnlyPath(path, connectorPointCount)
+    lastMatchedIndexRef.current = null
     destRef.current   = { lat: destLat, lng: destLng, id: destId ?? null }
     lastSnappedNodeRef.current = null
     setActiveDestination(destRef.current)
@@ -576,6 +690,7 @@ export function LocationProvider({ children }) {
     const dist = pathLength(path)
     setRemainingPath(path)
     setRemainingDist(dist)
+    frozenRemainingDistRef.current = dist
     setFullPath(path)
     setFullDistance(dist)
     setFullEta(Math.round((dist / 1.4 / 60) * 10) / 10)
@@ -589,6 +704,9 @@ export function LocationProvider({ children }) {
   const clearRoute = useCallback(() => {
     stopAutoWalkInternal()
     routeRef.current = null
+    graphPathRef.current = null
+    lastMatchedIndexRef.current = null
+    frozenRemainingDistRef.current = null
     destRef.current  = null
     lastSnappedNodeRef.current = null
     setActiveDestination(null)
