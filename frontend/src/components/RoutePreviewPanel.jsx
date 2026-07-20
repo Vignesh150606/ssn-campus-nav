@@ -46,6 +46,23 @@ export default function RoutePreviewPanel({
       {loading && <SkeletonRoutePreview />}
       {error && <div className="state-message" style={{ color: 'var(--danger)' }}>{error}</div>}
 
+      {/* Defensive fallback: none of the three states above should ever
+          all be false/null/false at once now that handleDirections in
+          Home.jsx guards against a superseded fetch overwriting this
+          state — but if it ever does happen again (a future change to
+          the fetch flow, a caller that forgets the guard, etc.), this is
+          what stops the panel silently rendering nothing below the
+          header. See Home.jsx's handleDirections docstring comment for
+          the race this is a backstop for. */}
+      {!loading && !error && !active && (
+        <div className="state-message">
+          Couldn't load route details.
+          <button className="route-preview-btn secondary" style={{ marginTop: 8 }} onClick={onCancel}>
+            Close and try again
+          </button>
+        </div>
+      )}
+
       {active && !loading && (
         <>
           {routes.length > 1 && (

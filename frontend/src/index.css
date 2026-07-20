@@ -7,7 +7,7 @@
 /* ---------- Tokens ---------- */
 :root {
   /* SSN institutional palette — sourced from the SSN crest navy */
-  --ssn-navy:        #003b7a;
+  --ssn-navy:        #0d4ba0;
   --ssn-navy-strong: #002a59;
   --ssn-navy-soft:   rgba(0, 59, 122, 0.10);
   --ssn-gold:        #c8a24a;

@@ -22,14 +22,132 @@ export function pathLength(points) {
   return total
 }
 
-export function nearestIndex(lat, lng, path) {
-  let best = 0
-  let bestDist = Infinity
-  for (let i = 0; i < path.length; i++) {
-    const d = haversine(lat, lng, path[i].lat, path[i].lng)
-    if (d < bestDist) { bestDist = d; best = i }
+// ─────────────────────────────────────────────────────────────────────────
+// Map-matching — projects a live GPS point onto the route's own geometry
+// instead of snapping to the nearest raw vertex.
+//
+// Root-cause note: the previous "current position on route" logic scanned
+// every vertex in the WHOLE path on every GPS tick and had no memory of
+// which part of the route the user was already on. Two failure modes fell
+// out of that directly:
+//   1. It measured distance to path VERTICES, not to the path itself — a
+//      GPS point sitting exactly on a long straight segment, but far from
+//      either endpoint, could be reported as "far from the route".
+//   2. Wherever the route geometry passes close to a different, unrelated
+//      part of itself (a corner, a path that loops back near a building —
+//      exactly the IT Block/CSE Annexure/Open Air Theatre cluster in the
+//      bug reports), a few metres of GPS noise could make the "nearest"
+//      match jump to that unrelated part instead of staying on the
+//      segment the user is actually walking. Every downstream value
+//      (remaining path geometry, remaining distance, ETA, and the
+//      turn-by-turn instruction, which is just computeUpcomingTurn() of
+//      whatever remaining path this produced) inherited that discontinuity
+//      on every single GPS tick — that's the mechanism behind the
+//      diagonal/V-shaped route segments and the flickering turn
+//      instructions reported in real-world testing.
+//
+// matchToPath() fixes both: it projects onto path SEGMENTS (not just
+// vertices — projectOntoSegment below clamps the projection to the
+// segment, so it's still well-defined at the ends), and — the important
+// part — when given the previous tick's matched segment, it only searches
+// a small window around it, so the match can only ever progress along the
+// route the user is actually on rather than teleporting to a lookalike
+// stretch elsewhere in the path.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Local flat-earth (equirectangular) projection, using the query point
+ *  itself as the origin. Accurate to sub-metre precision over the scale
+ *  of a single route segment (tens of metres) on a campus this size —
+ *  this is ONLY used for the point-to-segment projection math below, not
+ *  for any of the haversine distances the rest of the app already uses. */
+function toLocalXY(lat, lng, originLat, originLng) {
+  const cosLat = Math.cos((originLat * Math.PI) / 180)
+  const mPerDegLat = 110540
+  const mPerDegLng = 111320 * cosLat
+  return {
+    x: (lng - originLng) * mPerDegLng,
+    y: (lat - originLat) * mPerDegLat,
   }
-  return { index: best, distance: bestDist }
+}
+
+/** Closest point to (lat,lng) on the segment [a,b] — clamped to the
+ *  segment itself (t in [0,1]), not the infinite line through it.
+ *  Returns { lat, lng, distance (metres), t }. */
+export function projectOntoSegment(lat, lng, a, b) {
+  const pa = toLocalXY(a.lat, a.lng, lat, lng)
+  const pb = toLocalXY(b.lat, b.lng, lat, lng)
+  const abx = pb.x - pa.x, aby = pb.y - pa.y
+  const lenSq = abx * abx + aby * aby
+  let t = lenSq === 0 ? 0 : (-pa.x * abx + -pa.y * aby) / lenSq
+  t = Math.max(0, Math.min(1, t))
+  const projX = pa.x + abx * t
+  const projY = pa.y + aby * t
+  return {
+    lat: a.lat + (b.lat - a.lat) * t,
+    lng: a.lng + (b.lng - a.lng) * t,
+    distance: Math.hypot(projX, projY),
+    t,
+  }
+}
+
+// How far around the previous match to search on subsequent ticks.
+// Backward slack is small (routes don't need to reconsider segments the
+// user has clearly already passed) but non-zero (a stationary/slow-moving
+// user's noisy fix can legitimately project slightly behind the last
+// match). Forward slack is generous — large enough to comfortably cover a
+// normal walking pace between GPS ticks — but still bounded, so a genuinely
+// wrong turn is left for off-route detection to catch rather than the
+// matcher quietly "finding" a plausible-looking segment far down the route.
+const MATCH_WINDOW_BACK_SEGMENTS = 2
+const MATCH_WINDOW_FORWARD_SEGMENTS = 25
+
+/**
+ * Match a live GPS point onto `path`, constrained to a window around
+ * `searchFromIndex` (the previous tick's matched segment index) when
+ * supplied. Pass `null` for the first match of a route (or right after a
+ * reroute, when `path` itself is new) — that does one unconstrained,
+ * whole-path search to establish an initial position.
+ *
+ * Returns { segmentIndex, point: {lat,lng}, distance (perpendicular
+ * distance from (lat,lng) to the matched point, metres), cumulativeDistanceM
+ * (arc length from path[0] to the matched point) }, or null if `path` has
+ * fewer than 2 points.
+ */
+export function matchToPath(lat, lng, path, searchFromIndex = null) {
+  if (!path || path.length < 2) return null
+
+  const lastSegment = path.length - 2
+  const lo = searchFromIndex == null ? 0 : Math.max(0, searchFromIndex - MATCH_WINDOW_BACK_SEGMENTS)
+  const hi = searchFromIndex == null ? lastSegment : Math.min(lastSegment, searchFromIndex + MATCH_WINDOW_FORWARD_SEGMENTS)
+
+  let best = null
+  for (let i = lo; i <= hi; i++) {
+    const proj = projectOntoSegment(lat, lng, path[i], path[i + 1])
+    if (!best || proj.distance < best.distance) {
+      best = { segmentIndex: i, point: { lat: proj.lat, lng: proj.lng }, distance: proj.distance }
+    }
+  }
+  if (!best) return null
+
+  let cumulative = 0
+  for (let i = 0; i < best.segmentIndex; i++) {
+    cumulative += haversine(path[i].lat, path[i].lng, path[i + 1].lat, path[i + 1].lng)
+  }
+  cumulative += haversine(path[best.segmentIndex].lat, path[best.segmentIndex].lng, best.point.lat, best.point.lng)
+
+  return { segmentIndex: best.segmentIndex, point: best.point, distance: best.distance, cumulativeDistanceM: cumulative }
+}
+
+/** Builds the "remaining route" polyline from a match: starts exactly at
+ *  the matched (on-route) point — not the raw, possibly-off-to-the-side
+ *  GPS coordinate, and not a distant vertex — followed by the untouched
+ *  remaining vertices of the original path. This is what keeps the
+ *  rendered blue line glued to the actual route geometry tick to tick
+ *  instead of re-deriving a new shape (and a new upcoming-turn
+ *  calculation) from wherever the last GPS sample happened to land. */
+export function remainingPathFromMatch(path, match) {
+  if (!match) return path
+  return [match.point, ...path.slice(match.segmentIndex + 1)]
 }
 
 export function destinationPoint(lat, lng, bearingDeg, distanceM) {

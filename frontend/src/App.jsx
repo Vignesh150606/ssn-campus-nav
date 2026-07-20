@@ -15,7 +15,7 @@ function useTheme() {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('ssn-theme', theme)
     const metas = document.querySelectorAll('meta[name="theme-color"]')
-    const color = theme === 'dark' ? '#003b7a' : '#003b7a'
+    const color = theme === 'dark' ? '#0d4ba0' : '#0d4ba0'
     metas.forEach((m) => m.setAttribute('content', color))
   }, [theme])
   return [theme, () => setTheme(t => (t === 'dark' ? 'light' : 'dark'))]

@@ -26,27 +26,47 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { LocationContext } from './LocationContext'
-import { pathLength, nearestIndex, destinationPoint, pointAtDistanceAlongPath } from '../utils/geo'
+import { pathLength, matchToPath, remainingPathFromMatch, destinationPoint, pointAtDistanceAlongPath } from '../utils/geo'
 import { getRouteFromCoords } from '../api'
 // TEMPORARY — see utils/rerouteDebug.js. Remove once the live-navigation
 // "route through CSE Annexure" investigation concludes.
 import { logRerouteEvent } from '../utils/rerouteDebug'
 
-// Hysteresis on off-route detection: flag off-route only once past
-// OFF_ROUTE_ENTER_M, and don't clear it again until back within
-// OFF_ROUTE_CLEAR_M. A single shared threshold meant GPS jitter right at
-// that boundary could flip the flag back and forth on every tick, which
-// would re-trigger the off-route voice announcement repeatedly even
-// though the user hadn't really left and rejoined the route.
-// Phase 2 — corrected thresholds per spec:
-// Deviation < 15m → stay on route  |  Deviation > 20m → recalculate
-const OFF_ROUTE_ENTER_M = 20
-const OFF_ROUTE_CLEAR_M = 15
+// Off-route detection — root-cause redesign.
+//
+// The old implementation compared deviation against a FIXED 15m/20m
+// hysteresis band, regardless of how accurate the GPS fix itself was.
+// Real-world testing on this campus recorded accuracy ranging from ±4m to
+// ±52m — so a fixed ~20m band means an ordinary ±50m fix crosses it
+// constantly on GPS noise alone, with nothing to do with the user actually
+// leaving the route. That's the direct cause of the repeated "Off Route
+// Detected" / oscillating-instruction reports: the flag was reacting to
+// GPS quality, not to real deviation.
+//
+// The threshold now scales with the fix's own reported accuracy (clamped
+// to a sane floor/ceiling), and — separately — a single noisy sample is no
+// longer enough to flip the flag either way. OFF_ROUTE_CONFIRM_SAMPLES
+// consecutive ticks past the relevant threshold are required before
+// declaring off-route (or clearing it again), so brief jitter is absorbed
+// and only a *sustained* deviation ever reaches the reroute logic — small
+// drift → no reroute, real deviation → one reroute, matching how Google
+// Maps' own off-route detection behaves.
+const OFF_ROUTE_MIN_M = 20               // floor: never require less than this even with a perfect fix
+const OFF_ROUTE_MAX_M = 60               // ceiling: never require more than this even with a very poor fix
+const OFF_ROUTE_ACCURACY_FACTOR = 1.3    // enter-threshold ≈ accuracy_m × this, clamped to [MIN, MAX]
+const OFF_ROUTE_CLEAR_RATIO = 0.65       // clear-threshold = enter-threshold × this (hysteresis band)
+const OFF_ROUTE_CONFIRM_SAMPLES = 3      // consecutive accepted fixes required before flipping state
 const AUTO_WALK_STEP_M = 15      // metres advanced per auto-walk tick
 const AUTO_WALK_INTERVAL_MS = 1000
 const OFF_ROUTE_TEST_DISTANCE_M = 80
 const DEFAULT_SIM_POSITION = { lat: 12.75137, lng: 80.204085 } // main-gate
 const SIMULATED_ACCURACY_M = 5
+
+/** Accuracy-scaled off-route "enter" threshold — see redesign note above. */
+function offRouteEnterThresholdM(accuracyM) {
+  const base = (typeof accuracyM === 'number' && accuracyM > 0) ? accuracyM * OFF_ROUTE_ACCURACY_FACTOR : OFF_ROUTE_MIN_M
+  return Math.min(OFF_ROUTE_MAX_M, Math.max(OFF_ROUTE_MIN_M, base))
+}
 
 // --- Feature 1: automatic route recalculation ---
 // ── GPS accuracy policy ──────────────────────────────────────────────────
@@ -160,6 +180,23 @@ export function LocationProvider({ children }) {
   // previous one. See utils/router.py _nearest_node's docstring (the
   // "route-continuity stickiness" section) for the bug this fixes.
   const lastSnappedNodeRef = useRef(null)
+  // Segment index (into routeRef.current) that the previous GPS tick's
+  // map-match landed on — fed back into matchToPath() so each new tick
+  // only searches a small window around it instead of the whole route.
+  // Reset to null (full-path search) whenever the route itself changes:
+  // a fresh setRoute()/clearRoute() call, or a successful reroute (new
+  // path = old segment indices are meaningless). See utils/geo.js
+  // matchToPath()'s docstring for why this window is what keeps the
+  // matched position — and therefore remainingPath, ETA, and the upcoming
+  // turn — from jumping to an unrelated part of the route on GPS noise.
+  const lastMatchIndexRef = useRef(null)
+  // Consecutive-sample counters for the off-route hysteresis debounce
+  // (see OFF_ROUTE_CONFIRM_SAMPLES above): offStreakRef counts ticks in a
+  // row past the enter-threshold while on-route, onStreakRef counts ticks
+  // in a row back within the clear-threshold while off-route. Whichever
+  // one reaches the confirm count flips offRouteRef and resets both.
+  const offStreakRef = useRef(0)
+  const onStreakRef  = useRef(0)
   // Mirrors `offRoute` state for synchronous reads inside processPosition,
   // which is a stable useCallback (deps: [maybeRecalculate]) — reading the
   // `offRoute` state variable directly there would close over a stale
@@ -273,6 +310,9 @@ export function LocationProvider({ children }) {
         routeRef.current  = r.path
         lastSnappedNodeRef.current = r.snapped_to ?? null
         announced.current = new Set() // fresh route -> distance thresholds can fire again
+        lastMatchIndexRef.current = null // new path — old segment index is meaningless, re-search whole path next tick
+        offStreakRef.current = 0
+        onStreakRef.current  = 0
         setRemainingPath(r.path)
         setRemainingDist(Math.round(r.distance_m))
         setLiveEta(r.eta_minutes)
@@ -393,25 +433,60 @@ export function LocationProvider({ children }) {
     // off-route detection and reroutes from a bad initial cell/WiFi fix.
     if (isAcquiring) return
 
-    // Internal routing calculations can use the snapped position if needed,
+    // Internal routing calculations can use the matched position if needed,
     // but the public `position` state must remain the raw GPS coordinate.
-    const { index, distance: distFromPath } = nearestIndex(lat, lng, routeRef.current)
-    // Hysteresis: which threshold applies depends on the *current* state,
-    // read from the ref (not the `offRoute` state value, which would be
-    // stale inside this stable callback).
-    const isOffRoute = offRouteRef.current
-      ? distFromPath > OFF_ROUTE_CLEAR_M  // already off-route: stay off-route until back within 40m
-      : distFromPath > OFF_ROUTE_ENTER_M  // currently on-route: only flag once beyond 60m
+    //
+    // matchToPath is windowed around the previous tick's matched segment
+    // (lastMatchIndexRef) rather than searching the whole path fresh every
+    // time — see utils/geo.js for why that's what stops the match jumping
+    // to an unrelated, lookalike stretch of the route on GPS noise. The
+    // window is reset to null (whole-path search) by setRoute/clearRoute
+    // and after every successful reroute, since a new path's segment
+    // indices have nothing to do with the old one's.
+    const match = matchToPath(lat, lng, routeRef.current, lastMatchIndexRef.current)
+    if (!match) return
+    lastMatchIndexRef.current = match.segmentIndex
+    const distFromPath = match.distance
+
+    // Accuracy-scaled hysteresis with a consecutive-sample confirmation —
+    // see the OFF_ROUTE_* constants above for the reasoning. wasOffRoute is
+    // a snapshot of the CONFIRMED state at the start of this tick; the
+    // streak counters below only ever move the confirmed state on the
+    // Nth consecutive sample, never on a single reading.
+    const wasOffRoute    = offRouteRef.current
+    const enterThreshold = offRouteEnterThresholdM(accuracyM)
+    const clearThreshold = enterThreshold * OFF_ROUTE_CLEAR_RATIO
+
+    let isOffRoute = wasOffRoute
+    if (!wasOffRoute) {
+      offStreakRef.current = distFromPath > enterThreshold ? offStreakRef.current + 1 : 0
+      onStreakRef.current = 0
+      if (offStreakRef.current >= OFF_ROUTE_CONFIRM_SAMPLES) {
+        isOffRoute = true
+        offStreakRef.current = 0
+      }
+    } else {
+      onStreakRef.current = distFromPath <= clearThreshold ? onStreakRef.current + 1 : 0
+      offStreakRef.current = 0
+      if (onStreakRef.current >= OFF_ROUTE_CONFIRM_SAMPLES) {
+        isOffRoute = false
+        onStreakRef.current = 0
+      }
+    }
     offRouteRef.current = isOffRoute
 
     if (isOffRoute) {
       setOffRoute(true)
-      setGuidance('⚠️ Off route detected — recalculating route…')
+      // Only (re)announce on the tick the state actually changed, so the
+      // banner text doesn't get re-set (and voice guidance re-triggered
+      // downstream) on every tick for the whole time the user stays
+      // off-route — just once, when they first leave the route.
+      if (!wasOffRoute) setGuidance('⚠️ Off route detected — recalculating route…')
     } else {
       setOffRoute(false)
     }
 
-    const remaining = routeRef.current.slice(index)
+    const remaining = remainingPathFromMatch(routeRef.current, match)
     setRemainingPath(remaining)
 
     const remDist = pathLength(remaining)
@@ -550,6 +625,9 @@ export function LocationProvider({ children }) {
     routeRef.current = null
     destRef.current = null
     lastSnappedNodeRef.current = null
+    lastMatchIndexRef.current = null
+    offStreakRef.current = 0
+    onStreakRef.current = 0
     setActiveDestination(null)
     announced.current = new Set()
     setRemainingPath(null)
@@ -570,6 +648,9 @@ export function LocationProvider({ children }) {
     routeRef.current  = path
     destRef.current   = { lat: destLat, lng: destLng, id: destId ?? null }
     lastSnappedNodeRef.current = null
+    lastMatchIndexRef.current = null
+    offStreakRef.current = 0
+    onStreakRef.current = 0
     setActiveDestination(destRef.current)
     announced.current = new Set()
     walkedMetersRef.current = 0
@@ -591,6 +672,9 @@ export function LocationProvider({ children }) {
     routeRef.current = null
     destRef.current  = null
     lastSnappedNodeRef.current = null
+    lastMatchIndexRef.current = null
+    offStreakRef.current = 0
+    onStreakRef.current = 0
     setActiveDestination(null)
     announced.current = new Set()
     walkedMetersRef.current = 0

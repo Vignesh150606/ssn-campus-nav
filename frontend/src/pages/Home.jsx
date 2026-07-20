@@ -120,6 +120,13 @@ export default function Home() {
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError]     = useState(null)
   const [previewTrigger, setPreviewTrigger] = useState(0)
+  // Monotonically-increasing id identifying the most recent
+  // handleDirections/startNavigationFromCopilot fetch. Any async response
+  // (success or error) whose captured id no longer matches this ref's
+  // current value has been superseded by a newer request or a cancel, and
+  // is discarded without touching state. See handleDirections for the
+  // full race-condition writeup this fixes.
+  const previewRequestIdRef = useRef(0)
 
   // Voice settings panel
   const [navSettingsOpen, setNavSettingsOpen] = useState(false)
@@ -584,6 +591,20 @@ export default function Home() {
 
   // ── Handlers ──────────────────────────────────────────────────────────
   async function handleDirections(loc) {
+    // Root-cause fix for the "blank / half-rendered / inconsistent
+    // destination sheet" reports: nothing here previously tracked which
+    // fetch was the MOST RECENT one. If the user tapped a destination,
+    // then tapped a different one (or closed the sheet) before the first
+    // network round-trip finished — easy to do on the flaky campus wifi
+    // seen in testing — the first request could resolve AFTER the second
+    // and silently overwrite its state: wrong route data under the right
+    // destination name, or previewLoading cleared while a newer request
+    // was still genuinely in flight (leaving RoutePreviewPanel with
+    // loading=false, error=null, routes=null — nothing to render).
+    // previewRequestIdRef makes each call check, before writing any state
+    // back, that it's still the most recent request; a superseded one is
+    // silently discarded instead of touching state at all.
+    const requestId = ++previewRequestIdRef.current
     setDestination(loc.id)
     setPreviewLoc(loc)
     setPreviewActive(true)
@@ -598,6 +619,7 @@ export default function Home() {
       const r = usedFallback
         ? await getRoute(ENTRY_ID, loc.id)
         : await getRouteFromCoords(position.lat, position.lng, loc.id, accuracy)
+      if (previewRequestIdRef.current !== requestId) return // superseded — discard
       const landmarks = landmarksAlongPath(r.path, locations, roadSegments, [ENTRY_ID, loc.id])
       setPreviewRoutes([{ distanceM: r.distance_m, etaMinutes: r.eta_minutes, landmarks }])
       setRoutePath(r.path)
@@ -605,9 +627,10 @@ export default function Home() {
       setRouteEta(r.eta_minutes)
       if (r.warning) setRouteWarning(r.warning)
     } catch (e) {
+      if (previewRequestIdRef.current !== requestId) return // superseded — discard
       setPreviewError(e.message)
     } finally {
-      setPreviewLoading(false)
+      if (previewRequestIdRef.current === requestId) setPreviewLoading(false)
     }
   }
 
@@ -618,6 +641,7 @@ export default function Home() {
 
   function handleStartNavigation() {
     if (!previewLoc || !routePath) return
+    previewRequestIdRef.current++ // invalidate any preview fetch still in flight
     voice.resetForNewRoute()
     setRoute(routePath, previewLoc.lat, previewLoc.lng, previewLoc.id)
     voice.announceNavigationStart()
@@ -707,12 +731,14 @@ export default function Home() {
     // browsers only honor requestPermission() as part of the original
     // user-gesture call stack.
     requestCompassPermission()
+    const requestId = ++previewRequestIdRef.current // see handleDirections for the race this guards against
     try {
       const usedFallback = !(tracking && position)
       routeFromFallbackRef.current = usedFallback
       const r = usedFallback
         ? await getRoute(ENTRY_ID, loc.id)
         : await getRouteFromCoords(position.lat, position.lng, loc.id, accuracy)
+      if (previewRequestIdRef.current !== requestId) return // superseded — discard
       voice.resetForNewRoute()
       setDestination(loc.id)
       setPreviewLoc(loc)
@@ -737,11 +763,13 @@ export default function Home() {
       tripStartRef.current = Date.now()
       track('trip_started', { destination_id: loc.id, distance_m: r.distance_m })
     } catch (e) {
+      if (previewRequestIdRef.current !== requestId) return // superseded — discard
       setRouteError(e.message)
     }
   }
 
   function handleCancelPreview() {
+    previewRequestIdRef.current++ // invalidate any preview fetch still in flight
     setPreviewActive(false)
     setPreviewRoutes(null)
     setPreviewError(null)

@@ -61,21 +61,52 @@ export function useDraggableSheet(snapPeeks, initialTier = 'collapsed', active =
   // Priority 1 (Phase 4.8) root-cause fix — proven via runtime instrumentation
   // (real Chrome, real drag, getBoundingClientRect vs --sheet-h at every
   // frame): `maxH` here is the pivot for `translateY = maxH - peek`, so it
-  // must equal the sheet's TRUE, fixed CSS box height (`height: 86dvh` for
-  // the nav sheet) — that's the only thing translateY is actually measured
-  // against. It used to be inferred as `Math.max(collapsed, half, full)`,
-  // which is only correct if `full` always equals the box's real height.
-  // That assumption broke the moment the nav sheet's `full` tier started
-  // being capped below its natural 86dvh to avoid covering the turn-by-turn
-  // card (maxFullBeforeCollision in Home.jsx) — the capped `full` got used
-  // as the transform pivot too, so EVERY tier's rendered peek ended up
-  // taller than intended by exactly (true box height − capped full), with
-  // the floating controls' `bottom: calc(var(--sheet-h) + gap)` anchored to
-  // the (correct, uncapped) intended peek — hence a real, constant,
-  // gap-sized-or-larger overlap, confirmed at ~21px on a capped session.
-  // Callers whose `full` tier is never capped (preview/browse sheets) don't
-  // pass `boxHeight`, so they keep the exact previous (correct) behaviour.
-  const maxH = boxHeight ?? Math.max(snapPeeks.collapsed, snapPeeks.half, snapPeeks.full)
+  // must equal the sheet's TRUE, current CSS box height (`height: 86dvh` for
+  // the nav sheet, `70dvh` for preview/browse) — that's the only thing
+  // translateY is actually measured against. It used to be inferred as
+  // `Math.max(collapsed, half, full)` in JS, which is only correct if the
+  // caller's peeks were computed from the exact same number the CSS `dvh`
+  // resolves to at that instant — two independent sources (a JS-sampled
+  // `window.innerHeight` snapshot vs. the browser's own live dynamic-
+  // viewport value) that are assumed equal but aren't guaranteed to be,
+  // especially right after mobile browser chrome (address bar) shows or
+  // hides. Each caller having to pass a hand-computed `boxHeight` that
+  // "must be kept in sync" with a CSS literal elsewhere is exactly the
+  // kind of duplicated-constant drift that caused this — the nav sheet
+  // got an explicit fix for its own specific case (capped `full` tier),
+  // but the same fragility was still there for every other sheet, and is
+  // the confirmed cause of the "large empty black space below a correctly
+  // -collapsed preview sheet" report: the JS-assumed pivot ended up taller
+  // than the CSS box's real height, so the peek window exposed more of
+  // the (transform-invisible) box than the mounted collapsed-tier content
+  // actually filled.
+  //
+  // Root-cause redesign: instead of computing the pivot from peeks at all,
+  // measure the sheet's own rendered box height directly via
+  // ResizeObserver — the one thing that's guaranteed to equal whatever the
+  // CSS height resolves to right now, on this device, including every
+  // future dvh-vs-viewport edge case neither of us has hit yet. `boxHeight`
+  // is kept as an optional hint used only for the very first frame (before
+  // the observer's first callback has fired) so callers that already pass
+  // it (avoiding a one-frame flash) keep working unchanged; once real
+  // measurements arrive they take over completely and self-correct for
+  // any drift, for every sheet, not just the ones a caller remembered to
+  // special-case.
+  const [measuredBoxHeight, setMeasuredBoxHeight] = useState(null)
+  const maxH = measuredBoxHeight ?? boxHeight ?? Math.max(snapPeeks.collapsed, snapPeeks.half, snapPeeks.full)
+
+  useEffect(() => {
+    const node = sheetRef.current
+    if (!node || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const h = entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect?.height
+        if (h > 0) setMeasuredBoxHeight(Math.round(h))
+      }
+    })
+    ro.observe(node)
+    return () => ro.disconnect()
+  }, [])
 
   const activeRef = useRef(active)
   useEffect(() => { activeRef.current = active }, [active])
@@ -90,6 +121,15 @@ export function useDraggableSheet(snapPeeks, initialTier = 'collapsed', active =
       document.documentElement.style.setProperty('--sheet-h', `${Math.round(Math.max(0, peek))}px`)
     }
   }, [maxH])
+
+  // The instant maxH itself changes (a fresh real measurement replacing
+  // the initial estimate, or the box genuinely resizing — e.g. dvh
+  // changing as browser chrome shows/hides), re-apply the CURRENT peek
+  // (not reset to the tier's nominal peek, so this never fights an
+  // in-progress drag) against the corrected pivot.
+  useEffect(() => {
+    applyPeek(peekRef.current)
+  }, [applyPeek])
 
   // The moment this instance becomes the active/visible sheet, immediately
   // re-assert ITS current height onto --sheet-h. Without this, a sheet that
