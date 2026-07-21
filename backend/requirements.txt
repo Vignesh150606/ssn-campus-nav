@@ -9,3 +9,7 @@ PyJWT==2.10.1
 passlib[bcrypt]==1.7.4
 bcrypt==4.2.0
 python-multipart==0.0.9
+
+# Test-only — needed by FastAPI's TestClient, used in scripts/smoke_test_rbac.py.
+# Not required to run the app itself.
+httpx==0.27.2

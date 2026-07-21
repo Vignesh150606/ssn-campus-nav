@@ -120,14 +120,31 @@ export function matchToPath(lat, lng, path, searchFromIndex = null) {
   const lo = searchFromIndex == null ? 0 : Math.max(0, searchFromIndex - MATCH_WINDOW_BACK_SEGMENTS)
   const hi = searchFromIndex == null ? lastSegment : Math.min(lastSegment, searchFromIndex + MATCH_WINDOW_FORWARD_SEGMENTS)
 
+  // Zero-length segments (two consecutive path points that round to the
+  // same lat/lng) have no direction to project onto — skip them as match
+  // candidates so a real, direction-bearing neighbour always wins instead.
+  // build_walkway_graph.py's dedupe_consecutive_points now prevents this
+  // in the shipped graph data at the source, but this also covers the
+  // rarer coincidence of a live GPS fix landing exactly on a path vertex
+  // (which makes the segment before and after it briefly indistinguishable
+  // in remainingPathFromMatch's output) — belt-and-braces for whatever
+  // path this function is ever handed.
+  const DEGENERATE_SEGMENT_M = 0.1
   let best = null
   for (let i = lo; i <= hi; i++) {
+    if (haversine(path[i].lat, path[i].lng, path[i + 1].lat, path[i + 1].lng) < DEGENERATE_SEGMENT_M) continue
     const proj = projectOntoSegment(lat, lng, path[i], path[i + 1])
     if (!best || proj.distance < best.distance) {
       best = { segmentIndex: i, point: { lat: proj.lat, lng: proj.lng }, distance: proj.distance }
     }
   }
-  if (!best) return null
+  // Every candidate segment in the window was degenerate (pathological,
+  // e.g. a 1-point-effective path) — fall back to the first one so this
+  // still returns a usable match rather than dropping tracking entirely.
+  if (!best) {
+    const proj = projectOntoSegment(lat, lng, path[lo], path[lo + 1])
+    best = { segmentIndex: lo, point: { lat: proj.lat, lng: proj.lng }, distance: proj.distance }
+  }
 
   let cumulative = 0
   for (let i = 0; i < best.segmentIndex; i++) {
@@ -220,6 +237,20 @@ export function computeUpcomingTurn(path) {
     if (cumulative > TURN_LOOKAHEAD_M) break
 
     const segLen = haversine(path[i - 1].lat, path[i - 1].lng, path[i].lat, path[i].lng)
+
+    // A degenerate incoming segment (path[i-1] and path[i] effectively the
+    // same point — see matchToPath's comment above for how this can arise
+    // even with clean graph data) has no real bearing: bearing() between
+    // identical points is undefined and returns a bogus 0°, which then
+    // reads as a large, wrong angleDiff against whatever bearingOut
+    // actually is. Skip evaluating a turn at this vertex rather than
+    // trusting that reading — the real turn, if any, is still correctly
+    // found a few points later once a genuine bearingIn is available.
+    if (segLen < 0.1) {
+      cumulative += segLen
+      continue
+    }
+
     const bearingIn  = bearing(path[i - 1].lat, path[i - 1].lng, path[i].lat, path[i].lng)
     const bearingOut = bearing(path[i].lat, path[i].lng, path[i + 1].lat, path[i + 1].lng)
     const diff    = angleDiff(bearingIn, bearingOut)
@@ -283,7 +314,11 @@ export function computeAllTurns(path) {
   const turns = []
   let cumulative = 0
   for (let i = 1; i < path.length - 1; i++) {
-    cumulative += haversine(path[i - 1].lat, path[i - 1].lng, path[i].lat, path[i].lng)
+    const segLen = haversine(path[i - 1].lat, path[i - 1].lng, path[i].lat, path[i].lng)
+    cumulative += segLen
+    // See computeUpcomingTurn's comment above for why a near-zero-length
+    // incoming segment must be skipped rather than treated as a real turn.
+    if (segLen < 0.1) continue
     const bearingIn  = bearing(path[i - 1].lat, path[i - 1].lng, path[i].lat, path[i].lng)
     const bearingOut = bearing(path[i].lat, path[i].lng, path[i + 1].lat, path[i + 1].lng)
     const diff    = angleDiff(bearingIn, bearingOut)

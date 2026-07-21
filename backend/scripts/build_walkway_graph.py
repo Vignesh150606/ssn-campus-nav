@@ -622,6 +622,45 @@ def in_hostel_bbox(lat, lng):
     return b['lat_min'] <= lat <= b['lat_max'] and b['lng_min'] <= lng <= b['lng_max']
 
 
+def dedupe_consecutive_points(path):
+    """Collapse any run of consecutive points that are identical after the
+    lat/lng rounding applied above into a single point.
+
+    Root cause (found via a live turn-by-turn bug report, traced back to
+    this pipeline rather than patched at the symptom): two genuinely
+    distinct pre-rounding xy points -- e.g. either side of a degree-2
+    contraction seam (step 8), or two points a final RDP pass (step 9)
+    left a few centimetres apart -- can round to the exact same 6-decimal
+    lat/lng (one 6th-decimal-degree of latitude is ~0.11m). That leaves a
+    zero-length segment sitting in the middle of an otherwise normal
+    multi-point edge. It's invisible to every distance-based check in this
+    pipeline (a 0m segment doesn't change distance_m or trip the "near-
+    zero-length EDGE" validator, which only looks at the edge's total
+    length) and to Dijkstra itself, but not to anything that computes a
+    *bearing* across consecutive path points: bearing() between two
+    identical points is mathematically undefined, and in practice
+    atan2(0, 0) returns 0 -- a bogus "due north" reading that corrupts the
+    turn-angle calculation right at that vertex (frontend
+    utils/geo.js:computeUpcomingTurn / matchToPath). Confirmed against the
+    real graph: this is exactly what was producing contradictory turn
+    instructions (e.g. flipping between "u-turn" and "left" for a ~2m GPS
+    shift) at the n_8/n_177 junction in the IT Block/CSE Annexure area.
+
+    This is a general pass over every edge produced by this pipeline, not
+    a fix targeted at that one junction -- a second, independent instance
+    (n_190/n_108) was found and fixed by this same pass, and any future
+    survey/simplification pass that happens to produce the same seam
+    artifact elsewhere is covered too. Always leaves at least 2 points (a
+    single surviving point isn't a path)."""
+    if len(path) < 2:
+        return path
+    out = [path[0]]
+    for pt in path[1:]:
+        if pt['lat'] != out[-1]['lat'] or pt['lng'] != out[-1]['lng']:
+            out.append(pt)
+    return out if len(out) >= 2 else path
+
+
 def assemble_graph(edges, cluster_xy, connectors):
     # Only keep nodes actually referenced by an edge (no orphaned raw points).
     used_ids = set()
@@ -639,6 +678,7 @@ def assemble_graph(edges, cluster_xy, connectors):
     out_edges = []
     for e in edges:
         path = [{'lat': round(lat, 6), 'lng': round(lng, 6)} for lat, lng in (to_latlng(*pt) for pt in e['xy'])]
+        path = dedupe_consecutive_points(path)
         edge_obj = {'from': id_map[e['u']], 'to': id_map[e['v']],
                     'distance_m': round(path_length_latlng(path), 2), 'path': path}
         if in_hostel_bbox(path[0]['lat'], path[0]['lng']) and in_hostel_bbox(path[-1]['lat'], path[-1]['lng']):

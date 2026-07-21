@@ -14,12 +14,20 @@ create extension if not exists "pg_trgm";     -- fast ILIKE search on venues
 
 -- -----------------------------------------------------------------------------
 -- admins
+--
+-- Two roles: 'superadmin' (full access, can manage Fest Admins) and
+-- 'festadmin' (can only submit/edit their own fest schedule entries — see
+-- events.status below). `disabled` lets a Super Admin cut off a Fest
+-- Admin's access without deleting the account; `created_by` tracks which
+-- Super Admin created it (for "View who created each Fest Admin").
 -- -----------------------------------------------------------------------------
 create table if not exists admins (
     id              uuid primary key default gen_random_uuid(),
     username        text not null unique,
     password_hash   text not null,
-    role            text not null default 'admin' check (role in ('admin', 'superadmin')),
+    role            text not null default 'festadmin' check (role in ('superadmin', 'festadmin')),
+    disabled        boolean not null default false,
+    created_by      uuid references admins(id) on delete set null,
     created_at      timestamptz not null default now(),
     last_login_at   timestamptz
 );
@@ -91,8 +99,11 @@ create table if not exists events (
     room_number         text,
     floor               text,
     wing                text,
-    status              text not null default 'pending' check (status in ('pending', 'verified', 'rejected')),
+    status              text not null default 'pending' check (status in ('pending', 'verified', 'rejected', 'needs_changes')),
     reject_reason       text,
+    reviewed_by         uuid references admins(id) on delete set null,
+    approved_at         timestamptz,
+    review_notes        text,
     created_by          uuid references admins(id) on delete set null,
     created_at          timestamptz not null default now(),
     updated_at          timestamptz not null default now()
@@ -102,6 +113,7 @@ create index if not exists idx_events_status on events (status);
 create index if not exists idx_events_fest on events (fest);
 create index if not exists idx_events_date on events (date);
 create index if not exists idx_events_location_id on events (location_id);
+create index if not exists idx_events_reviewed_by on events (reviewed_by);
 
 -- -----------------------------------------------------------------------------
 -- event_images — normalizes the old poster_url (single string) + photo_urls
@@ -128,6 +140,23 @@ create index if not exists idx_event_images_event_id on event_images (event_id);
 create unique index if not exists one_poster_per_event
     on event_images (event_id)
     where (is_poster);
+
+-- -----------------------------------------------------------------------------
+-- admin_audit_log — tracks Fest Admin lifecycle + fest schedule review actions
+-- -----------------------------------------------------------------------------
+create table if not exists admin_audit_log (
+    id              uuid primary key default gen_random_uuid(),
+    actor_id        uuid references admins(id) on delete set null,
+    actor_username  text not null,
+    action          text not null,
+    target_type     text,
+    target_id       text,
+    details         jsonb,
+    created_at      timestamptz not null default now()
+);
+
+create index if not exists idx_audit_log_created_at on admin_audit_log (created_at desc);
+create index if not exists idx_audit_log_actor       on admin_audit_log (actor_id);
 
 -- -----------------------------------------------------------------------------
 -- road_segments  (was: backend/data/road_segments.json, mutated in place)
@@ -189,6 +218,7 @@ alter table event_categories enable row level security;
 alter table events          enable row level security;
 alter table event_images    enable row level security;
 alter table road_segments   enable row level security;
+alter table admin_audit_log enable row level security;
 
 -- =============================================================================
 -- End of schema. Next: Storage bucket setup — see SUPABASE_MIGRATION.md Step 2.

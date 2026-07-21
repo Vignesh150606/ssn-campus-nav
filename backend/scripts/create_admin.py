@@ -1,10 +1,14 @@
 """
 Create (or update the password of) an admin account in Supabase.
 
-Run this once to create your first admin login — there's no public
-sign-up endpoint by design (only superadmins should be able to create
-admins, and right now that's "whoever has the service role key", i.e. you,
-running this script).
+Run this to create your first Super Admin login, or to promote/reset any
+account — there's no HTTP route that can create or modify a superadmin
+account by design (see backend/auth.py / main.py's "Manage Fest Admins"
+section): only whoever has the Supabase service role key, i.e. you,
+running this script, can do that. Fest Admin accounts, by contrast, are
+normally created from the Super Admin Dashboard's "Manage Fest Admins"
+page — this script is only needed for them as a break-glass fallback (e.g.
+you're locked out of the dashboard itself).
 
 Usage:
     cd backend
@@ -39,9 +43,9 @@ def main():
         print("Use at least 8 characters.")
         return
 
-    role = input("Role [admin/superadmin] (default: admin): ").strip() or "admin"
-    if role not in ("admin", "superadmin"):
-        print("Role must be 'admin' or 'superadmin'.")
+    role = input("Role [superadmin/festadmin] (default: superadmin): ").strip() or "superadmin"
+    if role not in ("superadmin", "festadmin"):
+        print("Role must be 'superadmin' or 'festadmin'.")
         return
 
     client = get_client()
@@ -49,10 +53,10 @@ def main():
 
     existing = client.table("admins").select("id").eq("username", username).limit(1).execute()
     if existing.data:
-        client.table("admins").update({"password_hash": password_hash, "role": role}).eq(
+        client.table("admins").update({"password_hash": password_hash, "role": role, "disabled": False}).eq(
             "username", username
         ).execute()
-        print(f"Updated existing admin '{username}' (role: {role}).")
+        print(f"Updated existing admin '{username}' (role: {role}, re-enabled if it was disabled).")
     else:
         client.table("admins").insert(
             {"username": username, "password_hash": password_hash, "role": role}

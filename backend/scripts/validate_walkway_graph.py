@@ -62,11 +62,36 @@ def main():
             zero_len_count += 1
             errors.append(f"Near-zero-length edge {e['from']}->{e['to']} ({e['distance_m']}m)")
 
+    # Consecutive-duplicate points WITHIN an edge's path — distinct from
+    # the "near-zero-length EDGE" check above, which only looks at the
+    # edge's total distance_m and so completely misses a zero-length
+    # segment buried inside an otherwise normal-length multi-point edge
+    # (exactly how this shipped undetected before: a genuinely found bug,
+    # not a hypothetical one — see dedupe_consecutive_points() in
+    # build_walkway_graph.py for the full story and root cause). A
+    # zero-length segment doesn't affect distance/reachability at all, but
+    # it does produce an undefined bearing wherever anything computes a
+    # turn angle across consecutive path points (frontend
+    # utils/geo.js:computeUpcomingTurn) — that's what actually surfaces it,
+    # as a live turn-by-turn instruction flipping unpredictably for a
+    # metre or two of GPS noise right at that point.
+    internal_dup_count = 0
+    for e in graph['edges'] + graph['location_edges']:
+        path = e['path']
+        for i in range(len(path) - 1):
+            if path[i]['lat'] == path[i + 1]['lat'] and path[i]['lng'] == path[i + 1]['lng']:
+                internal_dup_count += 1
+                errors.append(
+                    f"Duplicate consecutive point inside edge {e['from']}->{e['to']} "
+                    f"at index {i} ({path[i]['lat']}, {path[i]['lng']})"
+                )
+
     print(f"Structural checks: {len(graph['nodes'])} nodes, {len(graph['edges'])} edges, "
           f"{len(graph['location_edges'])} location_edges")
     print(f"  duplicate edges: {dup_count}")
     print(f"  zero-length edges: {zero_len_count}")
     print(f"  self loops: {self_loop_count}")
+    print(f"  internal duplicate points (zero-length segments inside an edge): {internal_dup_count}")
 
     # node ids referenced by edges/location_edges must all exist
     node_ids = {n['id'] for n in graph['nodes']}

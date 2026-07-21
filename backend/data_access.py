@@ -126,9 +126,17 @@ def _get_or_create_category_id(client, name: Optional[str]) -> Optional[int]:
 # ---------------------------------------------------------------------------
 
 
-def _serialize_event(row: dict, location_mode: str = "minimal") -> dict:
+def _serialize_event(row: dict, location_mode: str = "minimal", admin_names: Optional[dict] = None) -> dict:
     """Turn a Supabase row (with embedded event_categories/event_images/venues)
-    back into the exact flat shape the frontend has always received."""
+    back into the exact flat shape the frontend has always received.
+
+    admin_names, if given, is a {admin_id: username} lookup — pass this
+    (built once per list by list_all_events_admin, see below) to also
+    resolve created_by/reviewed_by into human-readable submitted_by /
+    reviewed_by usernames for the admin dashboard's Events tab. Left out
+    entirely (not just null) for the public-facing calls (list_public_events
+    / get_event), same as created_by always was — never expose who
+    submitted/reviewed an event to a public visitor."""
     images = row.pop("event_images", None) or []
     images_sorted = sorted(images, key=lambda im: (im.get("sort_order") or 0))
     poster = next((im["url"] for im in images_sorted if im.get("is_poster")), "")
@@ -139,14 +147,25 @@ def _serialize_event(row: dict, location_mode: str = "minimal") -> dict:
 
     venue = row.pop("venues", None)
 
+    created_by_id = row.pop("created_by", None)
+    reviewed_by_id = row.pop("reviewed_by", None)
+
     out = {
         **row,
         "category": category,
         "poster_url": poster,
         "photo_urls": gallery,
+        # New unified reviewer-comment field. Pre-migration rejected events
+        # only have reject_reason set (review_notes will be null on those) —
+        # fall back so the admin UI has one field to read regardless of
+        # which review action (old or new) produced it.
+        "review_notes": row.get("review_notes") or row.get("reject_reason"),
     }
     out.pop("category_id", None)
-    out.pop("created_by", None)  # internal admin id — never exposed via the API
+
+    if admin_names is not None:
+        out["submitted_by"] = admin_names.get(created_by_id) if created_by_id else None
+        out["reviewed_by"] = admin_names.get(reviewed_by_id) if reviewed_by_id else None
 
     if location_mode == "none":
         return out
@@ -191,6 +210,19 @@ def get_event(event_id: str) -> Optional[dict]:
     return _wrap(_run)
 
 
+def get_event_meta(event_id: str) -> Optional[dict]:
+    """Just {id, created_by, status} — for authorization checks (does this
+    Fest Admin own this event? is it still editable?) without pulling and
+    serializing the full row. Distinct from get_event(), which is the
+    public-shaped read and never exposes created_by."""
+    def _run():
+        client = get_client()
+        rows = client.table("events").select("id, created_by, status").eq("id", event_id).limit(1).execute().data or []
+        return rows[0] if rows else None
+
+    return _wrap(_run)
+
+
 def event_exists(event_id: str) -> bool:
     def _run():
         client = get_client()
@@ -200,11 +232,29 @@ def event_exists(event_id: str) -> bool:
     return _wrap(_run)
 
 
-def list_all_events_admin() -> List[dict]:
+def list_all_events_admin(requesting_admin_id: Optional[str] = None, requesting_role: Optional[str] = None) -> List[dict]:
+    """List events for the admin dashboard.
+
+    A Super Admin sees every event (unchanged from before the Fest Admin
+    role existed). A Fest Admin only sees events they submitted themselves
+    — "View status of their submitted schedules", not everyone's — enforced
+    here server-side (not just hidden in the UI) since main.py always
+    passes the requesting admin's own id/role through from the JWT."""
     def _run():
         client = get_client()
-        rows = client.table("events").select(_EVENT_SELECT_WITH_VENUE).order("created_at").execute().data or []
-        return [_serialize_event(r, location_mode="minimal") for r in rows]
+        q = client.table("events").select(_EVENT_SELECT_WITH_VENUE)
+        if requesting_role == "festadmin":
+            q = q.eq("created_by", requesting_admin_id)
+        rows = q.order("created_at").execute().data or []
+
+        admin_ids = {r.get("created_by") for r in rows if r.get("created_by")}
+        admin_ids |= {r.get("reviewed_by") for r in rows if r.get("reviewed_by")}
+        admin_names = {}
+        if admin_ids:
+            admin_rows = client.table("admins").select("id, username").in_("id", list(admin_ids)).execute().data or []
+            admin_names = {a["id"]: a["username"] for a in admin_rows}
+
+        return [_serialize_event(r, location_mode="minimal", admin_names=admin_names) for r in rows]
 
     return _wrap(_run)
 
@@ -275,12 +325,18 @@ def create_event(payload: dict, created_by_admin_id: Optional[str] = None) -> st
     return _wrap(_run)
 
 
-def verify_event(event_id: str) -> bool:
+def verify_event(event_id: str, reviewer_id: Optional[str] = None) -> bool:
     def _run():
         client = get_client()
+        now = datetime.now(timezone.utc).isoformat()
         result = (
             client.table("events")
-            .update({"status": "verified", "updated_at": datetime.now(timezone.utc).isoformat()})
+            .update({
+                "status": "verified",
+                "reviewed_by": reviewer_id,
+                "approved_at": now,
+                "updated_at": now,
+            })
             .eq("id", event_id)
             .execute()
         )
@@ -289,7 +345,7 @@ def verify_event(event_id: str) -> bool:
     return _wrap(_run)
 
 
-def reject_event(event_id: str, reason: str = "") -> bool:
+def reject_event(event_id: str, reason: str = "", reviewer_id: Optional[str] = None) -> bool:
     def _run():
         client = get_client()
         result = (
@@ -298,6 +354,12 @@ def reject_event(event_id: str, reason: str = "") -> bool:
                 {
                     "status": "rejected",
                     "reject_reason": reason,
+                    # review_notes mirrors reject_reason going forward — see
+                    # its column comment in the RBAC migration for why both
+                    # are written.
+                    "review_notes": reason,
+                    "reviewed_by": reviewer_id,
+                    "approved_at": None,
                     "updated_at": datetime.now(timezone.utc).isoformat(),
                 }
             )
@@ -305,6 +367,87 @@ def reject_event(event_id: str, reason: str = "") -> bool:
             .execute()
         )
         return bool(result.data)
+
+    return _wrap(_run)
+
+
+def request_changes_event(event_id: str, notes: str, reviewer_id: Optional[str] = None) -> bool:
+    """The third review outcome alongside verify/reject — sends the
+    submission back to the Fest Admin with review_notes explaining what
+    needs to change, without deleting or fully rejecting it. They can edit
+    and it comes back to 'pending' automatically (see update_event)."""
+    def _run():
+        client = get_client()
+        result = (
+            client.table("events")
+            .update(
+                {
+                    "status": "needs_changes",
+                    "review_notes": notes,
+                    "reviewed_by": reviewer_id,
+                    "approved_at": None,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            .eq("id", event_id)
+            .execute()
+        )
+        return bool(result.data)
+
+    return _wrap(_run)
+
+
+def update_event(event_id: str, payload: dict, requesting_admin_id: str, requesting_role: str) -> str:
+    """Edit an existing event's core fields. Images go through the separate
+    /images endpoints, unchanged — this never touches poster_url/photo_urls.
+
+    Returns 'ok' / 'not_found' / 'forbidden' / 'locked' so main.py can map
+    each to the right HTTP status without a second lookup to explain why.
+
+    Super Admin: can edit any event in any status; status itself is left
+    untouched — this is a content fix, not a resubmission.
+    Fest Admin: only their own event ("Edit their own submitted schedules"),
+    and only while it's not yet approved ("...until approved") — pending,
+    needs_changes, or rejected are all still editable, verified is locked.
+    A successful Fest Admin edit resets status back to 'pending' and clears
+    the previous review (reviewed_by/approved_at/review_notes) — editing
+    after "needs changes" or "rejected" is a fresh submission for review.
+    `payload` should already be pre-filtered to only the keys the caller
+    actually provided (main.py does this via Pydantic's
+    exclude_unset=True) — every key present here gets written, including
+    an explicit null."""
+    def _run():
+        client = get_client()
+        existing = (
+            client.table("events").select("id, created_by, status").eq("id", event_id).limit(1).execute().data
+        )
+        if not existing:
+            return "not_found"
+        ev = existing[0]
+
+        if requesting_role != "superadmin":
+            if ev["created_by"] != requesting_admin_id:
+                return "forbidden"
+            if ev["status"] == "verified":
+                return "locked"
+
+        updates = dict(payload)
+        updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+        if requesting_role != "superadmin":
+            updates["status"] = "pending"
+            updates["reviewed_by"] = None
+            updates["approved_at"] = None
+            updates["review_notes"] = None
+
+        if "category" in updates:
+            updates["category_id"] = _get_or_create_category_id(client, updates.pop("category"))
+
+        if updates.get("location_id") and not venue_exists(updates["location_id"]):
+            raise ValueError(f"location_id '{updates['location_id']}' not found.")
+
+        client.table("events").update(updates).eq("id", event_id).execute()
+        return "ok"
 
     return _wrap(_run)
 
@@ -392,6 +535,155 @@ def upload_event_image_file(event_id: str, filename: str, content: bytes, conten
 
     public_url, storage_path = _wrap(_run)
     return public_url, storage_path
+
+
+# ---------------------------------------------------------------------------
+# Fest Admin accounts (RBAC) — Super Admin can create/list/disable/enable/
+# delete/reset-password on 'festadmin' accounts. There's deliberately no
+# equivalent for managing OTHER Super Admins here (or in main.py) — bootstrap
+# / promote a Super Admin via scripts/create_admin.py, same as before this
+# feature existed. Keeping that out of the API surface means there's no
+# HTTP route that can ever create or modify a superadmin account, which is
+# exactly the privilege boundary the RBAC redesign is for.
+# ---------------------------------------------------------------------------
+
+def list_fest_admins() -> List[dict]:
+    """For the "Manage Fest Admins" page — includes who created each one
+    (resolved to a username, not just an id) and current status."""
+    def _run():
+        client = get_client()
+        rows = (
+            client.table("admins")
+            .select("id, username, disabled, created_by, created_at, last_login_at")
+            .eq("role", "festadmin")
+            .order("created_at", desc=True)
+            .execute()
+            .data or []
+        )
+        creator_ids = {r["created_by"] for r in rows if r.get("created_by")}
+        creator_names = {}
+        if creator_ids:
+            creators = client.table("admins").select("id, username").in_("id", list(creator_ids)).execute().data or []
+            creator_names = {c["id"]: c["username"] for c in creators}
+        for r in rows:
+            r["created_by_username"] = creator_names.get(r.pop("created_by"))
+        return rows
+
+    return _wrap(_run)
+
+
+def get_admin(admin_id: str) -> Optional[dict]:
+    def _run():
+        client = get_client()
+        rows = client.table("admins").select("id, username, role, disabled").eq("id", admin_id).limit(1).execute().data or []
+        return rows[0] if rows else None
+
+    return _wrap(_run)
+
+
+def create_fest_admin(username: str, password_hash: str, created_by_id: str) -> dict:
+    """Raises ValueError if the username is already taken (checked
+    explicitly rather than relying on the DB's unique-constraint error
+    text, which differs across Postgres/PostgREST versions and shouldn't
+    leak to an HTTP response verbatim)."""
+    def _run():
+        client = get_client()
+        existing = client.table("admins").select("id").eq("username", username).limit(1).execute().data
+        if existing:
+            raise ValueError(f"Username '{username}' is already taken.")
+        row = {
+            "username": username,
+            "password_hash": password_hash,
+            "role": "festadmin",
+            "created_by": created_by_id,
+        }
+        result = client.table("admins").insert(row).execute()
+        return result.data[0] if result.data else row
+
+    return _wrap(_run)
+
+
+def set_admin_disabled(admin_id: str, disabled: bool) -> bool:
+    def _run():
+        client = get_client()
+        result = (
+            client.table("admins")
+            .update({"disabled": disabled})
+            .eq("id", admin_id)
+            .eq("role", "festadmin")  # can't disable/enable a superadmin through this path
+            .execute()
+        )
+        return bool(result.data)
+
+    return _wrap(_run)
+
+
+def reset_admin_password(admin_id: str, password_hash: str) -> bool:
+    def _run():
+        client = get_client()
+        result = (
+            client.table("admins")
+            .update({"password_hash": password_hash})
+            .eq("id", admin_id)
+            .eq("role", "festadmin")
+            .execute()
+        )
+        return bool(result.data)
+
+    return _wrap(_run)
+
+
+def delete_admin(admin_id: str) -> bool:
+    """Events created by a deleted Fest Admin are NOT deleted or hidden —
+    `created_by` on those rows just goes to null (ON DELETE SET NULL) and
+    the admin dashboard shows them as submitted by an unknown/removed
+    account rather than losing the fest schedule content itself."""
+    def _run():
+        client = get_client()
+        result = client.table("admins").delete().eq("id", admin_id).eq("role", "festadmin").execute()
+        return bool(result.data)
+
+    return _wrap(_run)
+
+
+# ---------------------------------------------------------------------------
+# Audit log
+# ---------------------------------------------------------------------------
+
+def record_audit(actor_id: Optional[str], actor_username: str, action: str,
+                  target_type: Optional[str] = None, target_id: Optional[str] = None,
+                  details: Optional[dict] = None) -> None:
+    """Best-effort — same philosophy as last_login_at above: a hiccup
+    writing an audit row must never block the actual admin action it's
+    describing (e.g. disabling a compromised account right now matters
+    more than the log entry about it)."""
+    try:
+        client = get_client()
+        client.table("admin_audit_log").insert({
+            "actor_id": actor_id,
+            "actor_username": actor_username,
+            "action": action,
+            "target_type": target_type,
+            "target_id": target_id,
+            "details": details,
+        }).execute()
+    except Exception:
+        pass
+
+
+def list_audit_log(limit: int = 200) -> List[dict]:
+    def _run():
+        client = get_client()
+        return (
+            client.table("admin_audit_log")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+            .data or []
+        )
+
+    return _wrap(_run)
 
 
 # ---------------------------------------------------------------------------

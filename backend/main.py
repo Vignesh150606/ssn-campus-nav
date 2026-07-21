@@ -38,7 +38,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import data_access
-from auth import authenticate_admin, create_access_token, get_current_admin
+from auth import authenticate_admin, create_access_token, get_current_active_admin, require_role, hash_password, generate_password
 from db import SupabaseUnavailableError
 from utils.qr_generator import generate_event_qr
 from utils.router import find_route as _find_route, find_route_from_point as _find_route_from_point
@@ -264,6 +264,9 @@ def root():
             "/api/feedback",
             "/api/admin/feedback",
             "/api/admin/login",
+            "/api/admin/events",
+            "/api/admin/fest-admins",
+            "/api/admin/audit-log",
             "/api/health",
         ],
     }
@@ -333,11 +336,13 @@ class EventCreate(BaseModel):
 
 
 @app.post("/api/admin/events")
-def create_event(payload: EventCreate, admin: dict = Depends(get_current_admin)):
+def create_event(payload: EventCreate, admin: dict = Depends(get_current_active_admin)):
     """
-    Protected — submit a new event for the fest.
-    Status will be 'pending' until an admin verifies it via PATCH.
-    The event will NOT appear on the public /api/events list until verified.
+    Protected — submit a new event for the fest. Both roles can reach this
+    (a Fest Admin submitting their own schedule is the main use now).
+    Status will be 'pending' until a Super Admin verifies/rejects/requests
+    changes via the endpoints below. The event will NOT appear on the
+    public /api/events list until verified (= approved).
     """
     try:
         event_id = data_access.create_event(payload.model_dump(), created_by_admin_id=admin["sub"])
@@ -345,41 +350,119 @@ def create_event(payload: EventCreate, admin: dict = Depends(get_current_admin))
         raise HTTPException(status_code=400, detail=str(e))
 
     generate_event_qr(event_id)
+    data_access.record_audit(admin["sub"], admin["username"], "fest_submitted", "event", event_id)
     return {"message": "Event submitted — pending verification.", "event_id": event_id}
 
 
-@app.patch("/api/admin/events/{event_id}/verify")
-def verify_event(event_id: str, admin: dict = Depends(get_current_admin)):
-    """Mark an event as verified — it will now appear on the public schedule."""
-    if not data_access.verify_event(event_id):
+class EventUpdate(BaseModel):
+    """Same field set as EventCreate, all optional — a PATCH, not a PUT.
+    Only fields actually present in the request body are changed (see
+    exclude_unset=True below); everything else on the event is left as-is.
+    Does not include poster_url/photo_urls — image management stays on the
+    existing /images endpoints, unchanged."""
+    name: Optional[str] = None
+    fest: Optional[str] = None
+    department: Optional[str] = None
+    location_id: Optional[str] = None
+    date: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    description: Optional[str] = None
+    open_to_external: Optional[bool] = None
+    organizer: Optional[str] = None
+    category: Optional[str] = None
+    contact_info: Optional[str] = None
+    registration_link: Optional[str] = None
+    building: Optional[str] = None
+    room_number: Optional[str] = None
+    floor: Optional[str] = None
+    wing: Optional[str] = None
+
+
+@app.patch("/api/admin/events/{event_id}")
+def edit_event(event_id: str, payload: EventUpdate, admin: dict = Depends(get_current_active_admin)):
+    """Edit an event's core fields. New endpoint — there wasn't one before
+    Fest Admin accounts existed (Super Admins only ever verified/rejected/
+    deleted). Super Admin can edit anything, any time, status unchanged.
+    Fest Admin can only edit their own submission, and only before it's
+    approved — see data_access.update_event for the exact rule and what
+    happens to its status on a successful edit."""
+    outcome = data_access.update_event(
+        event_id, payload.model_dump(exclude_unset=True), admin["sub"], admin["role"]
+    )
+    if outcome == "not_found":
         raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
+    if outcome == "forbidden":
+        raise HTTPException(status_code=403, detail="You can only edit fest schedules you submitted yourself.")
+    if outcome == "locked":
+        raise HTTPException(status_code=409, detail="This event is already approved and can no longer be edited. Contact a Super Admin.")
+    data_access.record_audit(admin["sub"], admin["username"], "fest_updated", "event", event_id)
+    return {"message": f"Event '{event_id}' updated."}
+
+
+@app.patch("/api/admin/events/{event_id}/verify")
+def verify_event(event_id: str, admin: dict = Depends(require_role("superadmin"))):
+    """Mark an event as verified (= Approved) — it will now appear on the
+    public schedule. Super Admin only."""
+    if not data_access.verify_event(event_id, reviewer_id=admin["sub"]):
+        raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
+    data_access.record_audit(admin["sub"], admin["username"], "fest_approved", "event", event_id)
     return {"message": f"Event '{event_id}' verified and now public."}
 
 
 @app.patch("/api/admin/events/{event_id}/reject")
-def reject_event(event_id: str, reason: str = "", admin: dict = Depends(get_current_admin)):
-    """Reject / hide an event from the public schedule."""
-    if not data_access.reject_event(event_id, reason):
+def reject_event(event_id: str, reason: str = "", admin: dict = Depends(require_role("superadmin"))):
+    """Reject / hide an event from the public schedule. Super Admin only."""
+    if not data_access.reject_event(event_id, reason, reviewer_id=admin["sub"]):
         raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
+    data_access.record_audit(admin["sub"], admin["username"], "fest_rejected", "event", event_id, {"reason": reason})
     return {"message": f"Event '{event_id}' rejected."}
 
 
+@app.patch("/api/admin/events/{event_id}/request-changes")
+def request_changes(event_id: str, notes: str = "", admin: dict = Depends(require_role("superadmin"))):
+    """Third review outcome: send it back to the Fest Admin with notes on
+    what to change, instead of an outright reject. Super Admin only."""
+    if not notes.strip():
+        raise HTTPException(status_code=400, detail="Add a note explaining what needs to change.")
+    if not data_access.request_changes_event(event_id, notes, reviewer_id=admin["sub"]):
+        raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
+    data_access.record_audit(admin["sub"], admin["username"], "fest_needs_changes", "event", event_id, {"notes": notes})
+    return {"message": f"Event '{event_id}' sent back for changes."}
+
+
 @app.get("/api/admin/events")
-def list_all_events_admin(admin: dict = Depends(get_current_admin)):
-    """List ALL events including pending and rejected — for the admin dashboard."""
-    return data_access.list_all_events_admin()
+def list_all_events_admin(admin: dict = Depends(get_current_active_admin)):
+    """List events for the admin dashboard. Super Admin sees every event;
+    a Fest Admin only sees the ones they submitted themselves (enforced in
+    data_access, not just hidden client-side)."""
+    return data_access.list_all_events_admin(requesting_admin_id=admin["sub"], requesting_role=admin["role"])
 
 
 @app.delete("/api/admin/events/{event_id}")
-def delete_event(event_id: str, admin: dict = Depends(get_current_admin)):
-    """Permanently delete an event (its images are removed too, via cascade)."""
+def delete_event(event_id: str, admin: dict = Depends(require_role("superadmin"))):
+    """Permanently delete an event (its images are removed too, via
+    cascade). Super Admin only — Fest Admins can edit/resubmit but not
+    delete outright."""
     if not data_access.delete_event(event_id):
         raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
     # Remove QR code if it exists
     qr_path = os.path.join(STATIC_DIR, "qr", f"{event_id}.png")
     if os.path.exists(qr_path):
         os.remove(qr_path)
+    data_access.record_audit(admin["sub"], admin["username"], "fest_deleted", "event", event_id)
     return {"message": f"Event '{event_id}' deleted."}
+
+
+def _authorize_event_access(event_id: str, admin: dict) -> None:
+    """Shared check for the image endpoints below: Super Admin can touch
+    any event's images; a Fest Admin only their own. Raises 404/403 as
+    appropriate; returns normally if access is allowed."""
+    meta = data_access.get_event_meta(event_id)
+    if not meta:
+        raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
+    if admin["role"] != "superadmin" and meta["created_by"] != admin["sub"]:
+        raise HTTPException(status_code=403, detail="You can only manage images on fest schedules you submitted yourself.")
 
 
 @app.post("/api/admin/events/{event_id}/images")
@@ -387,15 +470,14 @@ async def upload_event_image(
     event_id: str,
     file: UploadFile = File(...),
     is_poster: bool = Form(False),
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(get_current_active_admin),
 ):
     """New in Phase 3 — uploads an image file to Supabase Storage and returns
     its public URL. The admin dashboard drops that URL straight into the
     existing poster_url / photo_urls text field, so event creation/edit
     itself is completely unchanged; this just gives that field a real
     "Upload" option alongside pasting an external URL."""
-    if not data_access.event_exists(event_id):
-        raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
+    _authorize_event_access(event_id, admin)
 
     content = await file.read()
     try:
@@ -413,23 +495,126 @@ async def upload_event_image(
 
 
 @app.get("/api/admin/events/{event_id}/images")
-def list_event_images(event_id: str, admin: dict = Depends(get_current_admin)):
+def list_event_images(event_id: str, admin: dict = Depends(get_current_active_admin)):
     """Phase 4.2 — list all image rows for an event (for poster management UI)."""
-    if not data_access.event_exists(event_id):
-        raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
+    _authorize_event_access(event_id, admin)
     return data_access.list_event_images(event_id)
 
 
 @app.delete("/api/admin/events/{event_id}/images/{image_id}")
-def delete_event_image(event_id: str, image_id: str, admin: dict = Depends(get_current_admin)):
+def delete_event_image(event_id: str, image_id: str, admin: dict = Depends(get_current_active_admin)):
     """Phase 4.2 — delete one image from an event (removes from Storage too)."""
+    _authorize_event_access(event_id, admin)
     if not data_access.delete_event_image(image_id, event_id):
         raise HTTPException(status_code=404, detail="Image not found.")
     return {"message": "Image deleted."}
 
 
 # ---------------------------------------------------------------------------
+# Manage Fest Admins (RBAC) — Super Admin only.
+#
+# There's deliberately no equivalent set of routes for managing OTHER
+# Super Admins — that stays a CLI-only action (scripts/create_admin.py),
+# same as it was before Fest Admin accounts existed. No HTTP route in this
+# file can create, promote, or modify a superadmin account.
+# ---------------------------------------------------------------------------
+
+class FestAdminCreate(BaseModel):
+    username: str
+    password: Optional[str] = None  # omit to auto-generate one (returned once in the response)
+
+
+@app.get("/api/admin/fest-admins")
+def list_fest_admins(admin: dict = Depends(require_role("superadmin"))):
+    """List every Fest Admin account, who created it, and its status."""
+    return data_access.list_fest_admins()
+
+
+@app.post("/api/admin/fest-admins")
+def create_fest_admin(payload: FestAdminCreate, admin: dict = Depends(require_role("superadmin"))):
+    """Create a new Fest Admin account. Leave password blank to have one
+    generated — it's only ever returned in this response (bcrypt is one-
+    way, so this is the only chance to see or copy it); note it down or
+    hand it to the coordinator directly."""
+    username = payload.username.strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="Username can't be empty.")
+
+    password = payload.password or generate_password()
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
+
+    try:
+        data_access.create_fest_admin(username, hash_password(password), created_by_id=admin["sub"])
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+    data_access.record_audit(admin["sub"], admin["username"], "fest_admin_created", "admin", username)
+    return {
+        "message": f"Fest Admin '{username}' created.",
+        "username": username,
+        # Only present when we generated it — the frontend shows this once,
+        # in a "copy and share with the coordinator" panel, and never again.
+        "generated_password": password if not payload.password else None,
+    }
+
+
+@app.patch("/api/admin/fest-admins/{admin_id}/disable")
+def disable_fest_admin(admin_id: str, admin: dict = Depends(require_role("superadmin"))):
+    if not data_access.set_admin_disabled(admin_id, True):
+        raise HTTPException(status_code=404, detail="Fest Admin not found.")
+    data_access.record_audit(admin["sub"], admin["username"], "fest_admin_disabled", "admin", admin_id)
+    return {"message": "Fest Admin disabled. Their session is cut off on their very next request."}
+
+
+@app.patch("/api/admin/fest-admins/{admin_id}/enable")
+def enable_fest_admin(admin_id: str, admin: dict = Depends(require_role("superadmin"))):
+    if not data_access.set_admin_disabled(admin_id, False):
+        raise HTTPException(status_code=404, detail="Fest Admin not found.")
+    data_access.record_audit(admin["sub"], admin["username"], "fest_admin_enabled", "admin", admin_id)
+    return {"message": "Fest Admin re-enabled."}
+
+
+class PasswordResetRequest(BaseModel):
+    password: Optional[str] = None  # omit to auto-generate one (returned once in the response)
+
+
+@app.post("/api/admin/fest-admins/{admin_id}/reset-password")
+def reset_fest_admin_password(admin_id: str, payload: PasswordResetRequest, admin: dict = Depends(require_role("superadmin"))):
+    password = payload.password or generate_password()
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
+    if not data_access.reset_admin_password(admin_id, hash_password(password)):
+        raise HTTPException(status_code=404, detail="Fest Admin not found.")
+    data_access.record_audit(admin["sub"], admin["username"], "password_reset", "admin", admin_id)
+    return {
+        "message": "Password reset.",
+        "generated_password": password if not payload.password else None,
+    }
+
+
+@app.delete("/api/admin/fest-admins/{admin_id}")
+def delete_fest_admin(admin_id: str, admin: dict = Depends(require_role("superadmin"))):
+    """Deletes the account. Events they submitted are NOT deleted — see
+    data_access.delete_admin's docstring (created_by on those rows just
+    goes to null via ON DELETE SET NULL)."""
+    if not data_access.delete_admin(admin_id):
+        raise HTTPException(status_code=404, detail="Fest Admin not found.")
+    data_access.record_audit(admin["sub"], admin["username"], "fest_admin_deleted", "admin", admin_id)
+    return {"message": "Fest Admin deleted."}
+
+
+@app.get("/api/admin/audit-log")
+def get_audit_log(limit: int = Query(200, ge=1, le=1000), admin: dict = Depends(require_role("superadmin"))):
+    """Recent admin actions: Fest Admin created/disabled/enabled/deleted,
+    password resets, fest schedule submitted/approved/rejected/sent-back/
+    updated. Newest first."""
+    return data_access.list_audit_log(limit)
+
+
+# ---------------------------------------------------------------------------
 # Road segments — admin can close/open segments for construction etc.
+# Super Admin only — a Fest Admin has no reason to touch routing/roads.
 # ---------------------------------------------------------------------------
 
 @app.get("/api/road-segments")
@@ -439,7 +624,7 @@ def get_road_segments():
 
 
 @app.patch("/api/admin/road-segments/{seg_id}/close")
-def close_segment(seg_id: str, admin: dict = Depends(get_current_admin)):
+def close_segment(seg_id: str, admin: dict = Depends(require_role("superadmin"))):
     """Admin — mark a road segment as closed (construction, event, etc.)."""
     seg = data_access.set_segment_closed(seg_id, True)
     if not seg:
@@ -448,7 +633,7 @@ def close_segment(seg_id: str, admin: dict = Depends(get_current_admin)):
 
 
 @app.patch("/api/admin/road-segments/{seg_id}/open")
-def open_segment(seg_id: str, admin: dict = Depends(get_current_admin)):
+def open_segment(seg_id: str, admin: dict = Depends(require_role("superadmin"))):
     """Admin — reopen a previously closed road segment."""
     seg = data_access.set_segment_closed(seg_id, False)
     if not seg:
@@ -495,7 +680,7 @@ async def upload_venue_menu(
     file: UploadFile = File(...),
     date: str = Form(..., description="YYYY-MM-DD"),
     description: Optional[str] = Form(None),
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(require_role("superadmin")),
 ):
     """Admin — upload (or replace) the menu image for a venue on a specific date."""
     try:
@@ -523,7 +708,7 @@ async def upload_venue_menu(
 def delete_venue_menu(
     venue_id: str,
     date: str = Query(..., description="YYYY-MM-DD"),
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(require_role("superadmin")),
 ):
     """Admin — delete the menu for a venue on a specific date."""
     try:
@@ -536,7 +721,7 @@ def delete_venue_menu(
 
 
 @app.get("/api/admin/diagnostics/menu-system")
-def diagnose_menu_system(admin: dict = Depends(get_current_admin)):
+def diagnose_menu_system(admin: dict = Depends(require_role("superadmin"))):
     """Priority 1 (Phase 4.2.6) — hit this once (logged in as admin) to get
     an unambiguous answer to "what exactly is broken", instead of
     inferring it from the generic 503 the public endpoints intentionally
@@ -576,7 +761,7 @@ def ingest_analytics(body: AnalyticsBatch):
 
 
 @app.get("/api/admin/analytics/summary")
-def analytics_summary(days: int = Query(30, ge=1, le=365), admin: dict = Depends(get_current_admin)):
+def analytics_summary(days: int = Query(30, ge=1, le=365), admin: dict = Depends(require_role("superadmin"))):
     """Admin — aggregated analytics for the dashboard: top searches, top
     destinations/starting points, daily/weekly/monthly usage, reroute and
     cancellation hotspots, GPS weak-signal zones, success rate, etc."""
@@ -632,14 +817,14 @@ async def upload_feedback_screenshot(feedback_id: str, file: UploadFile = File(.
 
 
 @app.get("/api/admin/feedback")
-def list_feedback(status: Optional[str] = Query(None), admin: dict = Depends(get_current_admin)):
+def list_feedback(status: Optional[str] = Query(None), admin: dict = Depends(require_role("superadmin"))):
     """Admin — list route feedback, optionally filtered by status
     (pending / reviewed / resolved), newest first."""
     return data_access.list_feedback_admin(status)
 
 
 @app.patch("/api/admin/feedback/{feedback_id}")
-def update_feedback(feedback_id: str, body: FeedbackStatusUpdate, admin: dict = Depends(get_current_admin)):
+def update_feedback(feedback_id: str, body: FeedbackStatusUpdate, admin: dict = Depends(require_role("superadmin"))):
     """Admin — move feedback through pending -> reviewed -> resolved and
     record accepted / rejected / fixed once actioned."""
     row = data_access.update_feedback_status(feedback_id, body.status, body.resolution, body.admin_notes)

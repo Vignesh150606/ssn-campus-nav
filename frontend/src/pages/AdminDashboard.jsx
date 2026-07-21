@@ -1,126 +1,36 @@
 import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { API_BASE } from '../api'
-import { LOCATION_NAME_OVERRIDES } from '../constants'
 import PosterManager from '../components/PosterManager'
 import VenueMenuAdmin from '../components/VenueMenuAdmin'
+import {
+  adminFetch, decodeJwtPayload, TOKEN_STORAGE_KEY,
+  STATUS_COLOR, STATUS_LABEL, LOCATION_IDS, LOCATION_DISPLAY_NAMES,
+  BLANK_EVENT_FORM, inputStyle, textareaStyle, selectStyle, pill,
+} from './admin/adminShared'
 
 // Phase X — lazy-loaded (PERFORMANCE: "lazy-load heavy admin pages"). Public
 // users never download either of these; even admins only do on demand.
-const AdminAnalytics = lazy(() => import('./admin/AdminAnalytics'))
-const AdminFeedback  = lazy(() => import('./admin/AdminFeedback'))
+const AdminAnalytics   = lazy(() => import('./admin/AdminAnalytics'))
+const AdminFeedback    = lazy(() => import('./admin/AdminFeedback'))
+// RBAC redesign — Super Admin only, so also lazy: nobody downloads this
+// unless they're actually a Super Admin opening this specific tab.
+const ManageFestAdmins = lazy(() => import('./admin/ManageFestAdmins'))
+// A Fest Admin never needs any of the Super Admin dashboard code above —
+// lazy-loaded and rendered instead of everything below the login check.
+const FestAdminDashboard = lazy(() => import('./FestAdminDashboard'))
 
-const STATUS_COLOR = { verified:'#2E9E5B', pending:'#E07414', rejected:'#D7263D' }
-
-// Phase 3 — JWT bearer auth (replaces the old shared `?secret=` query param).
-async function adminFetch(path, method='GET', body=null, token) {
-  const headers = token ? { Authorization: `Bearer ${token}` } : {}
-  if (body) headers['Content-Type'] = 'application/json'
-  let res
-  try {
-    res = await fetch(`${API_BASE}${path}`, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : null,
-    })
-  } catch {
-    // Backend unreachable (cold start, offline, DNS, etc.) — distinct from
-    // an authenticated-but-rejected response, so callers can tell the two
-    // apart instead of treating "server didn't answer" the same as
-    // "your session is invalid".
-    const err = new Error('Could not reach the server. Please check your connection and try again.')
-    err.status = 0
-    throw err
-  }
-  if (!res.ok) {
-    const d = await res.json().catch(()=>({}))
-    const err = new Error(d.detail||`Error ${res.status}`)
-    err.status = res.status
-    throw err
-  }
-  return res.json()
-}
-
-const LOCATION_IDS = ['main-gate','parking','admin-block','central-library','eee-block',
-  'cse-block','ece-block','it-block','mech-block','civil-block','biomed-block',
-  'tcs-auditorium','mini-hall-1','food-rishabhs','food-snowcube','food-metro',
-  'food-pr','food-aswins','sports-complex','boys-hostel-gate','boys-hostel-office',
-  'girls-hostel','medical-center','clock-tower','cdc-block','ssn-fountain','snu-academic',
-  'main-canteen']
-
-// P8 — Updated display names (overrides backend names in the admin UI)
-// Do NOT change the IDs above — routing, graph, and coordinates remain unchanged.
-const LOCATION_DISPLAY_NAMES = {
-  'main-gate':          'Main Gate',
-  'parking':            'Parking',
-  'admin-block':        'Admin Block',
-  'central-library':    'Central Library',
-  'eee-block':          'EEE Block',
-  'cse-block':          'CSE Block',
-  'ece-block':          'ECE Block',
-  'it-block':           'IT Block',
-  'mech-block':         'Mech Block',
-  'civil-block':        'Civil Block',
-  'biomed-block':       'BioMed Block',
-  'tcs-auditorium':     'Main Auditorium',   // was: TCS Auditorium
-  'mini-hall-1':        'Mini Auditorium',   // was: Mini Hall 1
-  'food-rishabhs':      "Rishabh's",
-  'food-snowcube':      'Snow Cube',
-  'food-metro':         'Metro',
-  'food-pr':            'PR (Food Court)',
-  'sports-complex':     'Sports Complex',
-  'boys-hostel-gate':   'Boys Hostel Gate',
-  'boys-hostel-office': 'Boys Hostel Office',
-  'girls-hostel':       'Girls Hostel',
-  'medical-center':     'Medical Center',
-  'cdc-block':          'CDC Block',
-  'ssn-fountain':       'SSN Fountain',
-  'snu-academic':       'SNU Academic Block',
-  'main-canteen':       'Main Canteen',
-  // Priority 4 — these three always come from the single shared map in
-  // constants.js so this list can't silently drift out of sync with the
-  // rest of the app (Fest Schedule, Copilot, Search, Map, Food Menu, etc).
-  ...LOCATION_NAME_OVERRIDES,
-}
-
-const BLANK_FORM = {
-  name:'', fest:'Invente', department:'', location_id:'tcs-auditorium',
-  date:'', start_time:'', end_time:'', description:'', open_to_external:true,
-  organizer:'', category:'', contact_info:'', registration_link:'',
-  poster_url:'', photo_urls:'',
-  building:'', room_number:'', floor:'', wing:'',
-}
-
-// Task 3 — theme-aware input style; uses CSS variables so it works in both light + dark mode
-const inputStyle = {
-  width:'100%',
-  padding:'9px 12px',
-  borderRadius:10,
-  border:'1px solid var(--line-strong)',
-  fontFamily:'var(--font-sans)',
-  fontSize:'0.92rem',
-  outline:'none',
-  background:'var(--canvas)',
-  color:'var(--ink)',
-  boxSizing:'border-box',
-}
-
-const textareaStyle = {
-  ...inputStyle,
-  resize:'vertical',
-}
-
-const selectStyle = {
-  ...inputStyle,
-  background:'var(--surface)',
-}
-
-const TOKEN_STORAGE_KEY = 'ssn_admin_token_v1'
+const BLANK_FORM = BLANK_EVENT_FORM
 
 export default function AdminDashboard() {
   const usernameRef = useRef(null)
   const passwordRef = useRef(null)
   const [token, setToken]     = useState(() => sessionStorage.getItem(TOKEN_STORAGE_KEY) || '')
   const [authed, setAuthed]   = useState(false)
+  // RBAC redesign — which dashboard to render. Decoded from the JWT (see
+  // adminShared.js's decodeJwtPayload) the moment we have a token, so the
+  // branch below can pick Super Admin vs Fest Admin without a network
+  // round trip just to find out.
+  const [role, setRole]       = useState(null)
   // Phase 4A.1 — true while we're verifying a stored token on mount, so the
   // login form doesn't flash for an already-signed-in admin (previously
   // there was no loading state here at all: the dashboard rendered the
@@ -149,6 +59,17 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (!token) { setCheckingSession(false); return }
     let cancelled = false
+    const decoded = decodeJwtPayload(token)
+    const tokenRole = decoded?.role || null
+    setRole(tokenRole)
+    // A Fest Admin's own dashboard (FestAdminDashboard.jsx) fetches its own
+    // events with this same token — nothing Super-Admin-specific (road
+    // segments, venues list for the Add Event venue picker) needs to load
+    // here for that role, so skip straight to "authed" and let it render.
+    if (tokenRole === 'festadmin') {
+      setAuthed(true); setCheckingSession(false)
+      return
+    }
     adminFetch('/api/admin/events', 'GET', null, token)
       .then(data => {
         if (cancelled) return
@@ -188,15 +109,22 @@ export default function AdminDashboard() {
       const data = await adminFetch('/api/admin/login', 'POST', { username: usernameVal, password: passwordVal })
       sessionStorage.setItem(TOKEN_STORAGE_KEY, data.access_token)
       setToken(data.access_token)
+      setRole(data.role)
+      // "There should still be one login page. After login: Role determines
+      // destination." — for a Fest Admin, that destination is
+      // FestAdminDashboard, which fetches its own data; nothing else here
+      // (road segments, venues, the full events list) is relevant to them.
+      if (data.role === 'festadmin') { setAuthed(true); return }
       const events = await adminFetch('/api/admin/events', 'GET', null, data.access_token)
       setEvents(events); setAuthed(true)
       fetch(`${API_BASE}/api/road-segments`).then(r=>r.json()).then(setSegments)
+      fetch(`${API_BASE}/api/locations`).then(r=>r.json()).then(setVenues)
     } catch(e) { flash(e.message,true) }
   }
 
   function logout() {
     sessionStorage.removeItem(TOKEN_STORAGE_KEY)
-    setToken(''); setAuthed(false)
+    setToken(''); setAuthed(false); setRole(null)
   }
 
   // Priority 7 (Phase 4.2.3) — manual escape hatch for the "admin login
@@ -283,8 +211,6 @@ export default function AdminDashboard() {
     finally { setSubmitting(false) }
   }
 
-  const pill = {padding:'6px 14px',borderRadius:999,fontFamily:'var(--font-display)',fontWeight:600,fontSize:'0.78rem',cursor:'pointer'}
-
   if (checkingSession) {
     return (
     <div className="admin-fullpage">
@@ -317,11 +243,27 @@ export default function AdminDashboard() {
     </div>
   )}
 
+  // RBAC redesign — "one login page, role determines destination". Same
+  // login form above for both roles; once authed, a Fest Admin gets a
+  // completely separate, much simpler dashboard instead of anything below.
+  if (role === 'festadmin') {
+    return (
+      <Suspense fallback={<div className="admin-fullpage"><div className="boot-gate-spinner" aria-hidden="true" /></div>}>
+        <FestAdminDashboard token={token} onLogout={logout} />
+      </Suspense>
+    )
+  }
+
   return (
     <div style={{height:'100%',overflow:'hidden',display:'flex',flexDirection:'column'}}>
       {/* Tab bar */}
-      <div style={{display:'flex',gap:8,padding:'12px 16px',borderBottom:'1px solid var(--line)',flexShrink:0,flexWrap:'wrap'}}>
-        {[['events',`Events (${events.length})`],['roads','Road Closures'],['menus','🍽 Menus'],['analytics','📊 Analytics'],['feedback','💬 Feedback'],['add','+ Add Event']].map(([t,label])=>(
+      <div style={{display:'flex',gap:8,padding:'12px 16px',borderBottom:'1px solid var(--line)',flexShrink:0,flexWrap:'wrap',alignItems:'center'}}>
+        <span style={{fontSize:'0.68rem',fontWeight:700,padding:'4px 10px',borderRadius:999,
+          background:'var(--brand)22',color:'var(--brand)',border:'1px solid var(--brand)',
+          textTransform:'uppercase',letterSpacing:'0.06em',marginRight:2}}>
+          Role: Super Admin
+        </span>
+        {[['events',`Events (${events.length})`],['roads','Road Closures'],['menus','🍽 Menus'],['analytics','📊 Analytics'],['feedback','💬 Feedback'],['festadmins','👥 Manage Fest Admins'],['add','+ Add Event']].map(([t,label])=>(
           <button key={t} onClick={()=>setTab(t)} style={{...pill,
             background:tab===t?'var(--ink)':'transparent',
             color:tab===t?'var(--canvas)':'var(--ink)',
@@ -346,22 +288,43 @@ export default function AdminDashboard() {
                 <span style={{fontSize:'0.7rem',fontWeight:700,padding:'3px 10px',borderRadius:999,
                   background:STATUS_COLOR[e.status]+'22',color:STATUS_COLOR[e.status],
                   border:`1px solid ${STATUS_COLOR[e.status]}`,textTransform:'uppercase',letterSpacing:'0.06em'}}>
-                  {e.status}
+                  {STATUS_LABEL[e.status] || e.status}
                 </span>
               </div>
               <div style={{fontSize:'0.78rem',color:'var(--muted)',marginTop:4}}>
                 {e.fest} · {e.location ? (LOCATION_DISPLAY_NAMES[e.location.id] || e.location.name) : (LOCATION_DISPLAY_NAMES[e.location_id] || e.location_id)} · {e.date} {e.start_time}–{e.end_time}
               </div>
-              {e.reject_reason && <div style={{fontSize:'0.78rem',color:'#D7263D',marginTop:4}}>Reason: {e.reject_reason}</div>}
+              {/* RBAC redesign — who submitted it and who last reviewed it */}
+              {(e.submitted_by || e.reviewed_by) && (
+                <div style={{fontSize:'0.72rem',color:'var(--muted)',marginTop:4}}>
+                  {e.submitted_by && <>Submitted by <strong>{e.submitted_by}</strong></>}
+                  {e.submitted_by && e.reviewed_by && ' · '}
+                  {e.reviewed_by && <>Reviewed by <strong>{e.reviewed_by}</strong></>}
+                </div>
+              )}
+              {e.review_notes && (
+                <div style={{fontSize:'0.78rem',color: e.status==='rejected' ? '#D7263D' : 'var(--ink)', marginTop:4}}>
+                  {e.status==='needs_changes' ? 'Requested changes: ' : e.status==='rejected' ? 'Reason: ' : 'Note: '}{e.review_notes}
+                </div>
+              )}
               <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
                 {e.status!=='verified' && (
                   <button onClick={()=>action(`/api/admin/events/${e.id}/verify`)}
-                    style={{...pill,background:'#2E9E5B',color:'#fff'}}>✓ Verify</button>
+                    style={{...pill,background:'#2E9E5B',color:'#fff'}}>✓ Approve</button>
                 )}
-                {e.status==='verified' && (
-                  <button onClick={()=>action(`/api/admin/events/${e.id}/reject?reason=Manually+rejected`)}
-                    style={{...pill,background:'#E03E52',color:'#fff'}}>✗ Reject</button>
-                )}
+                <button onClick={()=>{
+                    const reason = window.prompt('Reason for rejecting?', '')
+                    if (reason===null) return   // cancelled
+                    action(`/api/admin/events/${e.id}/reject?reason=${encodeURIComponent(reason)}`)
+                  }}
+                  style={{...pill,background:'#E03E52',color:'#fff'}}>✗ Reject</button>
+                <button onClick={()=>{
+                    const notes = window.prompt('What needs to change?', '')
+                    if (notes===null) return   // cancelled
+                    if (!notes.trim()) { flash('Add a note explaining what needs to change.', true); return }
+                    action(`/api/admin/events/${e.id}/request-changes?notes=${encodeURIComponent(notes)}`)
+                  }}
+                  style={{...pill,background:'#B8860B',color:'#fff'}}>↩ Request Changes</button>
                 <button onClick={()=>{ if(window.confirm('Delete permanently?')) action(`/api/admin/events/${e.id}`,'DELETE') }}
                   style={{...pill,background:'transparent',border:'1px solid var(--line)',color:'var(--ink)'}}>Delete</button>
                 <a href={`/event/${e.id}`} target="_blank" rel="noreferrer"
@@ -415,6 +378,13 @@ export default function AdminDashboard() {
       {tab==='feedback' && (
         <Suspense fallback={<div className="state-message" style={{padding:16}}>Loading feedback…</div>}>
           <AdminFeedback token={token} />
+        </Suspense>
+      )}
+
+      {/* RBAC redesign — Manage Fest Admins */}
+      {tab==='festadmins' && (
+        <Suspense fallback={<div className="state-message" style={{padding:16}}>Loading…</div>}>
+          <ManageFestAdmins token={token} flash={flash} />
         </Suspense>
       )}
 
