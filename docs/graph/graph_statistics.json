@@ -1,0 +1,46 @@
+{
+  "total_nodes": 193,
+  "total_edges": 244,
+  "total_location_connectors": 32,
+  "average_degree": 2.528,
+  "max_degree": 5,
+  "critical_junction_nodes": [
+    "n_108"
+  ],
+  "connected_components": 1,
+  "component_sizes": [
+    193
+  ],
+  "largest_component_fraction": 1.0,
+  "dead_end_nodes": [
+    "n_4",
+    "n_7",
+    "n_20",
+    "n_22",
+    "n_24",
+    "n_45",
+    "n_48",
+    "n_58",
+    "n_63",
+    "n_64",
+    "n_68",
+    "n_73",
+    "n_74",
+    "n_77",
+    "n_89",
+    "n_91",
+    "n_94",
+    "n_97",
+    "n_98",
+    "n_102",
+    "n_178"
+  ],
+  "dead_ends_at_a_building_entrance": [
+    "n_178",
+    "n_20",
+    "n_24",
+    "n_4",
+    "n_64"
+  ],
+  "isolated_nodes": []
+}

@@ -76,6 +76,44 @@ def decode_access_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Invalid authentication token.")
 
 
+# ---------------------------------------------------------------------------
+# Production audit Part 9 (security review) — login had no brute-force
+# protection at all before this: unlimited password guesses against any
+# known username, with no delay or lockout. Simple in-memory sliding-
+# window lockout, keyed by username (not IP — a proxied/shared-network
+# deployment makes IP a weaker signal here, and locking the *account*
+# stops a credential-stuffing attempt regardless of what IP it's coming
+# from). In-memory means this resets on a backend restart and isn't
+# shared across multiple server instances if this is ever horizontally
+# scaled — an acceptable trade-off for this project's scale, but worth
+# knowing if that ever changes (a Redis-backed counter would be the next
+# step, not a rewrite of this).
+# ---------------------------------------------------------------------------
+_failed_login_attempts: dict = {}
+MAX_LOGIN_ATTEMPTS = 5
+LOGIN_LOCKOUT_WINDOW_MINUTES = 15
+
+
+def _check_login_rate_limit(username: str) -> None:
+    now = datetime.now(timezone.utc)
+    attempts = _failed_login_attempts.get(username, [])
+    attempts = [t for t in attempts if (now - t).total_seconds() < LOGIN_LOCKOUT_WINDOW_MINUTES * 60]
+    _failed_login_attempts[username] = attempts
+    if len(attempts) >= MAX_LOGIN_ATTEMPTS:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many failed login attempts for this account. Try again in {LOGIN_LOCKOUT_WINDOW_MINUTES} minutes.",
+        )
+
+
+def _record_failed_login(username: str) -> None:
+    _failed_login_attempts.setdefault(username, []).append(datetime.now(timezone.utc))
+
+
+def _clear_failed_logins(username: str) -> None:
+    _failed_login_attempts.pop(username, None)
+
+
 def authenticate_admin(username: str, password: str) -> dict:
     """Look up the admin by username and verify the password.
     Returns the admin row on success, raises HTTPException(401) on failure.
@@ -83,7 +121,10 @@ def authenticate_admin(username: str, password: str) -> dict:
     password" so the login endpoint can't be used to enumerate usernames.
     A disabled Fest Admin gets the same generic message too — no separate
     "this account is disabled" response, for the same reason (don't confirm
-    the account exists to someone who's just guessing usernames)."""
+    the account exists to someone who's just guessing usernames).
+
+    Rate-limited per username — see _check_login_rate_limit above."""
+    _check_login_rate_limit(username)
     try:
         client = get_client()
         result = (
@@ -98,8 +139,10 @@ def authenticate_admin(username: str, password: str) -> dict:
 
     rows = result.data or []
     if not rows or not verify_password(password, rows[0]["password_hash"]) or rows[0].get("disabled"):
+        _record_failed_login(username)
         raise HTTPException(status_code=401, detail="Invalid username or password.")
 
+    _clear_failed_logins(username)
     admin = rows[0]
     try:
         client.table("admins").update({"last_login_at": datetime.now(timezone.utc).isoformat()}).eq(

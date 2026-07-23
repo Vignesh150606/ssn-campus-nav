@@ -15,6 +15,11 @@ const AdminFeedback    = lazy(() => import('./admin/AdminFeedback'))
 // RBAC redesign — Super Admin only, so also lazy: nobody downloads this
 // unless they're actually a Super Admin opening this specific tab.
 const ManageFestAdmins = lazy(() => import('./admin/ManageFestAdmins'))
+// Production audit Part 8 — same reasoning, Super Admin dashboard only.
+const AccountSettings  = lazy(() => import('./admin/AccountSettings'))
+// Production audit — Dev Tools panel, Super Admin only. See DevTools.jsx's
+// own header comment for the exact steps to remove this feature later.
+const DevTools = lazy(() => import('./admin/DevTools'))
 // A Fest Admin never needs any of the Super Admin dashboard code above —
 // lazy-loaded and rendered instead of everything below the login check.
 const FestAdminDashboard = lazy(() => import('./FestAdminDashboard'))
@@ -31,6 +36,11 @@ export default function AdminDashboard() {
   // branch below can pick Super Admin vs Fest Admin without a network
   // round trip just to find out.
   const [role, setRole]       = useState(null)
+  // Production audit Part 8 — decoded alongside role, kept in sync locally
+  // after a successful Account Settings rename (the JWT itself still has
+  // the old value baked in until next login — see AccountSettings.jsx's
+  // onUsernameChanged callback below).
+  const [username, setUsername] = useState(null)
   // Phase 4A.1 — true while we're verifying a stored token on mount, so the
   // login form doesn't flash for an already-signed-in admin (previously
   // there was no loading state here at all: the dashboard rendered the
@@ -62,6 +72,7 @@ export default function AdminDashboard() {
     const decoded = decodeJwtPayload(token)
     const tokenRole = decoded?.role || null
     setRole(tokenRole)
+    setUsername(decoded?.username || null)
     // A Fest Admin's own dashboard (FestAdminDashboard.jsx) fetches its own
     // events with this same token — nothing Super-Admin-specific (road
     // segments, venues list for the Add Event venue picker) needs to load
@@ -110,6 +121,7 @@ export default function AdminDashboard() {
       sessionStorage.setItem(TOKEN_STORAGE_KEY, data.access_token)
       setToken(data.access_token)
       setRole(data.role)
+      setUsername(data.username)
       // "There should still be one login page. After login: Role determines
       // destination." — for a Fest Admin, that destination is
       // FestAdminDashboard, which fetches its own data; nothing else here
@@ -263,7 +275,7 @@ export default function AdminDashboard() {
           textTransform:'uppercase',letterSpacing:'0.06em',marginRight:2}}>
           Role: Super Admin
         </span>
-        {[['events',`Events (${events.length})`],['roads','Road Closures'],['menus','🍽 Menus'],['analytics','📊 Analytics'],['feedback','💬 Feedback'],['festadmins','👥 Manage Fest Admins'],['add','+ Add Event']].map(([t,label])=>(
+        {[['events',`Events (${events.length})`],['roads','Road Closures'],['menus','🍽 Menus'],['analytics','📊 Analytics'],['feedback','💬 Feedback'],['festadmins','👥 Manage Fest Admins'],['devtools','🛠 Dev Tools'],['account','⚙ Account Settings'],['add','+ Add Event']].map(([t,label])=>(
           <button key={t} onClick={()=>setTab(t)} style={{...pill,
             background:tab===t?'var(--ink)':'transparent',
             color:tab===t?'var(--canvas)':'var(--ink)',
@@ -385,6 +397,21 @@ export default function AdminDashboard() {
       {tab==='festadmins' && (
         <Suspense fallback={<div className="state-message" style={{padding:16}}>Loading…</div>}>
           <ManageFestAdmins token={token} flash={flash} />
+        </Suspense>
+      )}
+
+      {/* Production audit Part 8 — Account Settings */}
+      {tab==='account' && (
+        <Suspense fallback={<div className="state-message" style={{padding:16}}>Loading…</div>}>
+          <AccountSettings token={token} currentUsername={username} onLogout={logout} flash={flash}
+            onUsernameChanged={(u)=>setUsername(u)} />
+        </Suspense>
+      )}
+
+      {/* Production audit — Dev Tools panel */}
+      {tab==='devtools' && (
+        <Suspense fallback={<div className="state-message" style={{padding:16}}>Loading…</div>}>
+          <DevTools token={token} />
         </Suspense>
       )}
 

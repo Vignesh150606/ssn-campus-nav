@@ -1,0 +1,125 @@
+{
+  "generated_from": "/home/claude/investigate/ssn-campus-nav-a9f5d01bf5c2f389927934f2028b2dc807293d0b/backend/data/walkway_graph.json",
+  "structural": {
+    "nodes": 193,
+    "edges": 244,
+    "location_edges": 32,
+    "duplicate_edges": 0,
+    "zero_length_edges": 0,
+    "self_loops": 0,
+    "internal_duplicate_points": 0,
+    "duplicate_coordinates": {},
+    "geometric_crossings": [
+      {
+        "edge_a": [
+          "n_0",
+          "n_107"
+        ],
+        "edge_b": [
+          "n_190",
+          "n_108"
+        ],
+        "shares_a_node": false,
+        "nearest_node_distance_m": 6.2
+      },
+      {
+        "edge_a": [
+          "n_2",
+          "n_3"
+        ],
+        "edge_b": [
+          "n_41",
+          "n_42"
+        ],
+        "shares_a_node": false,
+        "nearest_node_distance_m": 10.4
+      },
+      {
+        "edge_a": [
+          "n_12",
+          "n_80"
+        ],
+        "edge_b": [
+          "n_12",
+          "n_19"
+        ],
+        "shares_a_node": true,
+        "nearest_node_distance_m": 6.3
+      },
+      {
+        "edge_a": [
+          "n_26",
+          "n_101"
+        ],
+        "edge_b": [
+          "n_39",
+          "n_26"
+        ],
+        "shares_a_node": true,
+        "nearest_node_distance_m": 6.9
+      }
+    ]
+  },
+  "reachability": {
+    "total_pairs": 496,
+    "reachable": 496,
+    "unreachable": [],
+    "detour_over_3x": [
+      {
+        "from": "central-library",
+        "to": "cse-block",
+        "straight_m": 115.8,
+        "route_m": 351.4
+      },
+      {
+        "from": "central-library",
+        "to": "it-block",
+        "straight_m": 75.9,
+        "route_m": 348.7
+      },
+      {
+        "from": "cse-block",
+        "to": "open-air-theatre",
+        "straight_m": 82.7,
+        "route_m": 277.4
+      },
+      {
+        "from": "ece-block",
+        "to": "it-block",
+        "straight_m": 111.4,
+        "route_m": 357.5
+      },
+      {
+        "from": "it-block",
+        "to": "cdc-block",
+        "straight_m": 71.5,
+        "route_m": 259.4
+      },
+      {
+        "from": "mech-block",
+        "to": "sports-complex",
+        "straight_m": 114.0,
+        "route_m": 455.0
+      },
+      {
+        "from": "mech-block",
+        "to": "sports-complex-main",
+        "straight_m": 154.0,
+        "route_m": 485.0
+      },
+      {
+        "from": "sports-complex-main",
+        "to": "main-canteen",
+        "straight_m": 37.3,
+        "route_m": 206.5
+      }
+    ]
+  },
+  "overlapping_micro_segments": 0,
+  "errors": [],
+  "warnings": [
+    "2 edge-pair(s) cross geometrically without sharing a junction node (see PRODUCTION_AUDIT_REPORT.md Part 1)",
+    "8 location pairs have route/straight-line ratio > 3x (see above)"
+  ],
+  "passed": true
+}

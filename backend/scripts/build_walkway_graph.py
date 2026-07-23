@@ -66,6 +66,13 @@ RAW_DIR = os.path.join(DATA_DIR, "raw")
 
 GPX_PATH = os.path.join(RAW_DIR, "walkpathssn.gpx")
 KML_PATH = os.path.join(RAW_DIR, "google_maps_directions.kml")
+# Production audit Part 5 — optional third source. Purely additive: if this
+# file doesn't exist, load_ways() below skips it silently and the pipeline
+# behaves exactly as it did before (GPX + KML only). Point this at any
+# GeoJSON FeatureCollection of LineString/MultiLineString walkway geometry
+# (e.g. exported from QGIS, a campus GIS system, or OpenStreetMap) to feed
+# it into the same graph-building pipeline as the surveyed GPX/KML data.
+GEOJSON_PATH = os.path.join(RAW_DIR, "walkways.geojson")
 LOCATIONS_PATH = os.path.join(DATA_DIR, "locations.json")
 OUT_PATH = os.path.join(DATA_DIR, "walkway_graph.json")
 
@@ -163,9 +170,54 @@ def parse_kml_ways(path):
     return ways
 
 
+def parse_geojson_ways(path):
+    """Production audit Part 5 — optional third input source, same 'way'
+    shape as parse_gpx_ways/parse_kml_ways above so it drops straight into
+    the same pipeline with zero changes anywhere else. Accepts a
+    FeatureCollection (or a bare Feature/geometry) containing LineString
+    and/or MultiLineString geometries — the two shapes that represent a
+    walkway path in GeoJSON. Anything else (Point, Polygon, etc.) is
+    skipped, not an error, since a real campus GIS export commonly mixes
+    building footprints and other layers into one file. GeoJSON coordinates
+    are always [lng, lat] (note the order) per RFC 7946 — flipped back to
+    (lat, lng) here to match this pipeline's convention everywhere else.
+    Returns [] if the file doesn't exist, so callers don't need their own
+    existence check."""
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding='utf-8') as f:
+        data = json.load(f)
+
+    def _linestrings_from_geometry(geom):
+        if geom is None:
+            return []
+        gtype = geom.get('type')
+        if gtype == 'LineString':
+            return [geom['coordinates']]
+        if gtype == 'MultiLineString':
+            return list(geom['coordinates'])
+        if gtype == 'GeometryCollection':
+            out = []
+            for g in geom.get('geometries', []):
+                out.extend(_linestrings_from_geometry(g))
+            return out
+        return []  # Point / Polygon / etc — not a walkway path, skip
+
+    features = data['features'] if data.get('type') == 'FeatureCollection' else [data]
+    ways = []
+    for feat in features:
+        geom = feat.get('geometry') if feat.get('type') == 'Feature' else feat
+        name = (feat.get('properties') or {}).get('name') if feat.get('type') == 'Feature' else None
+        for coords in _linestrings_from_geometry(geom):
+            pts = [(lat, lng) for lng, lat, *_z in coords]  # GeoJSON is [lng,lat] — flip to this pipeline's (lat,lng)
+            if len(pts) >= 2:
+                ways.append({'source': 'geojson', 'name': name, 'points': pts})
+    return ways
+
+
 def load_ways():
     ways = []
-    for w in parse_gpx_ways(GPX_PATH) + parse_kml_ways(KML_PATH):
+    for w in parse_gpx_ways(GPX_PATH) + parse_kml_ways(KML_PATH) + parse_geojson_ways(GEOJSON_PATH):
         ways.append({'source': w['source'], 'name': w['name'],
                      'xy': [to_xy(lat, lng) for lat, lng in w['points']]})
     return ways

@@ -38,7 +38,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import data_access
-from auth import authenticate_admin, create_access_token, get_current_active_admin, require_role, hash_password, generate_password
+from auth import authenticate_admin, create_access_token, get_current_active_admin, require_role, hash_password, verify_password, generate_password
 from db import SupabaseUnavailableError
 from utils.qr_generator import generate_event_qr
 from utils.router import find_route as _find_route, find_route_from_point as _find_route_from_point
@@ -65,6 +65,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Production audit — Dev Tools (Graph Viewer/Snap Debug/Route Inspector/
+# Graph Stats/Export Graph), Super-Admin-only. Entirely self-contained in
+# devtools.py — see that file's own docstring for the exact steps to
+# remove this feature later if you don't want it.
+from devtools import router as _devtools_router  # noqa: E402
+app.include_router(_devtools_router)
 
 
 @app.exception_handler(SupabaseUnavailableError)
@@ -610,6 +617,84 @@ def get_audit_log(limit: int = Query(200, ge=1, le=1000), admin: dict = Depends(
     password resets, fest schedule submitted/approved/rejected/sent-back/
     updated. Newest first."""
     return data_access.list_audit_log(limit)
+
+
+# ---------------------------------------------------------------------------
+# Account Settings (production audit Part 8) — change YOUR OWN username
+# and/or password. Deliberately NOT require_role("superadmin") — changing
+# your own credentials never crosses the RBAC boundary (a Fest Admin
+# changing their own password is just as safe as a Super Admin doing the
+# same), so this uses get_current_active_admin like the rest of the
+# Fest-Admin-reachable routes. Only the Super Admin dashboard has a UI
+# entry point to it today (that's what was asked for), but the endpoint
+# itself works for either role.
+# ---------------------------------------------------------------------------
+
+class AccountUpdateRequest(BaseModel):
+    current_password: str
+    new_username: Optional[str] = None
+    new_password: Optional[str] = None
+    confirm_password: Optional[str] = None
+
+
+def _password_is_strong(pw: str) -> Optional[str]:
+    """Returns an error message if the password is too weak, else None."""
+    if len(pw) < 8:
+        return "Password must be at least 8 characters."
+    if not any(c.isalpha() for c in pw):
+        return "Password must contain at least one letter."
+    if not any(c.isdigit() for c in pw):
+        return "Password must contain at least one number."
+    return None
+
+
+@app.patch("/api/admin/account")
+def update_account(payload: AccountUpdateRequest, admin: dict = Depends(get_current_active_admin)):
+    row = data_access.get_admin_with_hash(admin["sub"])
+    if not row:
+        raise HTTPException(status_code=404, detail="Account not found.")
+    if not verify_password(payload.current_password, row["password_hash"]):
+        raise HTTPException(status_code=401, detail="Current password is incorrect.")
+
+    new_username = payload.new_username.strip() if payload.new_username else None
+    if new_username == row["username"]:
+        new_username = None  # no actual change
+
+    new_password_hash = None
+    password_changed = False
+    if payload.new_password:
+        if payload.new_password != payload.confirm_password:
+            raise HTTPException(status_code=400, detail="New password and confirmation don't match.")
+        weak_reason = _password_is_strong(payload.new_password)
+        if weak_reason:
+            raise HTTPException(status_code=400, detail=weak_reason)
+        new_password_hash = hash_password(payload.new_password)
+        password_changed = True
+
+    if not new_username and not new_password_hash:
+        raise HTTPException(status_code=400, detail="Nothing to update — provide a new username and/or a new password.")
+
+    try:
+        data_access.update_own_account(admin["sub"], new_username=new_username, new_password_hash=new_password_hash)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+    data_access.record_audit(admin["sub"], new_username or admin["username"], "account_updated", "admin", admin["sub"], {
+        "username_changed": bool(new_username), "password_changed": password_changed,
+    })
+
+    # "No logout required unless password changes" — a username-only change
+    # keeps the current session valid (the JWT's `sub` is the admin's id,
+    # not their username, so nothing about the still-live token becomes
+    # stale). A password change doesn't actually invalidate the existing
+    # JWT either (it's stateless — see auth.py), but the frontend uses this
+    # flag to log the admin out anyway so a stale session can't linger
+    # after a credential change on this device.
+    return {
+        "message": "Account updated." + (" Please sign in again with your new password." if password_changed else ""),
+        "username": new_username or row["username"],
+        "logout_required": password_changed,
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -581,6 +581,42 @@ def get_admin(admin_id: str) -> Optional[dict]:
     return _wrap(_run)
 
 
+def get_admin_with_hash(admin_id: str) -> Optional[dict]:
+    """Includes password_hash — internal use only (verifying "current
+    password" on the Account Settings page), never returned from an API
+    response. Distinct from get_admin(), which is safe to serialize."""
+    def _run():
+        client = get_client()
+        rows = client.table("admins").select("id, username, role, password_hash").eq("id", admin_id).limit(1).execute().data or []
+        return rows[0] if rows else None
+
+    return _wrap(_run)
+
+
+def update_own_account(admin_id: str, new_username: Optional[str] = None, new_password_hash: Optional[str] = None) -> dict:
+    """Self-service account update (production audit Part 8) — works for
+    either role, since changing your OWN credentials never touches the
+    RBAC role boundary (see main.py's endpoint for why it's gated with
+    get_current_active_admin, not require_role). Raises ValueError if the
+    requested username is already taken by a different account."""
+    def _run():
+        client = get_client()
+        updates = {}
+        if new_username:
+            existing = client.table("admins").select("id").eq("username", new_username).neq("id", admin_id).limit(1).execute().data
+            if existing:
+                raise ValueError(f"Username '{new_username}' is already taken.")
+            updates["username"] = new_username
+        if new_password_hash:
+            updates["password_hash"] = new_password_hash
+        if not updates:
+            return {}
+        result = client.table("admins").update(updates).eq("id", admin_id).execute()
+        return result.data[0] if result.data else {}
+
+    return _wrap(_run)
+
+
 def create_fest_admin(username: str, password_hash: str, created_by_id: str) -> dict:
     """Raises ValueError if the username is already taken (checked
     explicitly rather than relying on the DB's unique-constraint error
