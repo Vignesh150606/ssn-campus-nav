@@ -98,6 +98,23 @@ const GPS_ACQUIRE_GRACE_MS = 6000
 const RECALC_COOLDOWN_MS = 4000      // Phase 2: 3-5 second cooldown per spec
 const RECALC_MIN_REMAINING_M = 15    // don't bother rerouting if basically already there
 
+// Root cause + fix confirmed and reproduced against the real backend (see
+// IMPLEMENTATION_PLAN.md Fix 2 / ROOT_CAUSE_REPORT.md Q7): route-continuity
+// stickiness (lastSnappedNodeRef, below) previously had no mid-session
+// reset — whichever node the *first* reroute of a session happened to snap
+// to was sent back as `prefer_node` on every subsequent reroute for the
+// rest of that session, even once GPS accuracy improved dramatically
+// afterward. Reproduced end-to-end: a single poor-accuracy (~30m) first
+// fix near IT Block/CSE Annexure locked onto the wrong node for an entire
+// simulated walk, despite every later fix reporting a good ~15m accuracy.
+// Fix: only honour the sticky preference when the current fix isn't
+// decisively more accurate than whichever fix originally set it — once a
+// meaningfully better fix arrives, drop the hint and let the backend
+// re-decide from scratch with that better information, instead of
+// re-litigating on every tick's tiny jitter (which would just reintroduce
+// the flip-flopping stickiness exists to prevent).
+const STICKY_ACCURACY_IMPROVEMENT_TO_RESET_M = 10
+
 // Priority 2 (Phase 4.2.4) — Geolocation's `coords.heading` (course over
 // ground) is only meaningful once you're actually moving; standing still
 // it's frequently null or wildly noisy. ~1.1 m/s is a slow-walk pace —
@@ -180,6 +197,13 @@ export function LocationProvider({ children }) {
   // previous one. See utils/router.py _nearest_node's docstring (the
   // "route-continuity stickiness" section) for the bug this fixes.
   const lastSnappedNodeRef = useRef(null)
+  // The accuracy_m of the fix that produced the CURRENT lastSnappedNodeRef
+  // value — not the accuracy of the latest tick. Compared against each new
+  // fix's accuracy to decide whether the sticky preference is still
+  // trustworthy or should be dropped in favour of a fresh, unbiased pick
+  // (see STICKY_ACCURACY_IMPROVEMENT_TO_RESET_M above). Reset in lockstep
+  // with lastSnappedNodeRef everywhere that's reset to null.
+  const lastSnappedAccuracyRef = useRef(null)
   // Segment index (into routeRef.current) that the previous GPS tick's
   // map-match landed on — fed back into matchToPath() so each new tick
   // only searches a small window around it instead of the whole route.
@@ -264,9 +288,21 @@ export function LocationProvider({ children }) {
     lastRecalcAtRef.current  = now
     setRecalculating(true)
 
+    // Only carry the sticky preference forward if the current fix isn't a
+    // decisively better fix than whichever one originally set it — see
+    // STICKY_ACCURACY_IMPROVEMENT_TO_RESET_M above. If lastSnappedAccuracyRef
+    // is null (shouldn't happen alongside a non-null lastSnappedNodeRef in
+    // practice, but fail safe) the preference is trusted as before.
+    const stickyAccuracyM = lastSnappedAccuracyRef.current
+    const stickyIsStale = (
+      lastSnappedNodeRef.current != null &&
+      stickyAccuracyM != null && accuracyM != null &&
+      (stickyAccuracyM - accuracyM) >= STICKY_ACCURACY_IMPROVEMENT_TO_RESET_M
+    )
+
     // TEMPORARY — mirrors getRouteFromCoords' own query-string construction
     // (api.js) purely for logging; does not affect the real request below.
-    const preferNodeId = lastSnappedNodeRef.current
+    const preferNodeId = stickyIsStale ? null : lastSnappedNodeRef.current
     const requestUrl = `/api/route?from_lat=${lat}&from_lng=${lng}&to_id=${encodeURIComponent(destRef.current.id)}`
       + (accuracyM != null ? `&accuracy=${accuracyM}` : '')
       + (preferNodeId ? `&prefer_node=${encodeURIComponent(preferNodeId)}` : '')
@@ -292,7 +328,7 @@ export function LocationProvider({ children }) {
     // Phase X — meta.isReroute tags this specific call (the only automatic,
     // on-route recalculation in the app) for analytics purposes only; it
     // has no effect on the request itself or on any routing behaviour.
-    getRouteFromCoords(lat, lng, destRef.current.id, accuracyM, lastSnappedNodeRef.current, { isReroute: true })
+    getRouteFromCoords(lat, lng, destRef.current.id, accuracyM, preferNodeId, { isReroute: true })
       .then((r) => {
         // TEMPORARY — see utils/rerouteDebug.js. `source` is the field that
         // matters most: it should always be 'local' (genuinely came from
@@ -309,6 +345,7 @@ export function LocationProvider({ children }) {
         })
         routeRef.current  = r.path
         lastSnappedNodeRef.current = r.snapped_to ?? null
+        lastSnappedAccuracyRef.current = r.snapped_to ? accuracyM : null
         announced.current = new Set() // fresh route -> distance thresholds can fire again
         lastMatchIndexRef.current = null // new path — old segment index is meaningless, re-search whole path next tick
         offStreakRef.current = 0
@@ -625,6 +662,7 @@ export function LocationProvider({ children }) {
     routeRef.current = null
     destRef.current = null
     lastSnappedNodeRef.current = null
+    lastSnappedAccuracyRef.current = null
     lastMatchIndexRef.current = null
     offStreakRef.current = 0
     onStreakRef.current = 0
@@ -648,6 +686,7 @@ export function LocationProvider({ children }) {
     routeRef.current  = path
     destRef.current   = { lat: destLat, lng: destLng, id: destId ?? null }
     lastSnappedNodeRef.current = null
+    lastSnappedAccuracyRef.current = null
     lastMatchIndexRef.current = null
     offStreakRef.current = 0
     onStreakRef.current = 0
@@ -672,6 +711,7 @@ export function LocationProvider({ children }) {
     routeRef.current = null
     destRef.current  = null
     lastSnappedNodeRef.current = null
+    lastSnappedAccuracyRef.current = null
     lastMatchIndexRef.current = null
     offStreakRef.current = 0
     onStreakRef.current = 0

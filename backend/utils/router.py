@@ -175,14 +175,18 @@ def _nearest_node(graph, lat, lng, adj=None, to_id=None, accuracy_m=None, prefer
     for only 22m of extra unverified distance — an overwhelming, clearly
     legitimate win. `accuracy_m`, when supplied (the GPS fix's own reported
     accuracy — already collected and already treated as authoritative
-    elsewhere in this codebase, not a new invented figure), gates *when*
-    this sanity check applies at all: for a candidate no farther than
-    accuracy_m past the closest node, the extra distance is inside this
-    fix's own measurement noise and isn't worth second-guessing; only a
-    candidate confidently farther than that (by more than the fix's own
-    uncertainty) has its total-cost win checked against what it actually
-    cost to reach it. Callers without an accuracy figure (e.g. the named
-    from_id path) get the previous, unchanged behaviour.
+    elsewhere in this codebase, not a new invented figure), is added to the
+    margin `improvement` must clear over `extra_snap` for a non-closest
+    candidate to be trusted at all — so a *worse* (larger) accuracy_m makes
+    this check *more* conservative, requiring a bigger win before trusting
+    a longer unverified segment, not less. (An earlier version of this
+    check instead gated *whether* it ran at all behind `extra_snap >
+    accuracy_m`, which had the opposite effect: a worse fix raised the bar
+    for the check to engage in the first place, so poor accuracy made this
+    protection weaker exactly when it mattered most. Root-caused,
+    reproduced, and corrected — see IMPLEMENTATION_PLAN.md Fix 1.) Callers
+    without an accuracy figure (e.g. the named from_id path) skip this
+    check entirely, same as before.
 
     Without `adj`/`to_id` (e.g. called for something other than routing
     toward a specific destination), falls back to plain nearest-by-distance.
@@ -249,11 +253,29 @@ def _nearest_node(graph, lat, lng, adj=None, to_id=None, accuracy_m=None, prefer
 
     # Sanity-check a win that isn't the closest-by-distance candidate — see
     # docstring above for the worked examples this is derived from.
+    #
+    # Root-cause fix (confirmed + reproduced against the live graph — see
+    # IMPLEMENTATION_PLAN.md Fix 1 / ROOT_CAUSE_REPORT.md Q5): the previous
+    # version gated this check behind `extra_snap > accuracy_m`, which ran
+    # backwards — a *worse* (larger) accuracy_m made `extra_snap` less
+    # likely to exceed it, so the safety net triggered *less* often for
+    # poor fixes. That's the opposite of what you want: a poor fix is
+    # exactly when we're least sure where the user actually is, so an
+    # unverified long straight-line "shortcut" segment deserves MORE
+    # scrutiny, not less. Reproduced at the IT Block/CSE Annexure
+    # chokepoint: any accuracy reading >= ~20m (ordinary near buildings)
+    # disabled this check entirely under the old formula.
+    #
+    # Fix: accuracy_m is now added to the bar `improvement` must clear,
+    # instead of gating whether the comparison runs at all. A worse fix
+    # now requires the far candidate to win by *more* to be trusted, not
+    # less — and the check still always compares the true winner against
+    # the closest-by-distance node regardless of accuracy.
     if (accuracy_m is not None and best_id is not None and closest_id is not None
             and best_id != closest_id):
         extra_snap  = best_snap_dist - closest_snap_dist
         improvement = closest_total - best_total
-        if extra_snap > accuracy_m and improvement < extra_snap:
+        if improvement < extra_snap + accuracy_m:
             best_id, best_total, best_snap_dist = closest_id, closest_total, closest_snap_dist
 
     # Route-continuity stickiness — see docstring above for the follow-up
