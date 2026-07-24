@@ -305,7 +305,143 @@ independently re-confirmed against a fresh validator run, is 2. See B3's entry a
 
 ---
 
-## 4. Open questions / evidence still needed
+## 4. In progress — live field test against the fixed build (2026-07-25)
+
+**Received:** 5 field screenshots + 1 graph visualization, from testing the delivered fixed
+zip live on campus. No reroute logs (not connected to remote debugging while walking).
+Two approximate GPS fixes supplied: "photo 3" (12°45'08.0"N 80°11'49.0"E, DMS) and "photo 4"
+(12.752231825303204, 80.19717248210814, decimal). Both fixes are ~57-64m **north** of the
+n_177/n_178/n_8 chokepoint Fix 1/Fix 2 targeted — a different part of the local path
+network, near the "SSN Fountain / Clock Tower" instruction banner visible in photo 4.
+
+**What I ran (against the current, already-fixed code, not a hypothetical):**
+`find_route_from_point`/`_nearest_node` directly on both coordinates.
+
+- **Photo 3 fix** (12.752222, 80.196944): closest node by straight-line is `n_128` (23.2m),
+  but the router picks `n_8` (51.8m) instead. Checked this is **not** a repeat of the F5
+  bug: computed both nodes' true Dijkstra cost to `cse-block` by hand —
+  `n_128`: 23.2m connector + 316.3m walk = 339.5m total. `n_8`: 51.8m connector + 62.5m
+  walk = **114.4m total**. `improvement` (225.1m) clears Fix 1's required margin
+  (`extra_snap` 28.6m + `accuracy_m`) at every accuracy tested (15/30/50) by a wide margin.
+  **Fix 1 is working correctly here.**
+
+- **Photo 4 fix** (12.752232, 80.197172): snaps cleanly to `n_99` (13.8m), total 392.0m.
+
+### ⚠️ Self-correction — my own follow-up hypothesis about `SNAP_MARGIN_M` was wrong
+
+Before the external `FIELD_TEST_INVESTIGATION_REPORT.md` arrived, I brute-forced every node
+within 150m of photo4 (bypassing `SNAP_MARGIN_M`/`NEAREST_NODE_CANDIDATES`) and found `n_178`
+scoring better on paper (113.6m) than the router's actual choice (392.0m), and provisionally
+flagged this as a candidate-shortlist defect worth fixing — reproduced the same pattern along
+a perturbation scan between photo3 and photo4 and found a sharp discontinuity at the last
+~6m of that walk. **This was a real observation but the wrong conclusion.** The "113.6m" figure
+used an **unverified 90.4m straight-line haversine distance** from the live point to `n_178`
+as if it were free — exactly the class of unverified-connector risk `SNAP_MARGIN_M` exists to
+prevent, in the same tightly-built cluster as the original bug. I was about to recommend
+loosening or restructuring the exact safeguard that protects against the original bug's
+mechanism, based on a number that assumed the thing being protected against was fine.
+
+`FIELD_TEST_INVESTIGATION_REPORT.md` (external, this round) reached the correct conclusion
+independently: `n_99` is the genuine, unambiguous closest node (confirmed:
+`best_id == closest_id` at this exact position, so Fix 1's check isn't even invoked — there's
+nothing to override), and the real mechanism is that `n_99` has real graph edges only westward
+(`n_128`, `n_98`, `n_2`) — genuinely no short path toward the `n_136`/`n_8` cluster exists in
+the graph. **Re-verified every one of that report's specific claims independently, by direct
+execution, before accepting the correction:**
+
+| Claim | My independent check | Result |
+|---|---|---|
+| `n_99`'s edges are only `n_128` (61.8m), `n_98` (30.5m), `n_2` (73.1m) | Iterated the raw edge list for `n_99` myself | ✅ exact match |
+| `n_99`→`n_136` straight-line 49.1m, `n_99`→`n_8` 58.0m | Recomputed with haversine | ✅ exact match (49.14m, 57.99m) |
+| Photo 3: 114.4m computed vs. 118m displayed (3.6m/3% gap) | Recomputed | ✅ exact match |
+| Photo 4: 391.9m computed vs. 313m displayed (79m/25% gap) | Recomputed (392.0m) | ✅ matches within rounding |
+| Regression check: neither Fix 1 nor Fix 2 caused this | Confirmed `best_id==closest_id` (Fix 1 never triggers) and this is a first-ever reroute at a fresh position (Fix 2's staleness logic isn't relevant) | ✅ confirmed independently |
+
+**Verdict on my own prior hypothesis: ❌ Rejected, by my own further testing**, not just on the
+other report's say-so — see the follow-up check below, which is what actually convinced me.
+
+### Follow-up: checked for *real, already-collected* survey evidence before ruling either way
+
+Before accepting "this needs a new edge" *or* "don't touch anything," I checked whether the
+project's own raw GPX survey (`data/raw/walkpathssn.gpx` — already in the repo, not new data)
+contains any trackpoints in the `n_99`↔`n_136` gap that the graph-build pipeline might have
+missed. Found 13 raw trackpoints within 20m of that hypothetical line — promising at first —
+but checking each one's distance to *every existing edge's polyline* (not just nearby nodes)
+showed **all 13 are already shape points of edges that exist in the graph today**
+(`n_99`-`n_128`, `n_99`-`n_98`, `n_2`-`n_99`, `n_136`-`n_137` — distances 0.3-3.1m, clearly
+already-claimed geometry, not orphaned data). **No raw survey evidence supports a direct
+`n_99`↔`n_136` connector.** This is a clean negative result, not an absence of looking.
+
+**Conclusion, independently reached and now doubly-confirmed:** the `n_99` gap is a genuine
+**missing graph data** issue (classification: graph topology / missing data, **High
+confidence** — reproduced by direct execution, cross-checked against two independent lines
+of evidence, and confirmed there's no already-collected data to build the fix from).
+**Not fixed this round** — adding an edge here would mean inventing survey data, which both
+this investigation and the external report explicitly rule out. The responsible next step is
+a short dedicated GPS-logged walk of just that ~50m corridor, not a code change.
+
+---
+
+## 4a. KML merge — implemented
+
+**Received:** `cseitroad.kml` (2-point LineString, "path not in map as of now") +
+`KML_MERGE_REPORT.md` (external, proposing the merge). User was explicit this KML is
+unrelated to the routing investigation above and should be judged independently — treated
+accordingly; it is not offered as evidence for or against the `n_99` finding.
+
+**Independent verification of the external merge report, before applying anything:**
+loaded the raw KML myself, recomputed every distance in the report from scratch.
+
+| Claim | My check | Result |
+|---|---|---|
+| KML points A (12.7513717,80.1970728) / B (12.7510447,80.1970702) | Read raw KML directly | ✅ exact match |
+| A nearest existing node = `n_178` @ 6.10m | Checked against every node in the graph | ✅ exact match |
+| B nearest existing node = `n_122` @ 4.39m | Checked against every node in the graph | ✅ exact match |
+| `n_178`↔`n_122` direct distance 43.09m | Recomputed | ✅ exact match |
+| No existing edge already connects them | Searched the full edge list | ✅ confirmed |
+| `n_122`→`cse-block` currently 412.1m | Ran `_dijkstra` myself | ✅ exact match (412.13m) |
+| `n_99` (this investigation's gap) is a different, ~130m+-distant node from `n_122` | Recomputed | ✅ exact match (135.5m) — confirms the two reports' findings are genuinely unrelated, not the same thing twice |
+
+**One correction to the external report before implementing:** it proposed `distance_m:
+36.36` for the new edge — the KML survey's own raw endpoint-to-endpoint length. But every
+existing edge in this graph uses `distance_m` = the *cumulative* haversine length of its
+actual `path` array (verified against an existing edge: `n_17`-`n_106`'s recorded 15.23m
+matches its 2-point path exactly). The path being merged starts at `n_178`'s own coordinate
+and ends at `n_122`'s own coordinate (per "reuse existing nodes" — not the KML's raw
+endpoints, which are 6.1m/4.4m away from those), so its true cumulative length is
+**46.85m** (6.10 + 36.36 + 4.39m across the 3 segments), not 36.36m. Used the corrected
+value — this is what Dijkstra actually uses as edge weight, so getting it right matters for
+route-cost accuracy, not just bookkeeping.
+
+**Implemented:** appended one edge to `backend/data/walkway_graph.json`:
+```json
+{
+  "from": "n_178", "to": "n_122", "distance_m": 46.85,
+  "path": [
+    {"lat": 12.751426, "lng": 80.197065},
+    {"lat": 12.7513717, "lng": 80.1970728},
+    {"lat": 12.7510447, "lng": 80.1970702},
+    {"lat": 12.75104, "lng": 80.19703}
+  ]
+}
+```
+No nodes added, renamed, or removed. No existing edges modified, simplified, or removed.
+193 nodes unchanged, 244→245 edges, 32 location_edges unchanged.
+
+**Regression testing:**
+- `validate_walkway_graph.py`: still passes, same 2 pre-existing crossing warnings (unrelated,
+  F2), **no new warnings**. The "long route/straight-line ratio" warning count actually
+  *improved* (8→5 pairs), consistent with this edge shortening some previously-circuitous
+  routes — a positive side effect, not something I optimized for.
+- `route_quality_test.py 400`: 800/800 passed post-merge, same as pre-merge.
+- Confirmed the predicted improvement directly: `n_122`→`cse-block` now costs **70.06m**
+  (46.85 + `n_178`'s existing 23.21m), down from 412.13m — matches 46.85+23.21 exactly,
+  confirming the corrected `distance_m` is what the router actually uses.
+- Confirmed this merge does **not** touch the `n_99` cluster: re-ran the photo-4 query
+  post-merge, identical result (392.0m, snapped to `n_99`) — the two findings are genuinely
+  independent, as expected.
+
+## 5. Open questions / evidence still needed
 
 **Resolved this round** (kept here, struck through, for the record — not deleted):
 - ~~Exact GPS coordinates from a walk that reproduced the bad route near CSE Annexure~~ —
@@ -331,3 +467,18 @@ independently re-confirmed against a fresh validator run, is 2. See B3's entry a
 - Fix 2's `STICKY_ACCURACY_IMPROVEMENT_TO_RESET_M = 10` threshold is a reasoned judgment
   call, not derived from field data — worth revisiting if real sessions show it's too
   eager or too sluggish to unstick.
+
+**This round's additions:**
+- ~~Whether photo3/photo4 field evidence indicates a code defect~~ — resolved: photo3 is
+  Fix 1 working correctly; photo4 is a genuine missing-edge gap (`n_99`↔`n_136`), not a
+  code defect, confirmed via two independent lines of evidence (external report +
+  raw-GPX orphan-point check finding none).
+- **New, still open:** the `n_99`↔`n_136`/`n_8` graph gap (§4 above). High-confidence
+  diagnosis, deliberately **not** fixed — no already-collected survey data supports a
+  specific edge geometry, and inventing one would repeat the exact mistake this whole
+  investigation chain has been careful to avoid. Needs a dedicated ~50m GPS-logged walk
+  between those two clusters, same discipline as the `cseitroad.kml` merge that was
+  possible this round precisely because that survey data existed.
+- F1's raw-survey-point underrepresentation near the *original* n_177/n_178/n_8 chokepoint
+  (as opposed to the newly-found n_99 gap, a different location) — still genuinely open,
+  still needs field verification, still not the same question as the n_99 gap above.

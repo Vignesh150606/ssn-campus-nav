@@ -2,7 +2,7 @@
   "generated_from": "/home/claude/project/app/backend/data/walkway_graph.json",
   "structural": {
     "nodes": 193,
-    "edges": 244,
+    "edges": 245,
     "location_edges": 32,
     "duplicate_edges": 0,
     "zero_length_edges": 0,
@@ -66,28 +66,10 @@
     "unreachable": [],
     "detour_over_3x": [
       {
-        "from": "central-library",
-        "to": "cse-block",
-        "straight_m": 115.8,
-        "route_m": 351.4
-      },
-      {
-        "from": "central-library",
-        "to": "it-block",
-        "straight_m": 75.9,
-        "route_m": 348.7
-      },
-      {
         "from": "cse-block",
         "to": "open-air-theatre",
         "straight_m": 82.7,
-        "route_m": 277.4
-      },
-      {
-        "from": "ece-block",
-        "to": "it-block",
-        "straight_m": 111.4,
-        "route_m": 357.5
+        "route_m": 253.6
       },
       {
         "from": "it-block",
@@ -119,7 +101,7 @@
   "errors": [],
   "warnings": [
     "2 edge-pair(s) cross geometrically without sharing a junction node (see PRODUCTION_AUDIT_REPORT.md Part 1)",
-    "8 location pairs have route/straight-line ratio > 3x (see above)"
+    "5 location pairs have route/straight-line ratio > 3x (see above)"
   ],
   "passed": true
 }
