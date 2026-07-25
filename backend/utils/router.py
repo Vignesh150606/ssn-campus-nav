@@ -125,6 +125,47 @@ NEAREST_NODE_CANDIDATES = 8  # how many closest-by-distance nodes to weigh by to
 SNAP_MARGIN_M = 30           # only weigh candidates within this many extra metres of the single closest node
 STICKY_MIN_MARGIN_M = 20     # an alternative must beat the in-progress route's node by more than this to win
 
+# Field-verified exceptions to SNAP_MARGIN_M: specific nodes whose live-GPS "connector"
+# segment has been directly confirmed, by walking there, to NOT correspond to real
+# walkable ground beyond a short distance. A candidate is excluded from the shortlist if
+# its snap distance exceeds ITS OWN cap here -- this is per-node and evidence-linked, not
+# a general distance rule, and it does not touch SNAP_MARGIN_M or any other node's
+# behaviour. In particular it does NOT affect the separately field-confirmed-legitimate
+# 51.8m connector to n_8 from a different position in this same cluster (round 2 of this
+# investigation) -- that's a different node, with no cap here, precisely because distance
+# alone was already proven not to predict walkability (51.8m fine there, 43.9m not fine
+# here). Add entries here ONLY from direct field confirmation, never from inference or
+# graph-geometry alone -- see IMPLEMENTATION_PLAN.md for the specific investigation
+# behind each entry.
+#
+# n_136: field-confirmed 2026-07-25 -- a live position ~43.9m north of n_136 (near
+# 12.752222, 80.197111 / photo 2 of that round's field test) has no real path to n_136,
+# and the field tester confirmed no alternate pedestrian shortcut exists from that area
+# either -- the only real route from there is the long way via n_99 / the SSN Fountain
+# corridor (photo 1 of the same round). 15m is a conservative cap: comfortably below the
+# confirmed-fictional 43.9m, and in line with how short every other *real* connector onto
+# this node actually is (n_136's real graph edges to n_8 and n_137 are 9.4m and 27.9m).
+#
+# n_98, n_128, n_116, n_127, n_137: same field test, same position, follow-up check.
+# Excluding n_136 alone was NOT sufficient -- the router simply promoted the next
+# margin-eligible candidate (n_127, 49.5m) to the winner, which shares the identical
+# "long unverified connector in this same tightly-built cluster" profile as n_136 and had
+# no more field support than n_136 originally did. The field tester's own statement is
+# comprehensive, not node-specific: "the only practical route is the longer route shown in
+# Photo 1" rules out every short-connector candidate from this position at once, not just
+# whichever one the router happened to pick first. Capped at the same conservative 15m for
+# the same reason. n_99 itself (the true closest node, reached via its own real, if long,
+# graph edges -- matching Photo 1) is deliberately NOT in this table; it needs no cap
+# because it was never in question.
+UNVERIFIED_CONNECTOR_CAP_M = {
+    'n_136': 15.0,
+    'n_98': 15.0,
+    'n_128': 15.0,
+    'n_116': 15.0,
+    'n_127': 15.0,
+    'n_137': 15.0,
+}
+
 
 def _nearest_node(graph, lat, lng, adj=None, to_id=None, accuracy_m=None, prefer_node_id=None):
     """Nearest walkway node to an arbitrary GPS point.
@@ -236,7 +277,11 @@ def _nearest_node(graph, lat, lng, adj=None, to_id=None, accuracy_m=None, prefer
         return node_id, d
 
     nearest_dist = candidates[0][0]
-    shortlist = [c for c in candidates[:NEAREST_NODE_CANDIDATES] if c[0] <= nearest_dist + SNAP_MARGIN_M]
+    shortlist = [
+        c for c in candidates[:NEAREST_NODE_CANDIDATES]
+        if c[0] <= nearest_dist + SNAP_MARGIN_M
+        and c[0] <= UNVERIFIED_CONNECTOR_CAP_M.get(c[1], float('inf'))
+    ]
 
     best_id, best_total, best_snap_dist = None, None, None
     closest_id, closest_total, closest_snap_dist = None, None, None  # the single nearest-by-distance candidate, if reachable

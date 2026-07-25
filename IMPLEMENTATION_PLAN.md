@@ -441,6 +441,87 @@ No nodes added, renamed, or removed. No existing edges modified, simplified, or 
   post-merge, identical result (392.0m, snapped to `n_99`) — the two findings are genuinely
   independent, as expected.
 
+## 4b. Round 5 — field-confirmed connector fix (2026-07-25)
+
+### 6a. Ground truth received
+Field tester confirmed, by direct testing: **no pedestrian path exists** from
+(12.752222, 80.197111) — DMS 12°45'08.0"N 80°11'49.6"E, "photo 2" of the newest 3-photo
+set — to node `n_136`, **and no alternate pedestrian shortcut exists from that position
+either**; "the only practical route is the longer route shown in Photo 1." This is
+first-person field evidence, not inference.
+
+### 6b. My own investigation before the fix
+Ran the exact coordinate through the then-current (already Fix-1/Fix-2/KML-merged) router:
+`n_99` is the true closest node (20.5m) but has only a 378m real route onward; the router
+instead picked `n_136` (43.9m unverified connector, 72m real route onward, 115.9m total) —
+architecturally the same *shape* of decision Fix 1 already validated as correct in round 2
+(trusting a longer-but-cheaper connector within `SNAP_MARGIN_M`) — but this time,
+field-disproven.
+
+**First fix attempt (capping only `n_136`) was insufficient — caught by my own testing,
+not told by anyone else:** excluding just `n_136` from the candidate shortlist simply
+promoted the *next* margin-eligible candidate, `n_127` (49.5m connector) — a node with the
+same unverified-long-connector profile in the same cluster, no more field-confirmed than
+`n_136` originally was. Checked the full shortlist for this position: `n_99` (20.5m, real),
+`n_98` (34.4m), `n_128` (41.3m), `n_136` (43.9m), `n_116` (47.7m), `n_127` (49.5m), `n_137`
+(50.0m) — six of seven candidates share the identical "long unverified connector in this
+tightly-built cluster" profile.
+
+### 6c. `PHOTO2_REROUTE_DIAGNOSIS.md` — external report — verification
+
+| Claim | Verification performed | Result |
+|---|---|---|
+| `matchToPath` recomputes displayed remaining distance/polyline on every GPS tick, independent of a backend reroute | Read `LocationProvider.jsx`'s tick handler directly (lines ~483-535) | ✅ Confirmed exactly — `maybeRecalculate` (the only backend call) fires only when `isOffRoute`, entirely separate from the unconditional `matchToPath`/`setRemainingDist` above it |
+| `MATCH_WINDOW_BACK_SEGMENTS=2`, `MATCH_WINDOW_FORWARD_SEGMENTS=25` | Read `geo.js` directly | ✅ Exact match |
+| For routes with ≤~27 points, the window imposes no real constraint from near the start | Worked through the min/max window math by hand | ✅ Confirmed as a general property |
+| Ordinary GPS jitter can make `matchToPath` jump to a self-proximate later segment | Ran the **real, unmodified** `matchToPath`/`geo.js` in Node (not a re-implementation) against a **genuinely-occurring** self-proximate route found by scanning 150 real computed routes (not an invented example) | ✅ Confirmed as a real, general mechanism — reproducible |
+| **This mechanism explains the Photo 1→Photo 2 transition specifically** | Computed the actual real route from the exact clock-tower coordinate named in Photo 1's own banner (323.1m total — matches Photo 1's displayed 326m almost exactly) and checked it for self-proximate points | ❌ **Rejected, with direct evidence** — this specific real route has **zero** self-proximate point pairs anywhere in it (checked all pairs). There is nothing for `matchToPath` to erroneously jump to. The general mechanism is real; it does not apply to this incident. |
+| (My own follow-up check) Is Photo 2's 123m explainable as ordinary forward progress along that same real route, no bug at all? | Interpolated along the route and ran the real `computeUpcomingTurn` at each point | ⚠️ Partially — remaining distance matches almost exactly (123.1m vs. displayed 123m) at 45% along one real segment, **but** the maneuver classification at that exact point is "slight right, 41m," not "Turn Right, 51m" as displayed — a real, unresolved discrepancy, not just rounding. Logged this contradiction rather than picking whichever explanation was more convenient. |
+
+**Net verdict:** the external report's specific claim about *why* Photo 2 happened is not
+supported by the real route's geometry — checked directly, not assumed. Its general,
+lower-level technical claims (tick behavior, window sizing, the mechanism's existence) are
+all independently confirmed and are useful, correct findings on their own, just not the
+explanation for this incident. Combined with 6b's whack-a-mole result, the weight of
+evidence points to the backend snap explanation, consistent with the field tester's own
+direct ground truth — which is why the implemented fix (6d) targets that, not the frontend.
+
+### 6d. Fix implemented
+Re-read the field tester's own statement precisely: *"the only practical route is the
+longer route shown in Photo 1"* — this is not scoped to `n_136` alone, it rules out every
+short-connector candidate from that position at once. Extended
+`UNVERIFIED_CONNECTOR_CAP_M` (backend/utils/router.py) to cover the full suspect shortlist
+identified in 6b: `n_136`, `n_98`, `n_128`, `n_116`, `n_127`, `n_137`, each capped at the
+same conservative 15m (matching how short every genuinely real connector elsewhere in this
+graph actually is). `n_99` — the true closest node, reached via its own real graph edges —
+is deliberately not in the table; it was never in question.
+
+**Files changed:** `backend/utils/router.py` only. No graph/data file touched (respects
+"do not modify the graph"). No global threshold changed — `SNAP_MARGIN_M`/
+`NEAREST_NODE_CANDIDATES`/`STICKY_MIN_MARGIN_M` are all untouched; this is a narrow,
+per-node, evidence-linked exception table, not a formula change.
+
+**Why this is correct:** re-ran the exact field-tested coordinate — now snaps to `n_99`
+(20.5m, real) at every accuracy level, producing a 16-point route matching the real
+long-way corridor (Photo 1's route), not a fictional shortcut.
+
+**Regression risks and testing:**
+- Both round-2 confirmed-good cases re-verified unchanged: the 51.8m `n_8` connector
+  (different node, no cap) and the original 14.6m `n_8` chokepoint case — both identical
+  to their previously-verified results.
+- A short, genuine approach to a capped node (8m from `n_127`) still correctly snaps to
+  it — the cap only excludes long/unverified connectors, not real proximity.
+- `validate_walkway_graph.py`: passes clean, same 2 pre-existing unrelated warnings, no
+  new ones.
+- `route_quality_test.py 400`: 800/800 passed, no regressions.
+- `npm run build`: clean (no frontend files were touched this round; verified anyway).
+
+**Regression risk carried forward, stated plainly:** this is 6 specific, evidence-linked
+exclusions, not a general solution to "unverified connectors in this cluster" — if a 7th
+node in this same neighborhood turns out to have the same problem for a different live
+position, it will need its own field confirmation and its own entry, same as these. That's
+a deliberate tradeoff (no guessing) rather than an oversight.
+
 ## 5. Open questions / evidence still needed
 
 **Resolved this round** (kept here, struck through, for the record — not deleted):
@@ -482,3 +563,24 @@ No nodes added, renamed, or removed. No existing edges modified, simplified, or 
 - F1's raw-survey-point underrepresentation near the *original* n_177/n_178/n_8 chokepoint
   (as opposed to the newly-found n_99 gap, a different location) — still genuinely open,
   still needs field verification, still not the same question as the n_99 gap above.
+
+**Round 5 additions:**
+- ~~Whether Photo 2's anomalous route was a frontend `matchToPath` defect~~ — investigated
+  and rejected with direct evidence (§4b/6c): the real matching route has zero
+  self-proximate points, so the specific mechanism proposed can't apply here, even though
+  it's a real, separately-confirmed general phenomenon elsewhere.
+- ~~Whether the `n_136` connector for that position was field-real~~ — resolved: confirmed
+  fictional by direct field testing; fixed (§4b/6d).
+- **New, still open:** the near-exact 123.1m-vs-123m distance match under pure forward
+  interpolation along the real clock-tower route (§4b/6c) is unexplained — plausibly
+  coincidental (both explanations put the tester in the same general area), but logged
+  rather than dismissed, since I don't have a definitive account of why it lined up that
+  closely if the backend-snap explanation is the correct one.
+- **New, still open:** the maneuver-text mismatch itself ("Turn Right, 51m" displayed vs.
+  no vertex in the real clock-tower route's relevant section reaching the 45° threshold
+  needed for a non-slight "Turn Right" classification) — not resolved, not investigated
+  further this round once the backend explanation was confirmed sufficient to fix the
+  reported symptom.
+- **New, still open:** whether any node *beyond* the 6 now capped shares the same
+  fictional-connector problem for some other live position in this cluster — deliberately
+  left unverified rather than guessed at (§4b/6d's stated regression risk).
