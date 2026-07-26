@@ -434,6 +434,7 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
   transition: all 0.15s ease;
 }
 .chip:hover { color: var(--ink); }
+.chip:active { transform: scale(0.95); }
 .chip.active {
   background: var(--ink);
   color: var(--surface);
@@ -590,11 +591,35 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
   transition: background 0.15s ease;
 }
 .location-btn:hover { background: var(--line); }
+.location-btn:active { transform: scale(0.95); }
 .location-btn.active {
   background: var(--brand);
   color: white;
   border-color: var(--brand);
 }
+
+/* Bug fix (production UX hardening) — one-tap clear button for the active
+   search query shown in the results-sheet title (see Home.jsx). Sized to
+   a real 44px touch target even though the visible glyph is small, same
+   accessibility bar as the rest of the sheet's controls. */
+.sheet-search-clear-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: -8px;
+  padding: 8px;
+  font-size: 0.85rem;
+  line-height: 1;
+  color: var(--ink-2);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+}
+.sheet-search-clear-btn:hover,
+.sheet-search-clear-btn:active { background: var(--ring); }
 
 /* ---------- Location card ---------- */
 .location-card {

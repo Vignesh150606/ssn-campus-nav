@@ -43,7 +43,7 @@ const SNAP_ANIM_MS = 280
 const DRAG_ACTIVATE_PX = 4        // ignore sub-pixel jitter before committing to a drag
 const VELOCITY_FLING_PX_MS = 0.5  // fast flick threshold
 
-export function useDraggableSheet(snapPeeks, initialTier = 'collapsed', active = true, boxHeight) {
+export function useDraggableSheet(snapPeeks, initialTier = 'collapsed', active = true, boxHeight, forceZero = false) {
   const sheetRef      = useRef(null)
   const rafRef         = useRef(null)
   const peekRef        = useRef(snapPeeks[initialTier])
@@ -140,6 +140,27 @@ export function useDraggableSheet(snapPeeks, initialTier = 'collapsed', active =
       document.documentElement.style.setProperty('--sheet-h', `${Math.round(Math.max(0, peekRef.current))}px`)
     }
   }, [active])
+
+  // Bug fix (production UX hardening) — root cause of "floating chat
+  // button jumps to the middle of the screen": Home.jsx forces the browse
+  // sheet's box to height:0 via a CSS class (.results-sheet.empty) when
+  // there's nothing to show, but that's a CSS-only override this hook has
+  // no way to know about — --sheet-h kept reporting whatever peek (e.g.
+  // ~300px for the 'half' tier) was last committed, so .copilot-fab-stack
+  // and the zoom control, which both position themselves at
+  // `bottom: calc(var(--sheet-h) + gap)`, kept floating that far above
+  // the real (now zero-height) bottom edge instead of dropping down with
+  // it. `forceZero` lets the caller tell this hook explicitly when that
+  // external collapse is in effect, the same way `active` already scopes
+  // who's allowed to write the shared var. Mirrors the `active`-flip
+  // effect above: fires the moment forceZero changes, and restores the
+  // tier's real peek automatically the instant it's no longer forced —
+  // no separate "un-collapse" step needed anywhere else.
+  useEffect(() => {
+    if (!active) return
+    applyPeek(forceZero ? 0 : tiersRef.current[tier])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forceZero, active])
 
   const animateTo = useCallback((targetPeek, targetTier) => {
     cancelAnimationFrame(rafRef.current)

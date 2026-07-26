@@ -108,6 +108,16 @@ NEED_ALIASES = {
     'restroom':     ['restroom', 'washroom', 'toilet', 'bathroom', 'loo', 'lavatory', 'rest room'],
     'parking':      ['parking', 'park my vehicle', 'park my car', 'park my bike', 'car park', 'where to park'],
     'medical':      ['sick', 'unwell', 'injured', 'first aid', 'medical help', 'not feeling well', 'hurt'],
+    # Bug fix (chatbot — Critical Issue: accessibility guidance was
+    # entirely missing). Every venue already has an `accessible` boolean
+    # (see backend/data/locations.json / the venues table) but nothing in
+    # the chatbot ever surfaced it — a question like "which buildings are
+    # wheelchair accessible?" fell through to the generic out_of_scope
+    # reply. Resolution against actual locations happens on the frontend,
+    # same as every other need_type here (see the comment above this dict).
+    'accessibility': ['wheelchair', 'wheelchair accessible', 'wheelchair access', 'wheelchair friendly',
+                       'accessible', 'accessibility', 'disability', 'disabled access', 'handicap accessible',
+                       'ramp access', 'ramp', 'step free', 'step-free'],
 }
 # This "need" is a single specific place, not "nearest of several" — the
 # frontend just resolves it straight to a location id.
@@ -567,6 +577,7 @@ def _classify_need(text: str):
             'restroom': "Here's the nearest restroom.",
             'parking': "Here's where to park.",
             'medical': "Here's the medical center — head there or ask campus security for first aid.",
+            'accessibility': "Here are the wheelchair-accessible buildings on campus.",
         }
         return _result('need', text, text, reply=replies.get(best_need, "Here's what I found."),
                         need_type=best_need)

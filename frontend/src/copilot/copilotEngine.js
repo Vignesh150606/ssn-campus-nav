@@ -20,6 +20,7 @@ const NEED_LABELS = {
   restroom: 'a restroom',
   parking: 'parking',
   medical: 'the medical center',
+  accessibility: 'a wheelchair-accessible building',
 }
 
 function distanceLabel(meters) {
@@ -301,6 +302,23 @@ async function handleNeedIntent(result, locationsById, allLocations, position) {
       cards,
       state: { lastCandidates: matches.map(l => ({ kind: 'location', id: l.id })) },
       suggestions: ['Navigate there'],
+    }
+  }
+
+  // Bug fix (chatbot — accessibility guidance was entirely missing, see
+  // the NEED_ALIASES comment in backend/utils/copilot.py). Same
+  // nearest-first pattern as the dining branch above, filtered on the
+  // `accessible` flag every venue already carries instead of category.
+  if (needType === 'accessibility') {
+    const accessible = allLocations.filter(l => l.accessible)
+    const withDist = accessible.map(l => ({ l, d: position ? haversine(position.lat, position.lng, l.lat, l.lng) : null }))
+    withDist.sort((a, b) => (a.d ?? 0) - (b.d ?? 0))
+    const cards = withDist.map(({ l }) => locationCard(l, { position }))
+    return {
+      replyText: cards.length ? result.reply : "I don't have accessibility information on record for any building.",
+      cards,
+      state: { lastCandidates: withDist.map(({ l }) => ({ kind: 'location', id: l.id })) },
+      suggestions: cards.length > 1 ? ['Which is closest?', 'Navigate to first one'] : ['Navigate there'],
     }
   }
 

@@ -15,8 +15,10 @@ Two things are deliberately NOT here, by design (see SUPABASE_MIGRATION.md):
   utils/router.py keeps reading it straight off disk, untouched.
 """
 import os
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
+from difflib import SequenceMatcher
 from typing import List, Optional
 
 from db import SupabaseUnavailableError, get_client
@@ -67,19 +69,123 @@ def get_locations(category: Optional[str] = None) -> List[dict]:
     return _wrap(_run)
 
 
+# Bug fix (search intelligence) — campus abbreviation/alias gaps. Most
+# department abbreviations already work today purely by accident of the
+# existing substring search (e.g. "CSE" matches because the venue's `name`
+# literally contains "CSE Block") — verified against backend/data/
+# locations.json, the one real sample of this campus's actual naming.
+# "BME" is a genuine, confirmed gap that same check turned up: the venue is
+# named "Biomedical / Chemical Block" / department "Biomedical and Chemical
+# Engineering" — neither contains the substring "BME" anywhere, even
+# though that's exactly how it's labelled on the map. Each entry here is
+# additive (widens the OR filter with one more term), so worst case it
+# returns the same results as before — it can only surface matches that
+# were being missed, never hide ones that already worked.
+_SEARCH_ALIASES = {
+    "bme": "biomedical",
+    "biomedical": "bme",
+    "cdc": "career development",
+    "admin": "administration",
+    # Confirmed via utils/copilot.py's own NEED_ALIASES/LOCATION_ALIASES —
+    # "mess" is real campus slang for the canteen there, but the venue
+    # search endpoint had no way to know that until now.
+    "mess": "canteen",
+}
+
+_FUZZY_MIN_QUERY_LEN = 3
+_FUZZY_MIN_RATIO = 0.7
+_FUZZY_MAX_RESULTS = 8
+
+
+def _relevance_rank(row: dict, ql: str) -> tuple:
+    """Lower sorts first. Bug fix (search intelligence) — the previous
+    `.order("name")` was purely alphabetical, so a location whose NAME
+    starts with the query (the obvious best match) could rank below one
+    that merely happens to contain those letters somewhere inside a
+    longer, unrelated department string. This ranks an exact/prefix/
+    whole-word match on `name` above a same-substring match buried in
+    `department` or `category`, which is what "intelligent scoring"
+    actually means for a place-search box like this one."""
+    name = (row.get("name") or "").lower()
+    dept = (row.get("department") or "").lower()
+    cat = (row.get("category") or "").lower()
+    word_in_name = re.search(rf"\b{re.escape(ql)}", name) is not None
+    word_in_dept = re.search(rf"\b{re.escape(ql)}", dept) is not None
+    if name == ql:
+        tier = 0
+    elif name.startswith(ql):
+        tier = 1
+    elif word_in_name:
+        tier = 2
+    elif ql in name:
+        tier = 3
+    elif dept.startswith(ql) or word_in_dept:
+        tier = 4
+    elif ql in dept:
+        tier = 5
+    elif ql in cat:
+        tier = 6
+    else:
+        tier = 7
+    return (tier, name)
+
+
 def search_locations(q: str) -> List[dict]:
     def _run():
         client = get_client()
-        pattern = f"%{q}%"
-        # PostgREST OR filter across the three fields the old code searched.
+        ql = q.strip().lower()
+
+        patterns = {ql}
+        alias = _SEARCH_ALIASES.get(ql)
+        if alias:
+            patterns.add(alias)
+
+        # PostgREST OR filter across the three fields the old code
+        # searched, now unioned across the query plus any known alias.
+        or_clause = ",".join(
+            f"name.ilike.%{p}%,department.ilike.%{p}%,category.ilike.%{p}%"
+            for p in patterns
+        )
         result = (
             client.table("venues")
             .select(_VENUE_COLUMNS)
-            .or_(f"name.ilike.{pattern},department.ilike.{pattern},category.ilike.{pattern}")
-            .order("name")
+            .or_(or_clause)
             .execute()
         )
-        return result.data or []
+        rows = result.data or []
+
+        # Bug fix (search intelligence) — typo tolerance. A misspelled
+        # query ("libary", "hostle") matches nothing under plain ILIKE.
+        # This campus only has ~30 venues total, so on a genuine
+        # zero-result search it's cheap and safe to fetch the full table
+        # once and fuzzy-score it locally — no new dependency (difflib is
+        # stdlib) and no assumption about Postgres extensions (pg_trgm
+        # etc.) being enabled on this Supabase project, which can't be
+        # verified from here. Only triggers on a true zero-result search,
+        # so it can't ever downgrade a query that was already matching.
+        if not rows and len(ql) >= _FUZZY_MIN_QUERY_LEN:
+            all_rows = client.table("venues").select(_VENUE_COLUMNS).execute().data or []
+            scored = []
+            for row in all_rows:
+                fields = [row.get("name") or "", row.get("department") or "", row.get("category") or ""]
+                best = 0.0
+                for f in fields:
+                    fl = f.lower()
+                    if not fl:
+                        continue
+                    best = max(best, SequenceMatcher(None, ql, fl).ratio())
+                    # Also score against individual words, so a typo in one
+                    # word of a longer name/department isn't diluted by the
+                    # rest of the string being unrelated in length.
+                    for word in fl.split():
+                        best = max(best, SequenceMatcher(None, ql, word).ratio())
+                if best >= _FUZZY_MIN_RATIO:
+                    scored.append((best, row))
+            scored.sort(key=lambda t: -t[0])
+            return [row for _, row in scored[:_FUZZY_MAX_RESULTS]]
+
+        rows.sort(key=lambda r: _relevance_rank(r, ql))
+        return rows
 
     return _wrap(_run)
 

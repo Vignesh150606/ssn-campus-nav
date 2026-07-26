@@ -41,6 +41,10 @@ import RouteFeedbackDialog from '../components/RouteFeedbackDialog'
 import { track } from '../analytics/analyticsClient'
 
 const SHEET_HEIGHT = 38
+// Must match --header-h in index.css — used to keep the browse sheet's
+// 'full' tier from ever growing tall enough to cover the search bar
+// (see browseSheetPeeks below).
+const HEADER_H = 56
 const ENTRY_ID     = 'main-gate'
 const ARRIVED_DIST_M = 20
 
@@ -293,17 +297,65 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewActive, previewLoc])
 
+  // Moved up from further down in the file (was computed right before its
+  // main JSX usage) — sheetEmpty must exist before browseSheet is
+  // constructed below, since it's now passed in as the forceZero flag
+  // that keeps --sheet-h in sync with the sheet's real collapsed state
+  // (see the useDraggableSheet fix note just below). All of this still
+  // only depends on state already declared above (locations, category,
+  // searchResults, loadError, previewActive), so nothing here changes.
+  const visibleLocations = useMemo(() => {
+    if (category) return locations.filter(l => l.category === category)
+    return locations
+  }, [locations, category])
+
+  const listItems  = searchResults !== null ? searchResults : visibleLocations
+  // Bug fix (production UX hardening): this used to be
+  // `!previewActive && listItems.length === 0 && !loadError`, which also
+  // went true the moment an active *search* returned zero results —
+  // collapsing .results-sheet to height:0 (see .results-sheet.empty in
+  // index.css) and taking the "No matches found." message down with it,
+  // since that message lives inside the now-zero-height sheet. That's
+  // the reported bug: search a nonsense query and the entire search UI
+  // (sheet, empty-state message, recovery options) vanishes instead of
+  // showing "No matches found." A zero-result SEARCH is a normal,
+  // expected state that must stay visible and recoverable — only an
+  // empty BROWSE list (nothing loaded yet / category filters out
+  // everything, searchResults still null) should collapse the sheet and
+  // hand the screen to the map.
+  const sheetEmpty = !previewActive && !loadError && listItems.length === 0 && searchResults === null
+
   // Priority X.1 (Phase 4.2.7) — the "Campus Locations" panel on the Home
   // screen used to be a plain static div fixed at 38% height (SHEET_HEIGHT
   // below); it's now a full 3-tier draggable sheet, same as nav/preview.
   // 'half' keeps the same 38%-of-viewport default so nothing about the
   // everyday look changes — it's just draggable now, both up and down.
+  // Bug fix (production UX hardening) — 'full' was a flat 86% of
+  // viewport height with no ceiling. .results-sheet (z-index 25) sits
+  // ABOVE .search-overlay (z-index 20) in the stacking order, so on any
+  // viewport where 86% left less than ~120px of clearance at the top,
+  // dragging/tapping the sheet to 'full' would visually — and for touch
+  // purposes, functionally — bury the search box under the sheet with no
+  // way to reach it. This is the reported "search bar disappears after
+  // searching" bug. 120px matches the exact, already-measured clearance
+  // this file uses for the same overlap problem on the zoom control
+  // above (12px top offset + 48px search box + 10px gap + 38px chip row
+  // + 12px margin), and HEADER_H mirrors --header-h from index.css, so
+  // 'full' can now never climb higher than the bottom edge of the search
+  // box + category chips, on any screen size.
   const browseSheetPeeks = useMemo(() => ({
     collapsed: 132,
     half: Math.round(viewportH * (SHEET_HEIGHT / 100)),
-    full: Math.round(viewportH * 0.86),
+    full: Math.min(Math.round(viewportH * 0.86), viewportH - HEADER_H - 120),
   }), [viewportH])
-  const browseSheet = useDraggableSheet(browseSheetPeeks, 'half', !navMode && !previewActive)
+  // Bug fix (production UX hardening) — root cause of "floating chat
+  // button jumps to the middle of the screen": see the forceZero note in
+  // useDraggableSheet.js. Passing sheetEmpty through here is what lets
+  // --sheet-h actually drop to 0 the instant this sheet visually
+  // collapses, instead of keeping stale --sheet-h controls (the copilot
+  // FAB stack, zoom control) floating wherever the last real tier left
+  // them.
+  const browseSheet = useDraggableSheet(browseSheetPeeks, 'half', !navMode && !previewActive, undefined, sheetEmpty)
 
   // Priority X.2 (Phase 4.2.7) — pressing Enter/Search on the mobile
   // keyboard dismisses it (handled in SearchBar itself) and moves focus
@@ -534,14 +586,6 @@ export default function Home() {
   const displayFullDist  = (hasRoute && fullPath) ? fullDistance : routeDist
   const displayFullEta   = (hasRoute && fullPath) ? fullEta : routeEta
 
-  const visibleLocations = useMemo(() => {
-    if (category) return locations.filter(l => l.category === category)
-    return locations
-  }, [locations, category])
-
-  const listItems  = searchResults !== null ? searchResults : visibleLocations
-  const sheetEmpty = !previewActive && listItems.length === 0 && !loadError
-
   // While any of the three draggable sheets (nav, route-preview, or browse)
   // is mounted, it is the sole writer of --sheet-h, updating it every
   // animation frame (drag + snap). The floating controls that read
@@ -556,6 +600,75 @@ export default function Home() {
     document.documentElement.classList.toggle('nav-sheet-driving', navMode || previewActive || !sheetEmpty)
     return () => document.documentElement.classList.remove('nav-sheet-driving')
   }, [navMode, previewActive, sheetEmpty])
+
+  // Bug fix — Critical Issue #3 (Android/browser Back button): previously
+  // there was NO back-button handling anywhere in this app (verified: no
+  // popstate listener existed at all) — Back always left the page/PWA
+  // immediately, even mid-search, which is the same "trapped" complaint
+  // as the sheetEmpty/browseSheetPeeks fixes above, just reached via
+  // hardware/gesture back instead of a tap. This intercepts Back for
+  // exactly that scenario: an expanded browse sheet or an active search
+  // query, closing ONE layer per press (collapse sheet, then clear
+  // search) before letting Back behave normally again.
+  //
+  // Scoped deliberately to browse/search only. NOT extended to
+  // nav-mode-exit or generic modal-closing: ending an in-progress trip on
+  // a stray back-press would fire the trip-feedback dialog with no
+  // warning, and there's no single existing modal registry to hook into
+  // generically without auditing every dialog in the app individually —
+  // both are real gaps, just left as separate follow-ups rather than
+  // rushed in here.
+  //
+  // Mechanism: pushes exactly one extra history entry, cloning (not
+  // replacing) whatever's already in history.state — React Router keeps
+  // its own {usr,key,idx} bookkeeping there (see the locationState read
+  // near the top of this component), and overwriting it would corrupt
+  // back/forward navigation for deep links and every other page in the
+  // app. On popstate, this closes one layer and — if another layer still
+  // needs protecting — re-arms by pushing a fresh guard entry, the
+  // standard pattern for intercepting Back in a browser-history SPA
+  // (popstate can't be cancelled; re-pushing is the only way to "hold" a
+  // back press). Needs real-device QA before shipping: History API/
+  // popstate timing against React Router's BrowserRouter can't be
+  // exercised in this environment, only reasoned through.
+  const backGuardArmedRef = useRef(false)
+  const browseTierRef = useRef(browseSheet.tier)
+  browseTierRef.current = browseSheet.tier
+  const queryRef = useRef(query)
+  queryRef.current = query
+
+  useEffect(() => {
+    const escapable = !navMode && !previewActive &&
+      (browseSheet.tier !== 'collapsed' || query.trim().length > 0)
+    if (escapable && !backGuardArmedRef.current) {
+      backGuardArmedRef.current = true
+      window.history.pushState({ ...window.history.state, __searchGuard: true }, '')
+    } else if (!escapable) {
+      backGuardArmedRef.current = false
+    }
+  }, [navMode, previewActive, browseSheet.tier, query])
+
+  useEffect(() => {
+    const onPopState = () => {
+      if (!backGuardArmedRef.current) return // nothing of ours to protect — let Back behave normally
+      let stillEscapable
+      if (browseTierRef.current !== 'collapsed') {
+        browseSheet.snapToTier('collapsed')
+        stillEscapable = queryRef.current.trim().length > 0
+      } else {
+        setQuery('')
+        stillEscapable = false
+      }
+      if (stillEscapable) {
+        window.history.pushState({ ...window.history.state, __searchGuard: true }, '')
+      } else {
+        backGuardArmedRef.current = false
+      }
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const mainGateLoc = useMemo(() => locations.find(l => l.id === ENTRY_ID), [locations])
   const refLat = position?.lat ?? mainGateLoc?.lat ?? null
@@ -1122,9 +1235,26 @@ export default function Home() {
               >
                 <div className="sheet-handle" />
               </div>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 18px 8px' }}>
-                <div className="sheet-title" style={{ padding:0 }}>
-                  {searchResults !== null ? `"${query}"` : 'Campus locations'}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 18px 8px', gap:8 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:4, minWidth:0 }}>
+                  <div className="sheet-title" style={{ padding:0 }}>
+                    {searchResults !== null ? `"${query}"` : 'Campus locations'}
+                  </div>
+                  {/* Bug fix (production UX hardening) — previously this was
+                      static text with no way to clear or edit the search
+                      from here at all; the only clear button lived in the
+                      top SearchBar, which 'full' tier could cover (see the
+                      browseSheetPeeks fix above). This gives a one-tap way
+                      to recover a search from wherever the sheet is. */}
+                  {searchResults !== null && (
+                    <button
+                      className="sheet-search-clear-btn"
+                      onClick={() => setQuery('')}
+                      aria-label="Clear search"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
                 <button className={`location-btn ${tracking ? 'active' : ''}`} onClick={handleToggleTracking}>
                   {tracking ? '📍 Tracking' : '📍 My location'}
