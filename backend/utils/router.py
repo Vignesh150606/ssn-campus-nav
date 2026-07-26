@@ -343,12 +343,38 @@ def _nearest_node(graph, lat, lng, adj=None, to_id=None, accuracy_m=None, prefer
                     best_id, best_total, best_snap_dist = prefer_node_id, prefer_total, prefer_d
 
     if best_id is None:
-        # None of the nearby candidates can reach to_id — fall back to the
-        # plain closest node so we still return *something* usable; the
+        # None of the shortlisted candidates can reach to_id — fall back to
+        # the plain closest node so we still return *something* usable; the
         # caller's own "no path" check further down will catch a truly
         # unreachable destination.
-        d, node_id = candidates[0]
-        return node_id, d
+        #
+        # Bugfix (round 6, field-verified regression): this used to return
+        # candidates[0] unconditionally — the single closest node by raw
+        # distance, straight from the UNFILTERED candidates list — which
+        # bypasses UNVERIFIED_CONNECTOR_CAP_M entirely whenever the
+        # shortlist ends up empty (which capping a node can itself cause,
+        # if that node was also the closest-by-distance one: nearest_dist
+        # stays anchored to its raw distance, so the SNAP_MARGIN_M window
+        # built from it can end up excluding otherwise-good, uncapped
+        # candidates too). Confirmed reproducible: at
+        # (12.75169801107917, 80.19762395087547), n_137 — capped at 15m —
+        # sits at 32.3m and was STILL being returned via this exact branch,
+        # defeating the cap it exists to enforce. Fixed by applying the
+        # same per-node cap check here that the main shortlist filter above
+        # already uses, walking the full candidate list in distance order
+        # and returning the first one that isn't cap-excluded.
+        for d, node_id in candidates:
+            if d <= UNVERIFIED_CONNECTOR_CAP_M.get(node_id, float('inf')):
+                return node_id, d
+        # Every single node on the whole graph is both cap-excluded and
+        # farther than its own cap — cannot happen with the current
+        # 6-entry table (it only ever excludes 6 of the graph's 193 nodes),
+        # but if the table ever grew enough to reach this: returning
+        # (None, None) is correct and safe here, not a new failure mode —
+        # find_route_from_point already raises a clear "Walkway graph has
+        # no nodes to snap to" error for exactly this return value, rather
+        # than silently handing back a node the cap table says not to trust.
+        return None, None
 
     return best_id, best_snap_dist
 

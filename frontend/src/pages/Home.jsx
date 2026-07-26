@@ -97,6 +97,14 @@ export default function Home() {
   const [locations, setLocations]         = useState([])
   const [query, setQuery]                 = useState('')
   const [searchResults, setSearchResults] = useState(null)
+  // Monotonically-increasing id for the search-as-you-type fetch below —
+  // same "latest request wins" pattern as previewRequestIdRef further down.
+  // Without this, a slow response to an earlier keystroke (e.g. "eee")
+  // that resolves after a faster response to a later, more specific query
+  // (e.g. "eee department") could overwrite the newer, correct results
+  // with stale ones — a real race, not hypothetical, since nothing here
+  // previously guaranteed responses come back in request order.
+  const searchRequestIdRef                = useRef(0)
   const [category, setCategory]           = useState(null)
   const [destination, setDestination]     = useState(null)
   const [routePath, setRoutePath]         = useState(null)
@@ -486,9 +494,12 @@ export default function Home() {
 
   useEffect(() => {
     if (!query.trim()) { setSearchResults(null); return }
-    const h = setTimeout(() =>
-      searchLocations(query).then(setSearchResults).catch(e => setLoadError(e.message))
-    , 250)
+    const h = setTimeout(() => {
+      const requestId = ++searchRequestIdRef.current
+      searchLocations(query)
+        .then(results => { if (searchRequestIdRef.current === requestId) setSearchResults(results) })
+        .catch(e => { if (searchRequestIdRef.current === requestId) setLoadError(e.message) })
+    }, 250)
     return () => clearTimeout(h)
   }, [query])
 

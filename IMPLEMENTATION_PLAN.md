@@ -522,6 +522,65 @@ node in this same neighborhood turns out to have the same problem for a differen
 position, it will need its own field confirmation and its own entry, same as these. That's
 a deliberate tradeoff (no guessing) rather than an oversight.
 
+## 4c. Round 6 — fallback-bypass regression fix (2026-07-25)
+
+**Received:** `FINAL_VERIFICATION_REPORT.md` (external), reporting a confirmed regression in
+4b's fix: `_nearest_node`'s existing `if best_id is None:` fallback branch read from the
+**unfiltered** `candidates` list (`candidates[0]`), bypassing `UNVERIFIED_CONNECTOR_CAP_M`
+entirely whenever the post-cap shortlist ended up empty — which capping a node can itself
+cause, since `nearest_dist`/`SNAP_MARGIN_M`'s window stays anchored to the raw (uncapped)
+closest distance. Reported 34 concrete positions where this reintroduces the exact defect
+class the cap exists to prevent, with one fully worked example.
+
+**Independent verification before touching anything:** reproduced their exact example —
+`(12.75169801107917, 80.19762395087547)` — against the then-current code. **Confirmed
+exactly**: `n_137` (capped at 15m) sits at 32.3m and was still returned via the fallback,
+producing a 132.1m route starting with the same class of unverified long connector. All
+of the verifier's other independently-checked claims (byte-diff scope, regression suite
+results, the `n_8`/round-2 case being unaffected, the 7-candidate shortlist composition,
+and their own correction of their prior `matchToPath` hypothesis) were also spot-checked
+where feasible and found consistent with round 5's own record — no disagreement with the
+verification portion of their report.
+
+**Fix implemented (scope: only this fallback branch, per explicit instruction not to
+redesign the algorithm):** `backend/utils/router.py`, the `if best_id is None:` branch.
+Instead of unconditionally returning `candidates[0]`, it now walks the full
+distance-sorted candidate list and returns the first one that isn't cap-excluded — same
+per-node cap rule the main shortlist filter already applies, just also honored here. If
+every node on the graph were somehow cap-excluded (cannot happen with only 6 of 193 nodes
+capped), it now returns `(None, None)` rather than a capped node — `find_route_from_point`
+already raises a clear error for that return value, so this is a safe, pre-existing code
+path, not a new failure mode.
+
+**Why this is correct and doesn't require redesigning anything:** the bug was narrowly
+that one branch didn't apply a rule that already existed and was already correctly applied
+everywhere else in the function. No change to `SNAP_MARGIN_M`, `NEAREST_NODE_CANDIDATES`,
+`STICKY_MIN_MARGIN_M`, the accuracy-gated sanity check, the stickiness block, or the cap
+table itself.
+
+**Testing performed:**
+- Verifier's exact example re-run post-fix: now returns `n_8` (62.5m, real, previously
+  validated) instead of `n_137` beyond its cap.
+- Exhaustive grid scan, not just the one reported point: **1,734 positions** across an
+  80m×80m area around *each* of the 6 capped nodes (10,404 positions total scanned) —
+  **zero** cases of a capped node being returned beyond its own cap. A finer re-scan
+  (648 points, 3m spacing) of the specific area the verifier's report focused on (east of
+  `n_137`) — also zero violations. This directly satisfies "verify that no excluded node
+  can ever be returned through the fallback path," not just the single reported instance.
+- `validate_walkway_graph.py`: clean, same 2 pre-existing unrelated warnings.
+- `route_quality_test.py 400`: 800/800, no regressions.
+- Re-verified all three previously-confirmed cases unchanged: round 2's `n_8`/51.8m case,
+  round 5's `n_99` fix for the field-tested position, and a short genuine approach to a
+  capped node (`n_127`, ~8m away) still resolving normally.
+
+**Not addressed, per explicit instruction to scope this to the fallback only:** the
+verifier's second finding (the underlying total-cost-only scoring mechanism remains live
+at ~50 other nodes campus-wide, unrelated to this fix) — logged in Section 5, not acted
+on this round. That's a product/architecture question about the per-node-table approach's
+long-term scalability, not a code defect, and the instructions for this round were
+explicit that it's out of scope unless fixing the fallback required touching it (it
+didn't).
+
 ## 5. Open questions / evidence still needed
 
 **Resolved this round** (kept here, struck through, for the record — not deleted):
@@ -584,3 +643,14 @@ a deliberate tradeoff (no guessing) rather than an oversight.
 - **New, still open:** whether any node *beyond* the 6 now capped shares the same
   fictional-connector problem for some other live position in this cluster — deliberately
   left unverified rather than guessed at (§4b/6d's stated regression risk).
+
+**Round 6 additions:**
+- ~~The fallback-bypass regression~~ — resolved (§4c), verified with an exhaustive
+  10,404-position grid scan rather than just the one reported example.
+- **Carried forward, explicitly not addressed this round per scope instruction:** the
+  external verifier's campus-wide sweep found ~50 nodes with the same "long connector wins
+  on total cost" shape at 31 of 32 destinations, none field-verified either way. The
+  per-node cap table is confirmed correct as an interim measure but does not scale to
+  that — whether to keep extending it one field report at a time, or revisit why
+  total-cost-only scoring trusts an unsurveyed straight line at all, is an open product
+  question, not something resolved by this round's fix.
