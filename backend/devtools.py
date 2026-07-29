@@ -23,12 +23,12 @@ router-level dependency below (not per-route, so a route added here later
 can't accidentally ship unprotected).
 """
 import math
-import os
 from collections import defaultdict
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+import data_access
 from auth import require_role
 from utils import router as campus_router
 
@@ -52,11 +52,20 @@ def get_full_graph():
     """The full walkway graph as-is, for the Graph Viewer to render on a
     Leaflet map. Same data build_walkway_graph.py produces — this just
     hands it to the frontend rather than the frontend needing its own
-    copy or a filesystem read it doesn't have access to."""
+    copy or a filesystem read it doesn't have access to.
+
+    Item 23d — locations used to come from a direct read of the local
+    backend/data/locations.json seed file, which SUPABASE_MIGRATION.md is
+    explicit nothing reads at runtime anymore: real location data lives in
+    Supabase and is edited live through the Admin Dashboard. Any edit made
+    there (renaming a building, moving a pin, adding a new one) never
+    showed up in this viewer — it kept rendering whatever was in that seed
+    file at deploy time, silently drifting further out of sync with the
+    live data every time someone edited a location. Now reads the same
+    live source as everything else in the app.
+    """
     graph, _segs = campus_router._load()
-    locations_path = os.path.join(campus_router.BASE_DIR, 'data', 'locations.json')
-    import json
-    locations = json.load(open(locations_path))
+    locations = data_access.get_locations()
     return {"nodes": graph["nodes"], "edges": graph["edges"],
             "location_edges": graph["location_edges"], "locations": locations}
 

@@ -17,11 +17,14 @@ Two things are deliberately NOT here, by design (see SUPABASE_MIGRATION.md):
 import os
 import re
 import uuid
+import logging
 from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from typing import List, Optional
 
 from db import SupabaseUnavailableError, get_client
+
+logger = logging.getLogger("ssn-campus-nav.data_access")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -30,6 +33,51 @@ ROAD_SEGMENTS_CACHE_PATH = os.path.join(DATA_DIR, "road_segments.json")
 EVENT_IMAGES_BUCKET = "event-images"
 ALLOWED_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
+
+# Item 11 fix — file signatures ("magic bytes") for each allowed image
+# type, checked against the actual uploaded content. Previously the only
+# type check anywhere in the upload path was `content_type not in
+# ALLOWED_IMAGE_CONTENT_TYPES` — but content_type is the client-supplied
+# multipart Content-Type header, which a request can set to anything
+# regardless of what bytes actually follow. That let any file at all
+# (including e.g. an .svg or .html with embedded script) through the
+# allowlist just by claiming to be `image/png`, to a public Storage bucket
+# that's loaded directly into <img> tags on the admin dashboard.
+_IMAGE_MAGIC_PREFIXES = {
+    b"\xff\xd8\xff": "image/jpeg",
+    b"\x89PNG\r\n\x1a\n": "image/png",
+    b"GIF87a": "image/gif",
+    b"GIF89a": "image/gif",
+}
+
+
+def _sniff_image_content_type(content: bytes) -> Optional[str]:
+    for magic, mime in _IMAGE_MAGIC_PREFIXES.items():
+        if content.startswith(magic):
+            return mime
+    if content[:4] == b"RIFF" and content[8:12] == b"WEBP":  # WEBP: RIFF....WEBP
+        return "image/webp"
+    return None
+
+
+def validate_image_upload(content: bytes, content_type: str) -> None:
+    """Shared by upload_event_image_file / upload_menu_image_file /
+    upload_feedback_screenshot_file — was three separately-maintained
+    copies of the same two checks (claimed-type allowlist + size), neither
+    of which ever looked at the actual bytes. Now also sniffs the real
+    file signature and requires it to match a genuine allowed image type,
+    independent of what the client claims. The size check stays here too
+    as defense-in-depth even though callers now also bound how many bytes
+    they ever read off the wire in the first place (see main.py)."""
+    if content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
+        raise ValueError(f"Unsupported image type '{content_type}'. Allowed: jpeg, png, webp, gif.")
+    if len(content) > MAX_IMAGE_BYTES:
+        raise ValueError(f"Image too large ({len(content)} bytes). Max {MAX_IMAGE_BYTES} bytes.")
+    sniffed = _sniff_image_content_type(content)
+    if sniffed is None:
+        raise ValueError("File content doesn't match a recognized image format (checked the actual file bytes, not just the claimed type).")
+    if sniffed != content_type:
+        raise ValueError(f"File content looks like '{sniffed}' but was uploaded as '{content_type}'.")
 
 # Embeds events -> event_categories (for the category name) and
 # event_images (for poster_url / photo_urls) in a single round trip.
@@ -81,6 +129,8 @@ def get_locations(category: Optional[str] = None) -> List[dict]:
 # additive (widens the OR filter with one more term), so worst case it
 # returns the same results as before — it can only surface matches that
 # were being missed, never hide ones that already worked.
+_SEARCH_FILTER_UNSAFE_RE = re.compile(r"[,()]")
+
 _SEARCH_ALIASES = {
     "bme": "biomedical",
     "biomedical": "bme",
@@ -135,10 +185,26 @@ def search_locations(q: str) -> List[dict]:
         client = get_client()
         ql = q.strip().lower()
 
-        patterns = {ql}
+        # Item 9 fix — `,` separates conditions and `()` group them in
+        # PostgREST's `.or_()` filter-string DSL. The raw query used to go
+        # straight into the f-string below, so a search containing a comma
+        # or parenthesis could break the filter's own syntax (malformed
+        # request rejected by PostgREST) or be parsed as filter structure
+        # never intended by the query, instead of just being treated as
+        # search text. Ordinary building/department name searches never
+        # contain these characters, so this doesn't change normal results;
+        # the `%wildcards%` PostgREST ilike syntax around the value below
+        # is unaffected.
+        ql_safe = _SEARCH_FILTER_UNSAFE_RE.sub("", ql)
+
+        patterns = {ql_safe}
         alias = _SEARCH_ALIASES.get(ql)
         if alias:
             patterns.add(alias)
+        patterns.discard("")  # an all-special-characters query sanitizes to empty — nothing to filter on
+
+        if not patterns:
+            return []
 
         # PostgREST OR filter across the three fields the old code
         # searched, now unioned across the query plus any known alias.
@@ -612,10 +678,7 @@ def upload_event_image_file(event_id: str, filename: str, content: bytes, conten
     """Uploads raw bytes to the `event-images` Supabase Storage bucket and
     returns the public URL. Raises ValueError for invalid type/size — the
     route turns that into a 400."""
-    if content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
-        raise ValueError(f"Unsupported image type '{content_type}'. Allowed: jpeg, png, webp, gif.")
-    if len(content) > MAX_IMAGE_BYTES:
-        raise ValueError(f"Image too large ({len(content)} bytes). Max {MAX_IMAGE_BYTES} bytes.")
+    validate_image_upload(content, content_type)
 
     def _run():
         client = get_client()
@@ -810,7 +873,13 @@ def record_audit(actor_id: Optional[str], actor_username: str, action: str,
             "details": details,
         }).execute()
     except Exception:
-        pass
+        # Best-effort by design — a hiccup writing an audit row must never
+        # block the actual admin action it's describing — but "never
+        # block" isn't the same as "never notice". Previously a bare
+        # `pass` meant audit logging could fail silently forever (schema
+        # drift, permissions, an outage) with zero trace anywhere.
+        logger.warning("Failed to record audit entry: actor=%s action=%s target=%s/%s",
+                        actor_username, action, target_type, target_id, exc_info=True)
 
 
 def list_audit_log(limit: int = 200) -> List[dict]:
@@ -1027,10 +1096,7 @@ def delete_menu(venue_id: str, date: str) -> bool:
 def upload_menu_image_file(venue_id: str, filename: str,
                            content: bytes, content_type: str) -> tuple:
     """Upload menu image to Supabase Storage; returns (public_url, storage_path)."""
-    if content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
-        raise ValueError(f"Unsupported image type '{content_type}'.")
-    if len(content) > MAX_IMAGE_BYTES:
-        raise ValueError(f"Image too large ({len(content)} bytes). Max {MAX_IMAGE_BYTES} bytes.")
+    validate_image_upload(content, content_type)
     def _run():
         client = get_client()
         safe_name = "".join(c for c in filename if c.isalnum() or c in "._-") or "menu"
@@ -1346,6 +1412,23 @@ def create_feedback(payload: dict) -> dict:
 
 
 def attach_feedback_screenshot(feedback_id: str, url: str, storage_path: str) -> Optional[dict]:
+    """Item 12 — this endpoint is public and anonymous (route feedback has
+    no session/account concept), so there's no real "ownership" to check.
+    The closest meaningful substitute: first screenshot attached to a given
+    feedback_id wins — a later call for the same id (a retry, or anyone
+    else who learned/guessed the id; ids are random UUIDs, so low risk
+    either way) is rejected instead of silently overwriting it."""
+    def _fetch():
+        client = get_client()
+        result = client.table("route_feedback").select("id, screenshot_url").eq("id", feedback_id).limit(1).execute()
+        return result.data or []
+
+    rows = _wrap(_fetch)
+    if not rows:
+        return None
+    if rows[0].get("screenshot_url"):
+        raise ValueError("A screenshot has already been attached to this feedback submission.")
+
     def _run():
         client = get_client()
         result = (
@@ -1362,10 +1445,7 @@ def attach_feedback_screenshot(feedback_id: str, url: str, storage_path: str) ->
 def upload_feedback_screenshot_file(feedback_id: str, filename: str, content: bytes, content_type: str) -> tuple:
     """Same validation + Storage-upload pattern already used for event and
     menu images above."""
-    if content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
-        raise ValueError(f"Unsupported image type '{content_type}'. Allowed: jpeg, png, webp, gif.")
-    if len(content) > MAX_IMAGE_BYTES:
-        raise ValueError(f"Image too large ({len(content)} bytes). Max {MAX_IMAGE_BYTES} bytes.")
+    validate_image_upload(content, content_type)
 
     def _run():
         client = get_client()

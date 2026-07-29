@@ -18,12 +18,39 @@
  *                           rotates with the user's direction of travel.
  *   OFF (headingUp=false) → static, non-rotating "N" — map stays
  *                           North-Up, no heading rotation applied.
+ *
+ * Item 6 — same wraparound-jump guard as MapView.jsx's UserLocationMarker
+ * rotation effect (search "wraparound-jump guard" there). northAngle is
+ * always renormalized to a small range each render, so a heading crossing
+ * the 0°/360° seam (e.g. 359° → 1°) used to animate the CSS `transition`
+ * through the full ~358° long way around instead of the true ~2° short
+ * step. When the new angle differs from the last one by more than 180°,
+ * the transition is disabled for one frame (so the needle snaps straight
+ * to the new angle), then re-enabled for every normal, non-seam-crossing
+ * update.
  */
+import { useEffect, useRef } from 'react'
+
 export default function NavCompass({ mapHeading, headingUp }) {
   // Needle angle only means something while heading-up is actually
   // rotating the map; pinned to 0 (pointing straight up) otherwise.
   const normalised = mapHeading == null ? 0 : ((mapHeading % 360) + 360) % 360
   const northAngle = headingUp ? -normalised : 0
+
+  const svgRef = useRef(null)
+  const lastAngleRef = useRef(northAngle)
+
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
+    const jump = Math.abs(northAngle - lastAngleRef.current)
+    if (jump > 180) {
+      el.style.transition = 'none'
+      void el.offsetHeight // force reflow before re-enabling
+      requestAnimationFrame(() => { el.style.transition = '' })
+    }
+    lastAngleRef.current = northAngle
+  }, [northAngle])
 
   return (
     <div
@@ -32,6 +59,7 @@ export default function NavCompass({ mapHeading, headingUp }) {
       aria-label={headingUp ? 'Compass: heading-up active' : 'Compass: north-up'}
     >
       <svg
+        ref={svgRef}
         width="30"
         height="30"
         viewBox="0 0 30 30"

@@ -34,11 +34,12 @@ from typing import List, Optional
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import data_access
-from auth import authenticate_admin, create_access_token, get_current_active_admin, require_role, hash_password, verify_password, generate_password
+from auth import authenticate_admin, create_access_token, get_current_active_admin, require_role, hash_password, verify_password, generate_password, rate_limit, JWT_EXPIRES_HOURS
 from db import SupabaseUnavailableError
 from utils.qr_generator import generate_event_qr
 from utils.router import find_route as _find_route, find_route_from_point as _find_route_from_point
@@ -121,6 +122,22 @@ def haversine_meters(lat1, lng1, lat2, lng2) -> float:
     dlambda = math.radians(lng2 - lng1)
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
     return 2 * R * math.asin(math.sqrt(a))
+
+
+async def _read_upload_bounded(file: UploadFile, max_bytes: int = data_access.MAX_IMAGE_BYTES) -> bytes:
+    """Item 11 (part 1) — previously every upload endpoint did a plain
+    `await file.read()` (buffering the ENTIRE request body into memory)
+    before data_access's `validate_image_upload` ever got a chance to
+    check its size, so an oversized (or just huge, malicious) upload was
+    fully read into server memory before being rejected. Reading at most
+    `max_bytes + 1` bounds memory usage to that regardless of how large
+    the actual request body is — if the extra byte is present, the file is
+    definitely over the limit and is rejected immediately without reading
+    any further."""
+    content = await file.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"Image too large. Max {max_bytes} bytes.")
+    return content
 
 
 # ---------------------------------------------------------------------------
@@ -231,7 +248,7 @@ def get_route(
             result = _find_route(from_id, to_id)
             from_payload = {"id": a["id"], "name": a["name"], "lat": a["lat"], "lng": a["lng"]}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     return {
         "from": from_payload,
@@ -255,27 +272,24 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/")
 def root():
+    # Item 23a — this used to be a hand-maintained literal array, which is
+    # exactly the kind of list that silently goes stale: nothing enforces
+    # that a newly added endpoint gets added here too. Derived from the
+    # app's actual registered routes instead, so it can't drift again.
+    # Internal/docs routes (Starlette's own HEAD/OPTIONS handling, /docs,
+    # /openapi.json, /redoc) are filtered out to keep this focused on the
+    # same kind of "here's the public API surface" list it always was.
+    endpoints = sorted({
+        route.path
+        for route in app.routes
+        if isinstance(route, APIRoute)
+        and route.path not in {"/", "/openapi.json"}
+        and not route.path.startswith(("/docs", "/redoc"))
+    })
     return {
         "service": "SSN Campus Navigator API",
         "docs": "/docs",
-        "endpoints": [
-            "/api/locations",
-            "/api/locations/search?q=",
-            "/api/locations/{id}",
-            "/api/events",
-            "/api/events/{id}",
-            "/api/events/{id}/qr",
-            "/api/route?from_id=&to_id=",
-            "/api/analytics/events",
-            "/api/admin/analytics/summary",
-            "/api/feedback",
-            "/api/admin/feedback",
-            "/api/admin/login",
-            "/api/admin/events",
-            "/api/admin/fest-admins",
-            "/api/admin/audit-log",
-            "/api/health",
-        ],
+        "endpoints": endpoints,
     }
 
 
@@ -312,7 +326,7 @@ def admin_login(payload: AdminLoginRequest):
     return {
         "access_token": token,
         "token_type": "bearer",
-        "expires_in_hours": int(os.environ.get("JWT_EXPIRES_HOURS", "12")),
+        "expires_in_hours": JWT_EXPIRES_HOURS,
         "username": admin["username"],
         "role": admin["role"],
     }
@@ -354,7 +368,7 @@ def create_event(payload: EventCreate, admin: dict = Depends(get_current_active_
     try:
         event_id = data_access.create_event(payload.model_dump(), created_by_admin_id=admin["sub"])
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     generate_event_qr(event_id)
     data_access.record_audit(admin["sub"], admin["username"], "fest_submitted", "event", event_id)
@@ -486,7 +500,7 @@ async def upload_event_image(
     "Upload" option alongside pasting an external URL."""
     _authorize_event_access(event_id, admin)
 
-    content = await file.read()
+    content = await _read_upload_bounded(file)
     try:
         public_url, storage_path = data_access.upload_event_image_file(
             event_id,
@@ -495,7 +509,7 @@ async def upload_event_image(
             file.content_type or "application/octet-stream",
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     data_access.add_event_image(event_id, public_url, storage_path, is_poster)
     return {"url": public_url, "is_poster": is_poster}
@@ -554,7 +568,7 @@ def create_fest_admin(payload: FestAdminCreate, admin: dict = Depends(require_ro
     try:
         data_access.create_fest_admin(username, hash_password(password), created_by_id=admin["sub"])
     except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from e
 
     data_access.record_audit(admin["sub"], admin["username"], "fest_admin_created", "admin", username)
     return {
@@ -677,7 +691,7 @@ def update_account(payload: AccountUpdateRequest, admin: dict = Depends(get_curr
     try:
         data_access.update_own_account(admin["sub"], new_username=new_username, new_password_hash=new_password_hash)
     except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from e
 
     data_access.record_audit(admin["sub"], new_username or admin["username"], "account_updated", "admin", admin["sub"], {
         "username_changed": bool(new_username), "password_changed": password_changed,
@@ -771,13 +785,13 @@ async def upload_venue_menu(
     try:
         if not data_access.venue_exists(venue_id):
             raise HTTPException(status_code=404, detail=f"Venue '{venue_id}' not found")
-        content = await file.read()
+        content = await _read_upload_bounded(file)
         try:
             public_url, storage_path = data_access.upload_menu_image_file(
                 venue_id, file.filename or "menu", content, file.content_type or "image/jpeg"
             )
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e)) from e
         menu = data_access.upsert_menu(venue_id, date, public_url, storage_path, description, admin["sub"])
     except SupabaseUnavailableError as e:
         # Admin panel — friendly summary in the response, full detail in the
@@ -834,7 +848,7 @@ class AnalyticsBatch(BaseModel):
 
 
 @app.post("/api/analytics/events")
-def ingest_analytics(body: AnalyticsBatch):
+def ingest_analytics(body: AnalyticsBatch, _rl: None = Depends(rate_limit(100, 600))):
     """Public — batched analytics ingestion (the frontend queues events and
     flushes periodically / on reconnect rather than one request per event).
     Never fails a whole batch over one bad event — unrecognized event types
@@ -875,7 +889,7 @@ class FeedbackStatusUpdate(BaseModel):
 
 
 @app.post("/api/feedback")
-def submit_feedback(body: FeedbackCreate):
+def submit_feedback(body: FeedbackCreate, _rl: None = Depends(rate_limit(20, 600))):
     """Public — submit route feedback (shown when navigation ends or the
     destination is reached). Returns the new feedback id so the frontend
     can optionally follow up with POST /api/feedback/{id}/screenshot."""
@@ -884,18 +898,21 @@ def submit_feedback(body: FeedbackCreate):
 
 
 @app.post("/api/feedback/{feedback_id}/screenshot")
-async def upload_feedback_screenshot(feedback_id: str, file: UploadFile = File(...)):
+async def upload_feedback_screenshot(feedback_id: str, file: UploadFile = File(...), _rl: None = Depends(rate_limit(20, 600))):
     """Public — optional screenshot attach. Same create-then-attach pattern
     as the existing event-image upload flow above."""
-    content = await file.read()
+    content = await _read_upload_bounded(file)
     try:
         public_url, storage_path = data_access.upload_feedback_screenshot_file(
             feedback_id, file.filename or "screenshot", content,
             file.content_type or "application/octet-stream",
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    row = data_access.attach_feedback_screenshot(feedback_id, public_url, storage_path)
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    try:
+        row = data_access.attach_feedback_screenshot(feedback_id, public_url, storage_path)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     if not row:
         raise HTTPException(status_code=404, detail=f"Feedback '{feedback_id}' not found")
     return {"url": public_url}
@@ -938,7 +955,7 @@ class CopilotChatRequest(BaseModel):
 
 
 @app.post("/api/copilot/chat")
-def copilot_chat(body: CopilotChatRequest):
+def copilot_chat(body: CopilotChatRequest, _rl: None = Depends(rate_limit(30, 600))):
     """Public — classify one chatbot message. Stateless: the caller (the
     frontend) is responsible for holding conversation state and deciding
     what to do with the returned intent/entities."""

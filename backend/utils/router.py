@@ -8,6 +8,9 @@ import json
 import math
 import heapq
 import os
+import logging
+
+logger = logging.getLogger("ssn-campus-nav.router")
 
 BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GRAPH_PATH  = os.path.join(BASE_DIR, 'data', 'walkway_graph.json')
@@ -39,8 +42,31 @@ def _load():
     global _graph_cache
     if _graph_cache is None:
         _graph_cache = json.load(open(GRAPH_PATH))
+        _validate_cap_table_against_graph(_graph_cache)
     segs = json.load(open(SEG_PATH))
     return _graph_cache, segs
+
+
+def _validate_cap_table_against_graph(graph):
+    """Item 10 — UNVERIFIED_CONNECTOR_CAP_M (below) hardcodes specific
+    field-verified node IDs as safety exceptions. `_nearest_node` looks
+    them up with `.get(node_id, float('inf'))`, which means a node ID that
+    no longer exists in the graph silently stops being capped at all — no
+    error, no warning, the safety guard just quietly disappears — if the
+    graph is ever regenerated (build_walkway_graph.py) with different node
+    IDs. Checked once per process, when the graph is first loaded, against
+    whatever's actually on disk right now."""
+    node_ids = {n['id'] for n in graph.get('nodes', [])}
+    missing = sorted(nid for nid in UNVERIFIED_CONNECTOR_CAP_M if nid not in node_ids)
+    if missing:
+        logger.warning(
+            "UNVERIFIED_CONNECTOR_CAP_M in utils/router.py references node ID(s) "
+            "%s which do not exist in the currently-loaded walkway_graph.json. "
+            "These field-verified safety caps are silently NOT being applied. "
+            "If the graph was recently regenerated, re-verify (or re-derive) "
+            "these entries against the new node IDs.",
+            ", ".join(missing),
+        )
 
 
 def _closed_bboxes(segs):
@@ -164,6 +190,23 @@ UNVERIFIED_CONNECTOR_CAP_M = {
     'n_116': 15.0,
     'n_127': 15.0,
     'n_137': 15.0,
+    # n_193, n_194: csepathway.kml merge. The KML edge between them (the
+    # surveyed shortcut itself, n_193<->n_194) is field-verified ground
+    # truth per the person who surveyed it — NOT capped, same as every
+    # other real surveyed edge on this graph. What IS capped is each new
+    # node's own connector back into the existing graph (n_193<->n_99,
+    # 30.35m; n_194<->n_137, 23.7m) — those two segments are NOT part of
+    # the surveyed KML, they're this merge's own straight-line best guess
+    # at how the new path ties into the network, in the exact same
+    # tightly-built n_99/n_136/n_137/n_98 cluster already flagged above as
+    # having multiple unverified connectors that turned out not to be
+    # real. Capping prevents a live GPS position from snapping onto n_193/
+    # n_194 from far away and trusting an unverified connector segment it
+    # has no real evidence for, without in any way affecting whether
+    # Dijkstra can use the surveyed n_193<->n_194 edge once genuinely
+    # reached — same scoping as every entry above.
+    'n_193': 15.0,
+    'n_194': 15.0,
 }
 
 

@@ -89,6 +89,23 @@ const JUMP_CONFIRM_TOLERANCE_DEG   = 20
 // follow magnetometer noise from a phone that's sitting still.
 const STATIONARY_SPEED_MS = 0.35
 
+// Item 13 — some devices/browsers (older Android WebViews especially)
+// never populate coords.speed at all: it's permanently null, not just
+// momentarily. STATIONARY_SPEED_MS above can't gate that case (there's no
+// speed value to compare), so those devices previously got zero
+// stationary protection — a phone sitting still but picking up ordinary
+// hand jitter or ambient magnetic interference could still rotate the
+// map. Outright freezing whenever speed is unavailable would break
+// heading-up entirely for those devices even while genuinely walking, so
+// instead the compass-only confidence gate below requires tighter
+// agreement and more samples before ever committing a rotation when speed
+// telemetry doesn't exist — real, sustained walking still produces
+// consistent headings that clear this bar; incidental sway while
+// stationary is exactly the kind of borderline-but-not-scattered signal
+// this is meant to filter out that the normal (looser) threshold wouldn't.
+const NO_SPEED_CONFIDENCE_MAX_SPREAD_DEG = 16   // vs. CONFIDENCE_MAX_SPREAD_DEG = 32
+const NO_SPEED_CONFIDENCE_MIN_SAMPLES    = 5    // vs. CONFIDENCE_MIN_SAMPLES = 3
+
 // How long to wait, right after navigation activates, for real speed/GPS-
 // course telemetry before falling back to the confidence-buffer alone.
 // Long enough to skip the "phone still settling in your hand" moment right
@@ -172,6 +189,10 @@ export function useNavCamera(rawHeading, active, fusion = {}) {
     const now = Date.now()
 
     // ── Stationary lock ────────────────────────────────────────────────
+    // Only gates when speed is actually known and below threshold. A
+    // device that never reports speed at all (speed stays null forever,
+    // not just this tick) can't be gated here — see NO_SPEED_CONFIDENCE_*
+    // above for how that case is handled instead, further down.
     if (speed != null && speed < STATIONARY_SPEED_MS) return
 
     // Priority 2 (Phase 4.2.7) — right after navigation starts, hold off
@@ -251,14 +272,20 @@ export function useNavCamera(rawHeading, active, fusion = {}) {
 
     // GPS course readings are inherently high-confidence (derived from
     // real consecutive positions, not a noisy instantaneous sensor) — skip
-    // the agreement check. Compass readings need the buffer to agree.
+    // the agreement check. Compass readings need the buffer to agree —
+    // and need to agree *more tightly*, over *more samples*, when this
+    // device has never reported a usable speed at all (see item 13 /
+    // NO_SPEED_CONFIDENCE_* above) — that's the one case STATIONARY_LOCK
+    // above couldn't gate, since there's no speed value to compare.
     let confident = usingGpsCourse
     let estimate = source
     if (!usingGpsCourse) {
-      if (buffer.length < CONFIDENCE_MIN_SAMPLES) return // not enough data yet — wait
+      const minSamples = speed == null ? NO_SPEED_CONFIDENCE_MIN_SAMPLES : CONFIDENCE_MIN_SAMPLES
+      const maxSpread   = speed == null ? NO_SPEED_CONFIDENCE_MAX_SPREAD_DEG : CONFIDENCE_MAX_SPREAD_DEG
+      if (buffer.length < minSamples) return // not enough data yet — wait
       const mean = circMean(buffer.map(s => s.value))
       const spread = circSpread(buffer.map(s => s.value), mean)
-      confident = spread <= CONFIDENCE_MAX_SPREAD_DEG
+      confident = spread <= maxSpread
       estimate = mean
     }
     if (!confident) return // scattered readings — never rotates the map

@@ -19,15 +19,18 @@ deploying.
 """
 import os
 import secrets
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
 
 from db import SupabaseUnavailableError, get_client
+
+logger = logging.getLogger("ssn-campus-nav.auth")
 
 JWT_SECRET = os.environ.get("JWT_SECRET") or secrets.token_hex(32)
 JWT_ALGORITHM = "HS256"
@@ -70,10 +73,10 @@ def create_access_token(admin_id: str, username: str, role: str) -> str:
 def decode_access_token(token: str) -> dict:
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Session expired — please log in again.")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid authentication token.")
+    except jwt.ExpiredSignatureError as e:
+        raise HTTPException(status_code=401, detail="Session expired — please log in again.") from e
+    except jwt.InvalidTokenError as e:
+        raise HTTPException(status_code=401, detail="Invalid authentication token.") from e
 
 
 # ---------------------------------------------------------------------------
@@ -93,8 +96,47 @@ _failed_login_attempts: dict = {}
 MAX_LOGIN_ATTEMPTS = 5
 LOGIN_LOCKOUT_WINDOW_MINUTES = 15
 
+# Item 7 fix — used only to burn the same bcrypt-verify time for a
+# username that doesn't exist as a real lookup would spend on a wrong
+# password. Previously `not rows or not verify_password(...)` short-
+# circuited on `not rows`, so a nonexistent username returned after just
+# the DB lookup while a real-username-wrong-password attempt additionally
+# paid bcrypt's deliberately-slow hash comparison — a measurable timing
+# gap that reveals which usernames exist even though the error message
+# returned is identical either way. Hashed once at import time (not per
+# request); the actual value is irrelevant since nothing is ever meant to
+# match it.
+_DUMMY_PASSWORD_HASH = None
+
+
+def _dummy_password_hash() -> str:
+    global _DUMMY_PASSWORD_HASH
+    if _DUMMY_PASSWORD_HASH is None:
+        _DUMMY_PASSWORD_HASH = hash_password(secrets.token_hex(16))
+    return _DUMMY_PASSWORD_HASH
+
+
+def _prune_failed_login_attempts() -> None:
+    """Item 8 fix — evict every username whose entire attempt history has
+    aged out of the lockout window, not just the one being checked this
+    call. Previously only the just-checked username's list was filtered
+    (and even then, an emptied list stayed in the dict as `username: []`
+    forever), so a username tried once and never again — a typo, a single
+    probe, a scan across many usernames looking for valid ones — left a
+    permanent entry with nothing to ever clean it up. Login volume on an
+    admin-only dashboard is low enough that a full dict sweep on every
+    attempt is cheap."""
+    now = datetime.now(timezone.utc)
+    stale = [
+        u for u, attempts in _failed_login_attempts.items()
+        if not any((now - t).total_seconds() < LOGIN_LOCKOUT_WINDOW_MINUTES * 60 for t in attempts)
+    ]
+    for u in stale:
+        _failed_login_attempts.pop(u, None)
+
 
 def _check_login_rate_limit(username: str) -> None:
+    _prune_failed_login_attempts()
     now = datetime.now(timezone.utc)
     attempts = _failed_login_attempts.get(username, [])
     attempts = [t for t in attempts if (now - t).total_seconds() < LOGIN_LOCKOUT_WINDOW_MINUTES * 60]
@@ -108,6 +150,60 @@ def _check_login_rate_limit(username: str) -> None:
 
 def _record_failed_login(username: str) -> None:
     _failed_login_attempts.setdefault(username, []).append(datetime.now(timezone.utc))
+
+
+# ---------------------------------------------------------------------------
+# Item 22 — basic per-IP rate limiting for public endpoints. Only the login
+# endpoint had any rate limiting before this; feedback submission, analytics
+# ingestion, and the Copilot chat endpoint were all open to unlimited
+# requests from a single caller. Same in-memory sliding-window approach as
+# the login limiter above, generalized and parameterized — fine for this
+# app's traffic on a single Render instance (see PRODUCTION_AUDIT_REPORT.md
+# §14 on moving to a shared store if that ever changes).
+# ---------------------------------------------------------------------------
+_public_rate_limit_buckets: dict = {}
+_RATE_LIMIT_PRUNE_AFTER_S = 3600  # evict a bucket if it hasn't been hit in an hour
+
+
+def _client_ip(request: Request) -> str:
+    """Best-effort client IP. Render (like most PaaS platforms) sits behind
+    a reverse proxy, so request.client.host would just be the proxy's own
+    address — X-Forwarded-For's first entry is the actual client when
+    present."""
+    fwd = request.headers.get("x-forwarded-for")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _prune_public_rate_limit_buckets() -> None:
+    now = datetime.now(timezone.utc)
+    stale = [
+        k for k, hits in _public_rate_limit_buckets.items()
+        if not hits or (now - hits[-1]).total_seconds() > _RATE_LIMIT_PRUNE_AFTER_S
+    ]
+    for k in stale:
+        _public_rate_limit_buckets.pop(k, None)
+
+
+def rate_limit(max_requests: int, window_seconds: int):
+    """FastAPI dependency factory: `Depends(rate_limit(20, 600))` allows up
+    to 20 requests per 10 minutes per client IP per endpoint. Campus WiFi
+    commonly puts many real students behind one shared public IP (NAT), so
+    limits are set generously per call site rather than reused as one
+    global default."""
+    def _dependency(request: Request) -> None:
+        key = f"{max_requests}:{window_seconds}:{request.url.path}:{_client_ip(request)}"
+        now = datetime.now(timezone.utc)
+        hits = _public_rate_limit_buckets.get(key, [])
+        hits = [t for t in hits if (now - t).total_seconds() < window_seconds]
+        if len(hits) >= max_requests:
+            raise HTTPException(status_code=429, detail="Too many requests. Please slow down and try again shortly.")
+        hits.append(now)
+        _public_rate_limit_buckets[key] = hits
+        if len(_public_rate_limit_buckets) > 1000:  # only sweep occasionally — this runs on every request
+            _prune_public_rate_limit_buckets()
+    return _dependency
 
 
 def _clear_failed_logins(username: str) -> None:
@@ -135,10 +231,19 @@ def authenticate_admin(username: str, password: str) -> dict:
             .execute()
         )
     except Exception as exc:  # network / Supabase outage
-        raise SupabaseUnavailableError(str(exc))
+        raise SupabaseUnavailableError(str(exc)) from exc
 
     rows = result.data or []
-    if not rows or not verify_password(password, rows[0]["password_hash"]) or rows[0].get("disabled"):
+    if rows:
+        password_ok = verify_password(password, rows[0]["password_hash"])
+        is_valid = password_ok and not rows[0].get("disabled")
+    else:
+        # Always pay the same bcrypt cost as a real lookup — see item 7's
+        # note on _dummy_password_hash above.
+        verify_password(password, _dummy_password_hash())
+        is_valid = False
+
+    if not is_valid:
         _record_failed_login(username)
         raise HTTPException(status_code=401, detail="Invalid username or password.")
 
@@ -149,7 +254,11 @@ def authenticate_admin(username: str, password: str) -> dict:
             "id", admin["id"]
         ).execute()
     except Exception:
-        pass  # last_login_at is informational only — never block login over it
+        # last_login_at is informational only — never block login over it —
+        # but "never block" isn't the same as "never notice". Previously a
+        # bare `pass` meant this could fail silently forever (schema drift,
+        # permissions, an outage) with zero trace anywhere.
+        logger.warning("Failed to update last_login_at for admin id=%s", admin["id"], exc_info=True)
 
     return admin
 
@@ -199,7 +308,7 @@ def get_current_active_admin(
             .execute()
         )
     except Exception as exc:
-        raise SupabaseUnavailableError(str(exc))
+        raise SupabaseUnavailableError(str(exc)) from exc
 
     rows = result.data or []
     if not rows or rows[0].get("disabled"):

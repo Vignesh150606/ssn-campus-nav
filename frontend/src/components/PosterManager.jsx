@@ -14,7 +14,7 @@
  *   POST   /api/admin/events/:id/images        → upload (is_poster=true|false)
  *   DELETE /api/admin/events/:id/images/:imgId → delete one image
  */
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'
 
@@ -55,7 +55,13 @@ export default function PosterManager({ eventId, token, onUpdated }) {
   const poster  = images?.find(i => i.is_poster)
   const gallery = images?.filter(i => !i.is_poster) || []
 
-  function reload() {
+  // Item 26 — eslint flagged this effect as missing `reload` from its
+  // deps. Naively adding it as-is would refetch on every render (a plain
+  // function declaration is a brand-new reference each render), so it's
+  // wrapped in useCallback first — the effect now correctly declares its
+  // real dependency, and only re-runs when eventId/token actually change,
+  // exactly like before.
+  const reload = useCallback(() => {
     if (!token) {
       setImages([])
       setError('Not authenticated — please log in again.')
@@ -69,9 +75,9 @@ export default function PosterManager({ eventId, token, onUpdated }) {
         setImages([])
         setError(e.message)
       })
-  }
+  }, [eventId, token])
 
-  useEffect(() => { if (eventId) reload() }, [eventId, token])
+  useEffect(() => { if (eventId) reload() }, [eventId, reload])
 
   async function handleUpload(isPoster, replaceExisting = false) {
     const file = await pickFile()

@@ -44,6 +44,16 @@ function openDB() {
     }
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error)
+  }).catch((err) => {
+    // Item 19 — previously a failed open cached this rejected promise in
+    // dbPromise forever: every future call returned the same permanent
+    // failure with no way to recover, even from a transient error (a
+    // momentary storage-quota hiccup, private-browsing mode toggling
+    // mid-session, etc). Clearing dbPromise back to null lets the NEXT
+    // call retry a fresh indexedDB.open() instead of being stuck replaying
+    // one failure for the rest of the page's life.
+    dbPromise = null
+    throw err
   })
   return dbPromise
 }

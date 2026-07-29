@@ -90,10 +90,16 @@ export default function BootGate({ children }) {
 
   return (
     <div className="boot-gate" role="status" aria-live="polite">
-      {/* Phase 4.2 — SSN branding: real logo replaces the placeholder square */}
+      {/* Phase 4.2 — SSN branding: real logo replaces the placeholder square.
+          Item 21 — alt text + aria-hidden was self-contradictory (one says
+          "announce this", the other says "skip this" — aria-hidden wins in
+          practice, so the alt text was never actually read by anything).
+          Decorative here: the adjacent title text already conveys the app
+          identity, so alt="" consistently matches aria-hidden instead of
+          fighting it. */}
       <img
         src="/ssn-logo.png"
-        alt="SSN College of Engineering"
+        alt=""
         className="boot-gate-logo"
         aria-hidden="true"
       />

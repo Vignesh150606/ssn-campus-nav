@@ -117,8 +117,24 @@ export function useDraggableSheet(snapPeeks, initialTier = 'collapsed', active =
     if (node) node.style.transform = `translate3d(0, ${Math.round(maxH - peek)}px, 0)`
     // Priority 1 (Phase 4.4): only the currently-active/visible sheet is
     // allowed to drive the shared --sheet-h var — see file header comment.
+    //
+    // Bug fix (production UX hardening, round 2) — the forceZero effect
+    // below patches ONE specific known cause (Home.jsx's .empty CSS
+    // class), but the report that the chat FAB/zoom control still go
+    // stale after other transitions (e.g. viewing a location) means
+    // there's at least one more case forceZero doesn't cover. Rather than
+    // chase down and individually wire every CSS rule that can shrink a
+    // sheet's real box, clamp --sheet-h to `maxH` — the box height this
+    // hook is ALREADY accurately measuring via ResizeObserver for the
+    // transform pivot above. peek is only ever meant to describe how much
+    // of the sheet's OWN box is showing, so it can never legitimately
+    // exceed that box's real current height; if it does, something
+    // external shrank the box out from under this hook, and maxH is the
+    // one source of truth that self-corrects for that automatically,
+    // covering this case and any future one like it, not just the one
+    // already diagnosed.
     if (activeRef.current) {
-      document.documentElement.style.setProperty('--sheet-h', `${Math.round(Math.max(0, peek))}px`)
+      document.documentElement.style.setProperty('--sheet-h', `${Math.round(Math.max(0, Math.min(peek, maxH)))}px`)
     }
   }, [maxH])
 

@@ -15,7 +15,32 @@ import qrcode
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_QR_DIR = os.path.join(BASE_DIR, "static", "qr")
 
-FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "http://localhost:5173")
+# Previously `os.environ.get("FRONTEND_BASE_URL", "http://localhost:5173")`
+# with no way to tell "genuinely local dev" apart from "forgot to set this
+# in Render" — both silently produced the same working-looking localhost
+# URL, and every QR code (generated live by GET /api/events/{id}/qr, or by
+# the admin create-event flow) would encode a link only the developer's own
+# machine can reach. Nothing about generating or serving the QR code fails
+# in that case, so there was no error to notice — just posters that quietly
+# don't work for anyone who scans them.
+#
+# Render sets the RENDER env var automatically on every deployed service;
+# APP_ENV=production is the manual override for any other host. Local dev
+# (neither set) keeps the documented fallback exactly as before — see
+# README.md's "QR codes for the fest" section.
+FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL")
+_IS_PRODUCTION = bool(os.environ.get("RENDER")) or os.environ.get("APP_ENV") == "production"
+
+if not FRONTEND_BASE_URL:
+    if _IS_PRODUCTION:
+        raise RuntimeError(
+            "FRONTEND_BASE_URL is not set in this production environment. "
+            "Every QR code generated would silently encode a localhost link "
+            "that no real visitor can use. Set FRONTEND_BASE_URL in your "
+            "Render dashboard's environment variables (see "
+            "SUPABASE_MIGRATION.md) and redeploy before printing any posters."
+        )
+    FRONTEND_BASE_URL = "http://localhost:5173"
 
 
 def generate_event_qr(event_id: str) -> str:

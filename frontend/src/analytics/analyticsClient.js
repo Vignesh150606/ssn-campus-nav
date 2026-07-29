@@ -109,10 +109,17 @@ export async function flushQueuedOffline() {
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'hidden' || !queue.length) return
+    // Item 20 (part 1) — previously cleared `queue` unconditionally
+    // before even checking navigator.sendBeacon exists, and never looked
+    // at its return value (sendBeacon returns false if the browser
+    // couldn't queue the request at all, e.g. over its payload-size
+    // budget) — both paths silently threw the events away with no way to
+    // recover them. Now the queue is only cleared once the beacon was
+    // actually accepted; otherwise the events stay queued for the next
+    // regular flush() in case the tab is only backgrounded, not closed.
+    if (!navigator.sendBeacon) return
     const body = JSON.stringify({ session_id: sessionId(), events: queue })
-    queue = []
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon(`${API_BASE}/api/analytics/events`, new Blob([body], { type: 'application/json' }))
-    }
+    const sent = navigator.sendBeacon(`${API_BASE}/api/analytics/events`, new Blob([body], { type: 'application/json' }))
+    if (sent) queue = []
   })
 }

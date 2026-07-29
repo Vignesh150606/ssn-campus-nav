@@ -27,6 +27,14 @@ export default class ErrorBoundary extends Component {
     return { error }
   }
 
+  componentDidCatch(error, errorInfo) {
+    // Previously nothing logged this — the fallback UI below was the only
+    // record of a crash, and only if a human happened to be looking at the
+    // screen and copied it manually. Log it so it shows up in the console
+    // (and DevTools' console/network capture) without relying on that.
+    console.error('[ErrorBoundary] component crashed while rendering:', error, errorInfo)
+  }
+
   render() {
     if (this.state.error) {
       return (

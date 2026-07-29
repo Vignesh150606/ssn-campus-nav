@@ -25,20 +25,27 @@
 
 const META_KEY = 'ssn_offline_meta_v1'
 
-function readMeta() {
-  try {
-    const raw = localStorage.getItem(META_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
+// Item 20 (part 2) — the "Offline-First Experience" that used to write
+// this key was removed (see the file comment above), so nothing can ever
+// set it again — but a user who visited before that removal still has it
+// sitting in their browser's localStorage, permanently reporting
+// `hasCache: true` (and a frozen, increasingly stale `lastSyncedAt`) to
+// OfflineIndicator.jsx forever. That shows "Offline" (implying full
+// offline capability) instead of the correct "Offline — limited" for
+// exactly the returning users this was supposed to help. Since no code
+// path can ever populate this key again, it's removed once here instead
+// of read.
+try {
+  localStorage.removeItem(META_KEY)
+} catch {
+  /* localStorage unavailable — nothing to clean up */
 }
 
 const listeners = new Set()
 let status = {
   online: typeof navigator === 'undefined' ? true : navigator.onLine,
-  hasCache: !!readMeta(),
-  lastSyncedAt: readMeta()?.cachedAt ?? null,
+  hasCache: false,
+  lastSyncedAt: null,
 }
 function setStatus(patch) {
   status = { ...status, ...patch }

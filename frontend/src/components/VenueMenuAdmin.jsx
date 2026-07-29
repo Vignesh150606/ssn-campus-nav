@@ -8,7 +8,7 @@
  * ('ssn_admin_token_v1', not 'ssn_admin_token'). That caused "Invalid
  * authentication token" on every request.
  */
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { displayLocationName } from '../constants'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'
@@ -76,16 +76,19 @@ export default function VenueMenuAdmin({ venues, token }) {
 
   function flash(msg) { setSuccess(msg); setTimeout(() => setSuccess(null), 3000) }
 
-  function reload() {
+  // Item 26 — same fix as PosterManager.jsx (search "Item 26" there):
+  // wrap in useCallback so the effect can correctly declare `reload` as a
+  // dependency without refetching on every render.
+  const reload = useCallback(() => {
     if (!selectedVenueId) return
     setMenu(undefined)  // show loading
     setError(null)
     getVenueMenuPublic(selectedVenueId, selectedDate)
       .then(m => { setMenu(m); setDescription(m?.description || '') })
       .catch((e) => { setMenu(null); setError(e.message) })
-  }
+  }, [selectedVenueId, selectedDate, setDescription])
 
-  useEffect(() => { reload() }, [selectedVenueId, selectedDate])
+  useEffect(() => { reload() }, [reload])
 
   async function handleUpload() {
     if (!token) { setError('Not authenticated — please log in again.'); return }

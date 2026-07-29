@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
@@ -29,7 +29,31 @@ function leafletGlobalFix() {
 }
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command, mode }) => {
+  // Item 18 (strengthened) — apiBase.js already throws at module-load time
+  // in the browser if a production build shipped without VITE_API_BASE,
+  // but that only surfaces the problem to the first real visitor, after
+  // the broken build has already deployed. Checked here too because this
+  // file runs as actual Node.js during `vite build` itself (unlike
+  // application code, which is only ever bundled, never executed, at
+  // build time) — so a misconfigured Vercel deploy now fails the BUILD
+  // STEP directly, the same way a misconfigured Render deploy fails at
+  // backend startup (see qr_generator.py's FRONTEND_BASE_URL guard), and
+  // never goes live at all.
+  if (command === 'build' && mode === 'production') {
+    const env = loadEnv(mode, process.cwd(), 'VITE_')
+    if (!env.VITE_API_BASE) {
+      throw new Error(
+        'VITE_API_BASE is not set for this production build. Set it in ' +
+        "your deployment platform's environment variables (see README.md " +
+        '/ SUPABASE_MIGRATION.md) — without it the build would ship ' +
+        'permanently pointed at 127.0.0.1:8000, which does not exist for ' +
+        'real visitors.'
+      )
+    }
+  }
+
+  return {
   plugins: [
     leafletGlobalFix(),
     react(),
@@ -94,4 +118,5 @@ export default defineConfig({
       },
     }),
   ],
+  }
 })

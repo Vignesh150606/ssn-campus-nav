@@ -20,8 +20,38 @@
 import { API_BASE } from './apiBase'
 import { track } from './analytics/analyticsClient'
 
+// Previously plain fetch() with no timeout. LocationProvider.jsx's
+// maybeRecalculate() sets recalculatingRef.current = true before calling
+// getRouteFromCoords() (-> getJSON here) and only ever resets it to false
+// in that promise's .finally() — so one request that never settles (bad
+// signal, backend hung, cold-start stall) left recalculatingRef stuck
+// true for the rest of the tab's life, and every future off-route tick
+// silently no-ops on the "already-in-flight" guard forever, permanently
+// killing auto-reroute. Same pattern already used correctly by
+// checkHealth() below; applied here to every JSON call so nothing else
+// downstream (route requests, feedback submission) can wedge the same way.
+const DEFAULT_TIMEOUT_MS = 15000
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...options, signal: controller.signal })
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      const err = new Error('Request timed out — check your connection and try again.')
+      err.status = 0
+      err.timeout = true
+      throw err
+    }
+    throw e
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 async function getJSON(path) {
-  const res = await fetch(`${API_BASE}${path}`)
+  const res = await fetchWithTimeout(`${API_BASE}${path}`)
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}))
     const err = new Error(detail.detail || `Request failed: ${res.status}`)
@@ -165,7 +195,7 @@ export async function checkHealth(timeoutMs = 8000) {
 // ── Route feedback (Feature 3) ──────────────────────────────────────────
 
 async function postJSON(path, body) {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetchWithTimeout(`${API_BASE}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -190,10 +220,10 @@ export function submitFeedback(payload) {
 export async function uploadFeedbackScreenshot(feedbackId, file) {
   const form = new FormData()
   form.append('file', file)
-  const res = await fetch(`${API_BASE}/api/feedback/${encodeURIComponent(feedbackId)}/screenshot`, {
+  const res = await fetchWithTimeout(`${API_BASE}/api/feedback/${encodeURIComponent(feedbackId)}/screenshot`, {
     method: 'POST',
     body: form,
-  })
+  }, 30000)
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}))
     const err = new Error(detail.detail || `Request failed: ${res.status}`)

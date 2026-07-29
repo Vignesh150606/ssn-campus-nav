@@ -24,7 +24,7 @@
  * LocationContext.js, not here, so this file only exports a component —
  * that keeps Vite's Fast Refresh happy.)
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LocationContext } from './LocationContext'
 import { pathLength, matchToPath, remainingPathFromMatch, destinationPoint, pointAtDistanceAlongPath } from '../utils/geo'
 import { getRouteFromCoords } from '../api'
@@ -59,6 +59,11 @@ const OFF_ROUTE_CONFIRM_SAMPLES = 3      // consecutive accepted fixes required 
 const AUTO_WALK_STEP_M = 15      // metres advanced per auto-walk tick
 const AUTO_WALK_INTERVAL_MS = 1000
 const OFF_ROUTE_TEST_DISTANCE_M = 80
+// Ascending — deliberately checked tightest-first (see processPosition
+// below) so a route that starts or reroutes already close to the
+// destination announces the one milestone that's actually true, not the
+// largest one in the old array order.
+const DISTANCE_CALLOUT_THRESHOLDS_M = [50, 100, 200]
 const DEFAULT_SIM_POSITION = { lat: 12.75137, lng: 80.204085 } // main-gate
 const SIMULATED_ACCURACY_M = 5
 
@@ -536,16 +541,46 @@ export function LocationProvider({ children }) {
 
     // Phase 9 (Q7): dynamic arrival — uses max(15m, GPS accuracy)
     const arrivalM = Math.max(15, Math.min(acc ?? 15, 50))
-    const dynamicThresholds = [200, 100, 50, arrivalM]
-    for (const threshold of dynamicThresholds) {
-      if (remDist <= threshold && !announced.current.has(threshold)) {
-        announced.current.add(threshold)
-        const isArrival = threshold <= 20 || threshold === arrivalM && remDist <= arrivalM
-        const msg = isArrival ? '🎯 You have arrived!' : `📍 ${Math.round(threshold)}m from destination`
-        setGuidance(msg)
-        setTimeout(() => setGuidance(null), 4000)
-        if (isArrival) setArrivalRadius(arrivalM)  // expose for Home.jsx
-        break
+
+    // Arrival and the fixed "Xm from destination" callouts are checked as
+    // two independent things, tightest-distance-first. They used to share
+    // one [200, 100, 50, arrivalM] array walked in that order with a
+    // `break` only on a match, which caused two bugs on any route that
+    // starts or reroutes already close to the destination (remDist under
+    // 200m on the very first tick):
+    // (1) the loop announced whichever threshold came FIRST in array
+    //     order that was still true — "200m from destination" even when
+    //     actually 30m away — instead of the tightest one that applies.
+    // (2) because the `break` only fired on a match, a close-start route
+    //     satisfying several thresholds at once announced them one at a
+    //     time across the next few GPS ticks in quick succession
+    //     ("200m... 100m... 50m...") as each not-yet-announced threshold
+    //     took its turn passing the check. Checking tightest-first and
+    //     always breaking at the first (smallest) applicable threshold —
+    //     announced or not — means only the one that's actually true
+    //     right now can ever fire.
+    // (3) Separately, arrivalM clamps to a max of 50m (accuracy >= 50m),
+    //     which collided with the fixed "50m" milestone and let "You have
+    //     arrived!" fire up to 50m early. Arrival is now checked against
+    //     remDist directly, never against the callout array.
+    if (remDist <= arrivalM && !announced.current.has('arrived')) {
+      announced.current.add('arrived')
+      // Don't let a stale "Xm from destination" callout fire after arrival
+      // has already been announced (e.g. on a later, jitter-widened tick).
+      DISTANCE_CALLOUT_THRESHOLDS_M.forEach((t) => announced.current.add(t))
+      setGuidance('🎯 You have arrived!')
+      setTimeout(() => setGuidance(null), 4000)
+      setArrivalRadius(arrivalM)  // expose for Home.jsx
+    } else {
+      for (const threshold of DISTANCE_CALLOUT_THRESHOLDS_M) {
+        if (remDist <= threshold) {
+          if (!announced.current.has(threshold)) {
+            announced.current.add(threshold)
+            setGuidance(`📍 ${threshold}m from destination`)
+            setTimeout(() => setGuidance(null), 4000)
+          }
+          break
+        }
       }
     }
   }, [maybeRecalculate])
@@ -832,7 +867,15 @@ export function LocationProvider({ children }) {
     }
   }, [stopRealWatch])
 
-  const value = {
+  // Previously a fresh object literal on every render, which meant every
+  // consumer of useLocationContext() (Home.jsx, MapView.jsx, etc.) re-
+  // rendered on every single GPS tick, whether or not the specific fields
+  // it actually reads changed. Memoized against every value it closes
+  // over, so a new object is only produced when something in it actually
+  // changed. The callbacks (start, stop, setRoute, ...) are already stable
+  // (useCallback), so in practice this recomputes on state changes only —
+  // once per accepted GPS fix, not once per render for unrelated reasons.
+  const value = useMemo(() => ({
     // existing public API — unchanged
     position, accuracy, acquiringGps, tracking, error, arrivalRadius,
     // Priority 11 (Phase 4.2.7) — lets the UI show a specific "location
@@ -863,7 +906,15 @@ export function LocationProvider({ children }) {
     stopAutoWalk,
     goOffRoute,
     resetToActualGPS,
-  }
+  }), [
+    position, accuracy, acquiringGps, tracking, error, arrivalRadius,
+    permissionDenied, remainingPath, remainingDist, liveEta, guidance, offRoute,
+    start, stop, setRoute, clearRoute, speed, gpsCourse,
+    fullPath, fullDistance, fullEta, recalculating, recalcVersion, activeDestination,
+    devModeAvailable, useSimulatedGPS, simPosition, hasRoute, autoWalking,
+    toggleSimulatedGPS, moveSim, setSimLatLng, startAutoWalk, stopAutoWalk,
+    goOffRoute, resetToActualGPS,
+  ])
 
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>
 }
