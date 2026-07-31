@@ -654,3 +654,38 @@ didn't).
   that — whether to keep extending it one field report at a time, or revisit why
   total-cost-only scoring trusts an unsurveyed straight line at all, is an open product
   question, not something resolved by this round's fix.
+
+**Round 7 (this round) — sticky `prefer_node` bypassing `UNVERIFIED_CONNECTOR_CAP_M`:**
+- **New report:** live device navigation near the `csepathway.kml` merge (n_193/n_194,
+  Round 6's new corridor) — user deliberately continued straight past the turn onto that
+  corridor instead of taking it, to observe reroute behaviour. Reported symptom: the
+  recalculated route detoured back to a specific node before proceeding, rather than
+  routing on cleanly from the new position — visually a "Make U-Turn" instruction plus a
+  backtrack-then-forward path shape.
+- **Verified directly against this graph** (not guessed from the report): using the
+  reported KML's own "Point 3" as the deviation coordinate (26.4m from n_193, i.e. past
+  n_193's own 15m unverified-connector cap but still within the wider 30m
+  `SNAP_MARGIN_M`), a fresh/unprefered `find_route_from_point` call correctly rejects
+  n_193 and snaps to n_2 (284.0m total). The same call with `prefer_node_id='n_193'`
+  wrongly snapped back to n_193 anyway (190.5m total).
+- **Root cause:** the sticky `prefer_node` branch (added in Fix 2, this file's earlier
+  entries) re-checks `SNAP_MARGIN_M` but never re-checks `UNVERIFIED_CONNECTOR_CAP_M` —
+  the same safety cap every other shortlist candidate has to pass. Once a route sticks to
+  a capped node (any of the now-8 entries in that table), a later reroute can re-select it
+  from up to 30m away even though that specific node is only supposed to be trusted from
+  within its own much shorter cap. This silently reintroduces the unverified-straight-
+  line-shortcut risk the cap table exists to prevent, through a code path added after —
+  and never cross-checked against — the cap itself.
+- **Fix:** the `prefer_node_id` branch in `_nearest_node` now also requires
+  `prefer_entry[0] <= UNVERIFIED_CONNECTOR_CAP_M.get(prefer_node_id, float('inf'))`,
+  mirroring the general shortlist filter exactly. A stale sticky preference can no longer
+  override a safety limit the ordinary path already enforces.
+- **Verified, not just patched:** re-ran the exact repro (now falls back to n_2 with
+  `prefer_node_id='n_193'`, matching the unprefered result); confirmed legitimate
+  stickiness between two *uncapped* comparably-costed candidates (n_178/n_177) is
+  unaffected; confirmed the preferred node still wins normally when genuinely within its
+  own cap. Also re-ran `scripts/route_quality_test.py` at N=150 (300 checks total) —
+  no failures, no regressions.
+- **Still open:** whether any of the *other* 7 capped nodes have ever been reachable as a
+  stale `prefer_node_id` in the field — this fix closes the mechanism for all of them,
+  but only this one instance was actually reproduced and observed on a device.

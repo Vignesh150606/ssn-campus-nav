@@ -374,9 +374,26 @@ def _nearest_node(graph, lat, lng, adj=None, to_id=None, accuracy_m=None, prefer
     # while it's still a genuinely nearby, reachable candidate — this is a
     # tie-breaker among close options, not a way to keep routing through a
     # node the user has actually walked away from.
+    #
+    # Bugfix (cap-bypass regression, found via direct reproduction against
+    # this graph, not guessed): this branch re-checked SNAP_MARGIN_M but
+    # never UNVERIFIED_CONNECTOR_CAP_M, so once a route had ever stuck to
+    # one of the capped nodes (e.g. n_193 in the Gents Hostel / CSE
+    # Annexure corridor), a later reroute could re-select it from up to
+    # SNAP_MARGIN_M (30m) away even though that same node is only supposed
+    # to be trusted from within its own, much shorter cap (15m) — silently
+    # reintroducing the unverified-straight-line-shortcut risk the cap
+    # exists to prevent. Reproduced directly: from a point 26.4m past the
+    # csepathway.kml turn, a fresh (unprefered) lookup correctly rejects
+    # n_193 and snaps to n_2 (284.0m total); with prefer_node_id='n_193' it
+    # wrongly snapped back to n_193 (190.5m total) from that same point.
+    # Fix: the preferred node must clear its own cap here too, exactly like
+    # every other shortlist candidate above — a stale sticky preference can
+    # no longer override a safety limit the ordinary path already enforces.
     if prefer_node_id is not None and best_id is not None and prefer_node_id != best_id:
         prefer_entry = next((c for c in candidates if c[1] == prefer_node_id), None)
-        if prefer_entry is not None and prefer_entry[0] <= nearest_dist + SNAP_MARGIN_M:
+        if (prefer_entry is not None and prefer_entry[0] <= nearest_dist + SNAP_MARGIN_M
+                and prefer_entry[0] <= UNVERIFIED_CONNECTOR_CAP_M.get(prefer_node_id, float('inf'))):
             prefer_d = prefer_entry[0]
             prefer_dist, _ = _dijkstra(adj, prefer_node_id, to_id)
             prefer_route_dist = prefer_dist.get(to_id)
