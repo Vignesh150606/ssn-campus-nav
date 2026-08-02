@@ -44,7 +44,8 @@ const DRAG_ACTIVATE_PX = 4        // ignore sub-pixel jitter before committing t
 const VELOCITY_FLING_PX_MS = 0.5  // fast flick threshold
 
 export function useDraggableSheet(snapPeeks, initialTier = 'collapsed', active = true, boxHeight, forceZero = false) {
-  const sheetRef      = useRef(null)
+  const nodeRef        = useRef(null)   // current sheet DOM node (was sheetRef; see sheetRef below)
+  const roRef           = useRef(null)  // current ResizeObserver instance, torn down/rebuilt per node
   const rafRef         = useRef(null)
   const peekRef        = useRef(snapPeeks[initialTier])
   const dragRef        = useRef(null)   // { startY, startPeek, lastY, lastT, v, active }
@@ -95,9 +96,33 @@ export function useDraggableSheet(snapPeeks, initialTier = 'collapsed', active =
   const [measuredBoxHeight, setMeasuredBoxHeight] = useState(null)
   const maxH = measuredBoxHeight ?? boxHeight ?? Math.max(snapPeeks.collapsed, snapPeeks.half, snapPeeks.full)
 
-  useEffect(() => {
-    const node = sheetRef.current
-    if (!node || typeof ResizeObserver === 'undefined') return
+  // Bug fix — root cause of "Home UI (chat FAB / tracking button / sheet
+  // height) doesn't restore after Exit Navigation": this used to be a
+  // `useRef` node + a `useEffect(..., [])` that bound the ResizeObserver
+  // ONCE, to whichever node was on `sheetRef.current` at Home's very first
+  // render, and never rebound it. Home.jsx conditionally unmounts/remounts
+  // this sheet's DOM every time `navMode` toggles (`{!navMode && (...)}`
+  // wraps both the preview and browse sheets) — Home itself never
+  // remounts, so that one-shot effect never re-ran. Exiting navigation
+  // therefore always measured a permanently-detached node from before the
+  // trip started, silently reintroducing the exact "JS-assumed pivot
+  // drifts from the CSS box's real height" bug this ResizeObserver was
+  // built to eliminate (see the Phase 4.8 comment above) — just triggered
+  // by a remount instead of a dvh change. It also meant the nav sheet's
+  // own observer never attached at all, since its node is null on Home's
+  // first render (navMode starts false) and never gets a second attempt.
+  // A callback ref re-fires on every attach/detach, so it self-heals on
+  // every remount, not just the first mount — the same fix
+  // `useElementHeightVar` (driving `--fab-stack-h`) already uses for this
+  // identical scenario; see that hook's header comment.
+  const sheetRef = useCallback((node) => {
+    if (roRef.current) { roRef.current.disconnect(); roRef.current = null }
+    nodeRef.current = node
+    if (!node) { setMeasuredBoxHeight(null); return }
+    if (typeof ResizeObserver === 'undefined') return
+    // Measure synchronously so there's no one-frame flash waiting on the
+    // observer's first async callback (mirrors useElementHeightVar).
+    setMeasuredBoxHeight(Math.round(node.getBoundingClientRect().height))
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const h = entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect?.height
@@ -105,15 +130,20 @@ export function useDraggableSheet(snapPeeks, initialTier = 'collapsed', active =
       }
     })
     ro.observe(node)
-    return () => ro.disconnect()
+    roRef.current = ro
   }, [])
+
+  // Belt-and-braces: disconnect if Home itself ever unmounts while a node
+  // is still attached (the callback ref above already handles every
+  // ordinary attach/detach/remount).
+  useEffect(() => () => { roRef.current?.disconnect() }, [])
 
   const activeRef = useRef(active)
   useEffect(() => { activeRef.current = active }, [active])
 
   const applyPeek = useCallback((peek) => {
     peekRef.current = peek
-    const node = sheetRef.current
+    const node = nodeRef.current
     if (node) node.style.transform = `translate3d(0, ${Math.round(maxH - peek)}px, 0)`
     // Priority 1 (Phase 4.4): only the currently-active/visible sheet is
     // allowed to drive the shared --sheet-h var — see file header comment.
