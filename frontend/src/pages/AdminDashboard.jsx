@@ -410,9 +410,11 @@ export default function AdminDashboard() {
 
       {/* Production audit — Dev Tools panel */}
       {tab==='devtools' && (
-        <Suspense fallback={<div className="state-message" style={{padding:16}}>Loading…</div>}>
-          <DevTools token={token} />
-        </Suspense>
+        <div style={{flex:1,minHeight:0,overflow:'hidden',display:'flex',flexDirection:'column'}}>
+          <Suspense fallback={<div className="state-message" style={{padding:16}}>Loading…</div>}>
+            <DevTools token={token} />
+          </Suspense>
+        </div>
       )}
 
       {/* Road closures */}

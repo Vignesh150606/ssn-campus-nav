@@ -51,8 +51,8 @@ function GraphViewer({ token }) {
   const maxDeg = Math.max(...Object.values(adjCount))
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
+    <div className="devtools-split">
+      <div className="devtools-map">
         <MapContainer center={CAMPUS_CENTER} zoom={17} style={{ height: '100%', width: '100%' }}>
           <TileBase />
           {graph.edges.map((e, i) => (
@@ -76,7 +76,7 @@ function GraphViewer({ token }) {
           })}
         </MapContainer>
       </div>
-      <div style={{ width: 220, padding: 12, borderLeft: '1px solid var(--line)', overflowY: 'auto', fontSize: '0.78rem', color: 'var(--ink)' }}>
+      <div className="devtools-sidebar--narrow" style={{ fontSize: '0.78rem', color: 'var(--ink)' }}>
         <div style={{ fontWeight: 700, marginBottom: 8 }}>Legend</div>
         <div>🔴 Critical junction (degree {maxDeg})</div>
         <div>🟠 Dead end (degree 1)</div>
@@ -192,8 +192,8 @@ function SnapDebug({ token }) {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
-      <div style={{ width: 300, padding: 16, borderRight: '1px solid var(--line)', overflowY: 'auto' }}>
+    <div className="devtools-split">
+      <div className="devtools-sidebar">
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.92rem', marginBottom: 10, color: 'var(--ink)' }}>Snap Debug</div>
         <div style={{ fontSize: '0.76rem', color: 'var(--muted)', marginBottom: 12 }}>
           Runs the real _nearest_node() the app uses for reroute snapping — see which graph node any lat/lng resolves to, and how far away it is.
@@ -216,7 +216,7 @@ function SnapDebug({ token }) {
           </div>
         )}
       </div>
-      <div style={{ flex: 1 }}>
+      <div className="devtools-map">
         <MapContainer center={[parseFloat(lat)||CAMPUS_CENTER[0], parseFloat(lng)||CAMPUS_CENTER[1]]} zoom={18} style={{ height: '100%', width: '100%' }}>
           <TileBase />
           {lat && lng && !isNaN(parseFloat(lat)) && <Marker position={[parseFloat(lat), parseFloat(lng)]} />}
@@ -257,8 +257,8 @@ function RouteInspector({ token }) {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
-      <div style={{ width: 300, padding: 16, borderRight: '1px solid var(--line)', overflowY: 'auto' }}>
+    <div className="devtools-split">
+      <div className="devtools-sidebar">
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.92rem', marginBottom: 10, color: 'var(--ink)' }}>Route Inspector</div>
         <label style={{ fontSize: '0.72rem', color: 'var(--muted)', display: 'block', marginBottom: 3 }}>From</label>
         <select value={fromId} onChange={e => setFromId(e.target.value)} style={{ ...selectStyle, marginBottom: 8 }}>
@@ -285,7 +285,7 @@ function RouteInspector({ token }) {
           </>
         )}
       </div>
-      <div style={{ flex: 1 }}>
+      <div className="devtools-map">
         <MapContainer center={CAMPUS_CENTER} zoom={17} style={{ height: '100%', width: '100%' }}>
           <TileBase />
           {result && (
@@ -379,8 +379,8 @@ function RouteReplay() {
   const current = trace?.[step]
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
-      <div style={{ width: 300, padding: 16, borderRight: '1px solid var(--line)', overflowY: 'auto' }}>
+    <div className="devtools-split">
+      <div className="devtools-sidebar">
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.92rem', marginBottom: 8, color: 'var(--ink)' }}>Route Replay</div>
         <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: 10 }}>
           Paste a JSON array of GPS points (e.g. from <code>window.__navLog()</code> during live navigation, reshaped to <code>[&#123;lat,lng,accuracy_m?&#125;,…]</code>) to step or play back the trace on the map.
@@ -408,7 +408,7 @@ function RouteReplay() {
           </>
         )}
       </div>
-      <div style={{ flex: 1 }}>
+      <div className="devtools-map">
         <MapContainer center={CAMPUS_CENTER} zoom={17} style={{ height: '100%', width: '100%' }}>
           <TileBase />
           {trace && <Polyline positions={trace.slice(0, step + 1).map(p => [p.lat, p.lng])} pathOptions={{ color: '#3A6EA5', weight: 3 }} />}
@@ -465,7 +465,7 @@ export default function DevTools({ token }) {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', gap: 6, padding: '10px 14px', borderBottom: '1px solid var(--line)', flexWrap: 'wrap', flexShrink: 0 }}>
+      <div className="devtools-tabbar">
         {TOOLS.map(([id, label]) => (
           <button key={id} onClick={() => setTool(id)} style={{
             ...pill, padding: '5px 12px', fontSize: '0.74rem',

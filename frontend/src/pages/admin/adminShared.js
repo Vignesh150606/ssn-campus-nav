@@ -114,7 +114,7 @@ export const inputStyle = {
   borderRadius: 10,
   border: '1px solid var(--line-strong)',
   fontFamily: 'var(--font-sans)',
-  fontSize: '0.92rem',
+  fontSize: '1rem', // 16px — iOS Safari auto-zooms on focus for any input below this
   outline: 'none',
   background: 'var(--canvas)',
   color: 'var(--ink)',

@@ -1380,6 +1380,58 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
 }
 .admin-page th { color: var(--muted); font-weight: 600; }
 
+/* Dev Tools — map + sidebar split panel (GraphViewer, SnapDebug,
+   RouteInspector, RouteReplay). Sidebar width used to be a fixed inline
+   px value (220/300) next to a flex:1 map with no responsive fallback —
+   on a ~375-414px phone that left the map squeezed into whatever pixels
+   remained (well under half the screen). Below the breakpoint this
+   stacks the sidebar above the map instead of beside it, so the map
+   always gets the full width and a real minimum height. */
+.devtools-split {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+.devtools-sidebar, .devtools-sidebar--narrow {
+  flex-shrink: 0;
+  padding: 16px;
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+}
+.devtools-sidebar { width: 300px; }
+.devtools-sidebar--narrow { width: 220px; }
+.devtools-map {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+@media (max-width: 720px) {
+  .devtools-split { flex-direction: column; }
+  .devtools-sidebar, .devtools-sidebar--narrow {
+    width: 100%;
+    max-height: 38vh;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+  .devtools-map { flex: 1 1 auto; min-height: 260px; }
+}
+
+/* Dev Tools tool switcher — was flexWrap, which on a narrow phone wraps
+   the 7 tool buttons onto 2-3 lines, eating vertical space the map
+   needs. A horizontally-scrollable single row keeps every tab reachable
+   without shrinking the map underneath it. */
+.devtools-tabbar {
+  display: flex;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.devtools-tabbar > button { flex-shrink: 0; }
+
 /* ---------- Small screens ---------- */
 @media (max-width: 380px) {
   .app-header nav a { padding: 6px 10px; font-size: 0.78rem; }

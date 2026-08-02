@@ -689,3 +689,29 @@ didn't).
 - **Still open:** whether any of the *other* 7 capped nodes have ever been reachable as a
   stale `prefer_node_id` in the field — this fix closes the mechanism for all of them,
   but only this one instance was actually reproduced and observed on a device.
+
+**Round 8 (this round) — n_193/n_194 restructured from branch spurs onto their roads:**
+- **Observation:** visually inspecting the debug-area graph render, `n_193` and `n_194`
+  (the `csepathway.kml` merge nodes from Round 6b) looked like they sat almost exactly on
+  top of two existing roads (`n_99↔n_2` and `n_137↔n_124` respectively) rather than
+  branching off to the side — measured precisely: `n_193` was 1.97m off the straight
+  `n_99↔n_2` line, `n_194` was 3.81m off the straight `n_137↔n_124` line. Both well
+  inside normal GPS survey error, and both fall *between* the two endpoints (not past
+  either one) — consistent with them genuinely belonging on those roads rather than
+  being a separate nearby spur.
+- **Change made (data only, no new survey needed — both endpoints were already
+  trusted/surveyed nodes, this just corrects how they're connected):**
+  - `n_193`, `n_194` repositioned to their exact projected point on the respective line
+    (2–4m nudge).
+  - The old direct edges `n_99↔n_2` and `n_137↔n_124` were removed.
+  - Each was replaced by a real split: `n_99↔n_193↔n_2` and `n_137↔n_194↔n_124`, so a
+    walk along either road now naturally passes through the corridor nodes as a waypoint
+    instead of them being a separate branch that has to be detoured into and back out of.
+  - `UNVERIFIED_CONNECTOR_CAP_M` untouched — `n_193`/`n_194` are still capped at 15m for
+    live-GPS snapping; this round only changed graph topology/geometry, not snap trust.
+- **Verified, not just edited:** re-ran `scripts/route_quality_test.py` at N=150 (300
+  checks) — 0 failures, no regressions. Re-ran the Round 7 repro point (26.4m past the
+  turn, no `prefer_node`): route distance dropped from 284.0m to **228.8m**, and the path
+  no longer detours west through `n_99` before turning south — it now goes straight
+  `n_2 → n_193 → n_194 → ...`. Backup of the pre-restructure graph kept at
+  `backend/data/walkway_graph.PRE_RESTRUCTURE_BACKUP.json`.
