@@ -50,6 +50,22 @@ function pathLength(pts) {
   return d
 }
 
+// Mirrors backend/utils/router.py's _node_degree — real graph topology
+// (how many distinct edges touch each node), used to gate turn-by-turn
+// instructions on an actual graph-confirmed junction (degree >= 3)
+// rather than raw polyline curvature. See that file's _stitch docstring
+// for the full reasoning; kept in sync here so an offline route (this
+// file) and a live one (the backend) never disagree about what counts
+// as a turn.
+function nodeDegree(graph) {
+  const deg = new Map()
+  for (const e of graph.edges) {
+    deg.set(e.from, (deg.get(e.from) || 0) + 1)
+    deg.set(e.to, (deg.get(e.to) || 0) + 1)
+  }
+  return deg
+}
+
 function inBbox(lat, lng, bbox) {
   return lat >= bbox.lat_min && lat <= bbox.lat_max && lng >= bbox.lng_min && lng <= bbox.lng_max
 }
@@ -118,7 +134,7 @@ function dijkstra(adj, fromId, toId) {
   return { dist, prev }
 }
 
-function stitch(adj, seq) {
+function stitch(adj, seq, degree) {
   let fullPath = []
   let realDist = 0
   for (let i = 0; i < seq.length - 1; i++) {
@@ -127,7 +143,12 @@ function stitch(adj, seq) {
     const edge = (adj.get(a) || []).find(([nb]) => nb === b)
     if (!edge) continue
     const pts = edge[2]
-    fullPath = fullPath.length ? fullPath.concat(pts.slice(1)) : pts.slice()
+    const n = pts.length
+    const annotated = pts.map((p, j) => {
+      const id = j === 0 ? a : (j === n - 1 ? b : null) // interior points are shape data, not graph nodes — see nodeDegree above
+      return { lat: p.lat, lng: p.lng, id, junction: id != null && (degree.get(id) || 0) >= 3 }
+    })
+    fullPath = fullPath.length ? fullPath.concat(annotated.slice(1)) : annotated
     realDist += pathLength(pts)
   }
   return { fullPath, realDist }
@@ -173,7 +194,7 @@ export function routeBetweenLocations(graph, roadSegments, locationsById, fromId
   if (!dist.has(toId)) throw new Error(`No offline path from '${fromId}' to '${toId}'`)
 
   const seq = reconstruct(prev, fromId, toId)
-  const { fullPath, realDist } = stitch(adj, seq)
+  const { fullPath, realDist } = stitch(adj, seq, nodeDegree(graph))
   const a = locationsById.get(fromId)
   const b = locationsById.get(toId)
 
@@ -201,9 +222,13 @@ export function routeFromPoint(graph, roadSegments, locationsById, lat, lng, toI
   if (!dist.has(toId)) throw new Error(`No offline path from current location to '${toId}'`)
 
   const seq = reconstruct(prev, snap.id, toId)
-  const { fullPath, realDist } = stitch(adj, seq)
+  const degree = nodeDegree(graph)
+  const { fullPath, realDist } = stitch(adj, seq, degree)
   const snapNode = graph.nodes.find((n) => n.id === snap.id)
-  const withSnapSegment = [{ lat, lng }, { lat: snapNode.lat, lng: snapNode.lng }].concat(fullPath.slice(1))
+  const withSnapSegment = [
+    { lat, lng, id: null, junction: false },
+    { lat: snapNode.lat, lng: snapNode.lng, id: snap.id, junction: (degree.get(snap.id) || 0) >= 3 },
+  ].concat(fullPath.slice(1))
   const totalDist = realDist + snap.dist
   const b = locationsById.get(toId)
 

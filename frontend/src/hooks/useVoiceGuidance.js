@@ -12,7 +12,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { computeUpcomingTurn } from '../utils/geo'
 
 const STORAGE_KEY = 'ssn-nav-voice-settings'
-const DEFAULT_SETTINGS = { enabled: true, volume: 1, rate: 1 }
+// Default changed to off. Only affects users with no saved preference yet
+// (loadSettings below merges over this default, so anyone who already
+// explicitly turned voice guidance on or off keeps that choice — this
+// does not silently override an existing user's own setting).
+const DEFAULT_SETTINGS = { enabled: false, volume: 1, rate: 1 }
 
 // Pre-announce at this distance (early warning)
 const PRE_ANNOUNCE_M = 80

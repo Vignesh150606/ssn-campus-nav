@@ -194,6 +194,17 @@ export function LocationProvider({ children }) {
   const simPositionRef   = useRef(null)  // mirrors simPosition for sync reads
   const recalculatingRef = useRef(false) // guards against overlapping reroute requests
   const lastRecalcAtRef  = useRef(0)     // Date.now() of the last reroute attempt (cooldown)
+  // Bug fix — stale reroute race condition (previously undetected: a
+  // reroute fetch in flight for the current destination, still pending
+  // when the user exits nav / picks a different destination, would land
+  // afterwards and unconditionally overwrite routeRef/remainingPath/
+  // fullPath/liveEta with data for a destination that's no longer
+  // current — silently showing directions for the wrong route). Bumped
+  // once per reroute attempt and once on every destination change
+  // (setDestination/clearDestination below); the response handler in
+  // maybeRecalculate discards anything that doesn't match the value it
+  // captured when the request was sent.
+  const recalcGenerationRef = useRef(0)
   // The walkway node the most recent reroute snapped to (see main.py's
   // route response `snapped_to`) — fed back into the next reroute request
   // as `prefer_node` so it doesn't flip to a different, similarly-costed
@@ -293,6 +304,15 @@ export function LocationProvider({ children }) {
     lastRecalcAtRef.current  = now
     setRecalculating(true)
 
+    // Captured now, checked again when the response lands (below) — this
+    // is the actual fix for the stale-reroute race: recalculatingRef only
+    // ever prevented a SECOND automatic reroute from being *sent* while
+    // one was in flight, it never stopped an old one's response from
+    // being *applied* after the user had already moved on to a different
+    // destination (or exited navigation) in the meantime.
+    const requestGeneration = recalcGenerationRef.current
+    const requestedDestId   = destRef.current.id
+
     // Only carry the sticky preference forward if the current fix isn't a
     // decisively better fix than whichever one originally set it — see
     // STICKY_ACCURACY_IMPROVEMENT_TO_RESET_M above. If lastSnappedAccuracyRef
@@ -335,6 +355,24 @@ export function LocationProvider({ children }) {
     // has no effect on the request itself or on any routing behaviour.
     getRouteFromCoords(lat, lng, destRef.current.id, accuracyM, preferNodeId, { isReroute: true })
       .then((r) => {
+        // Bug fix — discard this response if it's stale: a newer reroute
+        // was sent (recalcGenerationRef bumped again since we started) or
+        // the destination changed/cleared entirely (setRoute/clearRoute/
+        // stop all bump the same counter). Without this, a slow response
+        // for a destination the user already left would silently
+        // overwrite the current route with directions for the wrong
+        // place. recalculatingRef/setRecalculating are still cleared
+        // unconditionally in .finally() below — the request genuinely
+        // completed, it's only the resulting state application that's
+        // being skipped.
+        if (requestGeneration !== recalcGenerationRef.current || destRef.current?.id !== requestedDestId) {
+          logRerouteEvent({
+            ...debugBase, requestUrl, preferNodeSent: preferNodeId,
+            skipped: 'stale-response-discarded',
+            requestedDestId, currentDestId: destRef.current?.id ?? null,
+          })
+          return
+        }
         // TEMPORARY — see utils/rerouteDebug.js. `source` is the field that
         // matters most: it should always be 'local' (genuinely came from
         // /api/route just now).
@@ -696,12 +734,7 @@ export function LocationProvider({ children }) {
     acquireDeadlineRef.current = null                      // Priority 2 (Phase 4.7)
     routeRef.current = null
     destRef.current = null
-    lastSnappedNodeRef.current = null
-    lastSnappedAccuracyRef.current = null
-    lastMatchIndexRef.current = null
-    offStreakRef.current = 0
-    onStreakRef.current = 0
-    setActiveDestination(null)
+    recalcGenerationRef.current += 1
     announced.current = new Set()
     setRemainingPath(null)
     setRemainingDist(null)
@@ -720,6 +753,7 @@ export function LocationProvider({ children }) {
     stopAutoWalkInternal()
     routeRef.current  = path
     destRef.current   = { lat: destLat, lng: destLng, id: destId ?? null }
+    recalcGenerationRef.current += 1
     lastSnappedNodeRef.current = null
     lastSnappedAccuracyRef.current = null
     lastMatchIndexRef.current = null
@@ -745,7 +779,7 @@ export function LocationProvider({ children }) {
     stopAutoWalkInternal()
     routeRef.current = null
     destRef.current  = null
-    lastSnappedNodeRef.current = null
+    recalcGenerationRef.current += 1
     lastSnappedAccuracyRef.current = null
     lastMatchIndexRef.current = null
     offStreakRef.current = 0

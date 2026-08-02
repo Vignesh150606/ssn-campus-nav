@@ -358,8 +358,16 @@ function NavigationController({
   // control is native Leaflet DOM, added via addInitHook, entirely
   // outside React's render output. A ref keeps the toggle callback
   // fresh across renders without re-running the mount effect below.
+  //
+  // Bug fix: the ref write used to happen directly in the render body
+  // (`onToggleHeadingUpRef.current = onToggleHeadingUp` with no
+  // useEffect wrapper) — mutating a ref during render violates React's
+  // rules (renders must stay pure) and is a hard error under this
+  // project's eslint-plugin-react-hooks config ("Cannot access refs
+  // during render"). Moved into its own effect, same pattern already
+  // used for onDragRef further down this file.
   const onToggleHeadingUpRef = useRef(onToggleHeadingUp)
-  onToggleHeadingUpRef.current = onToggleHeadingUp
+  useEffect(() => { onToggleHeadingUpRef.current = onToggleHeadingUp }, [onToggleHeadingUp])
   useEffect(() => {
     if (!map) return
     map._headingUpToggle = () => onToggleHeadingUpRef.current?.()

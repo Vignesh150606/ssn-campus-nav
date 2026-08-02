@@ -215,6 +215,23 @@ const TURN_LOOKAHEAD_M       = 300  // extended from 250m
  * Returns null if path is straight within the lookahead window.
  *
  * Keyed on (lat, lng) of the turn point — stable across ticks unlike turnIndex.
+ *
+ * Bug fix — "sometimes the directions shown are wrong": this used to
+ * fire on bearing change alone, at ANY vertex in the path — including
+ * points that are pure polyline shape data (curvature within a single
+ * walkway edge, not a real graph node at all) and real graph nodes with
+ * degree 2 (a corridor that just bends, with no actual alternative
+ * route there). Neither is an actual decision the pedestrian needs to
+ * be told about, and both can trip the angle threshold on nothing more
+ * than natural path curvature or GPS/survey noise — a confident but
+ * wrong-feeling "turn left" where the path just curves. `path[i]` now
+ * carries `junction` from the backend (utils/router.py `_stitch` /
+ * `_node_degree` — true only for a real graph node with degree >= 3,
+ * i.e. a point that's actually a fork in the walkway graph), computed
+ * from the graph's real topology, not from this function's own
+ * geometry. A turn is only ever reported at a graph-confirmed junction
+ * that ALSO clears the angle threshold — confirms there both really is
+ * a choice AND the route actually takes the non-straight option.
  */
 export function computeUpcomingTurn(path) {
   if (!path || path.length < 3) return null
@@ -247,6 +264,17 @@ export function computeUpcomingTurn(path) {
     // trusting that reading — the real turn, if any, is still correctly
     // found a few points later once a genuine bearingIn is available.
     if (segLen < 0.1) {
+      cumulative += segLen
+      continue
+    }
+
+    // Graph-confirmation gate — see this function's docstring. A vertex
+    // the backend didn't mark as a real junction is never a valid turn
+    // location, no matter how sharply the raw polyline bends there.
+    // `!== true` (not just falsy) so a path from a stale/legacy cache
+    // without this field at all fails safe toward no-turn rather than
+    // silently trusting unconfirmed geometry.
+    if (path[i].junction !== true) {
       cumulative += segLen
       continue
     }
@@ -304,10 +332,13 @@ export function pointAtDistanceAlongPath(path, distanceM) {
 /**
  * Presentation-only helper for the "Fully Expanded" nav sheet tier — lists
  * every meaningful turn along the REMAINING route, not just the next one.
- * Same bearing-diff detection as computeUpcomingTurn, just without the
- * 300m lookahead cutoff / early return. Does not feed voice guidance, the
- * GPS off-route check, or routing in any way — it's a read-only summary of
- * the path array already computed by the router.
+ * Same bearing-diff detection AND the same graph-confirmation gate as
+ * computeUpcomingTurn (see its docstring) — a point the backend didn't
+ * mark `junction: true` is skipped here too, so this list and the
+ * next-turn/voice guidance never disagree about what counts as a turn.
+ * Does not feed voice guidance, the GPS off-route check, or routing in
+ * any way — it's a read-only summary of the path array already computed
+ * by the router.
  */
 export function computeAllTurns(path) {
   if (!path || path.length < 3) return []
@@ -319,6 +350,7 @@ export function computeAllTurns(path) {
     // See computeUpcomingTurn's comment above for why a near-zero-length
     // incoming segment must be skipped rather than treated as a real turn.
     if (segLen < 0.1) continue
+    if (path[i].junction !== true) continue
     const bearingIn  = bearing(path[i - 1].lat, path[i - 1].lng, path[i].lat, path[i].lng)
     const bearingOut = bearing(path[i].lat, path[i].lng, path[i + 1].lat, path[i + 1].lng)
     const diff    = angleDiff(bearingIn, bearingOut)

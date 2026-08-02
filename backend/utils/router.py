@@ -23,6 +23,25 @@ WALKING_MPS    = 1.4
 
 
 _graph_cache = None
+_degree_cache = None
+
+
+def _node_degree():
+    """How many distinct edges touch each walkway node — the real graph
+    topology, independent of any particular route's start/end. degree>=3
+    means a genuine branch point; see _stitch's docstring for why this
+    is what turn-by-turn instructions should be gated on. Cached
+    alongside _graph_cache since the graph is build-time-generated and
+    never changes at runtime."""
+    global _degree_cache
+    if _degree_cache is None:
+        graph, _ = _load()
+        deg = {}
+        for e in graph.get('edges', []):
+            deg[e['from']] = deg.get(e['from'], 0) + 1
+            deg[e['to']]   = deg.get(e['to'], 0) + 1
+        _degree_cache = deg
+    return _degree_cache
 
 
 def _load():
@@ -133,7 +152,34 @@ def _dijkstra(adj, from_id, to_id):
     return dist, prev
 
 
-def _stitch(adj, seq):
+def _stitch(adj, seq, degree=None):
+    """Builds the full lat/lng path AND annotates each point against the
+    real graph — this is what lets the frontend tell a genuine navigable
+    decision from a shape point.
+
+    Every edge's `path` starts and ends exactly on its two graph nodes
+    (`a`/`b`); most edges are just those two points, but ~15% have 1-3
+    extra points in between purely to capture the surveyed walkway's
+    curvature (see build_walkway_graph.py) — those interior points are
+    NOT graph nodes and never correspond to a real branch. `degree` (from
+    _node_degree, below) is the walkway graph's actual topology: how many
+    distinct edges touch each node. Only a node with degree >= 3 is a
+    genuine fork — a point the pedestrian could actually have gone a
+    different way. Degree 1-2 nodes exist because long corridors get
+    systematically split into ~15m segments during graph construction,
+    not because there's a decision to make there.
+
+    Bug fix — "sometimes the directions shown are wrong": the frontend
+    used to infer turns purely from bearing changes between consecutive
+    path points (utils/geo.js computeUpcomingTurn), with no way to tell
+    a real fork from either of the above (a natural corridor curve, or a
+    pure shape point) — a plausible source of confident-but-wrong "turn
+    left/right" instructions where the path just bends, not branches.
+    Attaching `id`/`junction` here lets the frontend require an actual
+    graph-confirmed decision point before announcing a turn at all,
+    instead of trusting raw geometry alone.
+    """
+    degree = degree or {}
     full_path  = []
     real_dist  = 0.0
     for i in range(len(seq) - 1):
@@ -141,7 +187,21 @@ def _stitch(adj, seq):
         for (nb, _, path_pts) in adj.get(a, []):
             if nb == b:
                 pts = path_pts
-                full_path.extend(pts if not full_path else pts[1:])
+                n = len(pts)
+                annotated = []
+                for j, p in enumerate(pts):
+                    if j == 0:
+                        node_id = a
+                    elif j == n - 1:
+                        node_id = b
+                    else:
+                        node_id = None  # interior shape point — not a graph node, never a valid turn location
+                    annotated.append({
+                        'lat': p['lat'], 'lng': p['lng'],
+                        'id': node_id,
+                        'junction': node_id is not None and degree.get(node_id, 0) >= 3,
+                    })
+                full_path.extend(annotated if not full_path else annotated[1:])
                 real_dist += _path_length(pts)
                 break
     return full_path, real_dist
@@ -508,7 +568,7 @@ def find_route_from_point(lat: float, lng: float, to_id: str, accuracy_m: float 
     seq.append(snap_id)
     seq.reverse()
 
-    full_path, real_dist = _stitch(adj, seq)
+    full_path, real_dist = _stitch(adj, seq, _node_degree())
 
     # Connect the live GPS point to the route Dijkstra already chose with a
     # direct straight line to the snapped node. snap_id itself (which node
@@ -518,8 +578,14 @@ def find_route_from_point(lat: float, lng: float, to_id: str, accuracy_m: float 
     # route are drawn. The walkway graph edges themselves are built from
     # real surveyed GPX/KML data and are not straight-line inventions, so
     # this connector is the only synthesized segment in the whole path.
+    # The live point itself isn't a graph node (never a junction); the
+    # snap node is real, so it gets a real id/junction flag like any other
+    # stitched point.
     snap_node = next(n for n in graph['nodes'] if n['id'] == snap_id)
-    full_path = [{'lat': lat, 'lng': lng}, {'lat': snap_node['lat'], 'lng': snap_node['lng']}] + full_path[1:]
+    full_path = [
+        {'lat': lat, 'lng': lng, 'id': None, 'junction': False},
+        {'lat': snap_node['lat'], 'lng': snap_node['lng'], 'id': snap_id, 'junction': _node_degree().get(snap_id, 0) >= 3},
+    ] + full_path[1:]
     connector_dist = snap_dist
 
     real_dist += connector_dist
@@ -561,7 +627,7 @@ def find_route(from_id: str, to_id: str) -> dict:
     seq.append(from_id)
     seq.reverse()
 
-    full_path, real_dist = _stitch(adj, seq)
+    full_path, real_dist = _stitch(adj, seq, _node_degree())
     eta = round(real_dist / WALKING_MPS / 60, 1)
 
     # Detect if route used a closed segment (warning for frontend)
