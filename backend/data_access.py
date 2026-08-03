@@ -61,10 +61,12 @@ def _sniff_image_content_type(content: bytes) -> Optional[str]:
 
 
 def validate_image_upload(content: bytes, content_type: str) -> None:
-    """Shared by upload_event_image_file / upload_menu_image_file /
-    upload_feedback_screenshot_file — was three separately-maintained
-    copies of the same two checks (claimed-type allowlist + size), neither
-    of which ever looked at the actual bytes. Now also sniffs the real
+    """Shared by upload_event_image_file / upload_menu_image_file — was
+    three separately-maintained copies of the same two checks (claimed-type
+    allowlist + size) before consolidating here; the third caller,
+    upload_feedback_screenshot_file, was removed along with the feedback
+    screenshot-upload feature itself (see delete_feedback below).
+    Neither original copy ever looked at the actual bytes. Now also sniffs the real
     file signature and requires it to match a genuine allowed image type,
     independent of what the client claims. The size check stays here too
     as defense-in-depth even though callers now also bound how many bytes
@@ -1411,58 +1413,29 @@ def create_feedback(payload: dict) -> dict:
     return _wrap(_run)
 
 
-def attach_feedback_screenshot(feedback_id: str, url: str, storage_path: str) -> Optional[dict]:
-    """Item 12 — this endpoint is public and anonymous (route feedback has
-    no session/account concept), so there's no real "ownership" to check.
-    The closest meaningful substitute: first screenshot attached to a given
-    feedback_id wins — a later call for the same id (a retry, or anyone
-    else who learned/guessed the id; ids are random UUIDs, so low risk
-    either way) is rejected instead of silently overwriting it."""
+def delete_feedback(feedback_id: str) -> bool:
+    """Admin — permanently remove a feedback row, and its screenshot file
+    in Storage if one was attached before the upload feature was removed.
+    Returns False if the row didn't exist (caller returns 404)."""
     def _fetch():
         client = get_client()
-        result = client.table("route_feedback").select("id, screenshot_url").eq("id", feedback_id).limit(1).execute()
+        result = client.table("route_feedback").select("id, screenshot_storage_path").eq("id", feedback_id).limit(1).execute()
         return result.data or []
 
     rows = _wrap(_fetch)
     if not rows:
-        return None
-    if rows[0].get("screenshot_url"):
-        raise ValueError("A screenshot has already been attached to this feedback submission.")
+        return False
+    storage_path = rows[0].get("screenshot_storage_path")
 
     def _run():
         client = get_client()
-        result = (
-            client.table("route_feedback")
-            .update({"screenshot_url": url, "screenshot_storage_path": storage_path})
-            .eq("id", feedback_id)
-            .execute()
-        )
-        return result.data[0] if result.data else None
-
-    return _wrap(_run)
-
-
-def upload_feedback_screenshot_file(feedback_id: str, filename: str, content: bytes, content_type: str) -> tuple:
-    """Same validation + Storage-upload pattern already used for event and
-    menu images above."""
-    validate_image_upload(content, content_type)
-
-    def _run():
-        client = get_client()
-        safe_name = "".join(c for c in filename if c.isalnum() or c in "._-") or "screenshot"
-        storage_path = f"{feedback_id}/{uuid.uuid4().hex}_{safe_name}"
-        client.storage.from_(FEEDBACK_SCREENSHOTS_BUCKET).upload(
-            storage_path, content, file_options={"content-type": content_type}
-        )
-        public = client.storage.from_(FEEDBACK_SCREENSHOTS_BUCKET).get_public_url(storage_path)
-        if isinstance(public, dict):
-            public_url = (public.get("publicUrl") or public.get("publicURL")
-                          or public.get("data", {}).get("publicUrl"))
-        else:
-            public_url = public
-        if not public_url:
-            raise SupabaseUnavailableError("Storage upload succeeded but no public URL was returned.")
-        return public_url, storage_path
+        if storage_path:
+            try:
+                client.storage.from_(FEEDBACK_SCREENSHOTS_BUCKET).remove([storage_path])
+            except Exception:
+                pass  # best-effort — a storage hiccup shouldn't block deleting the row itself
+        client.table("route_feedback").delete().eq("id", feedback_id).execute()
+        return True
 
     return _wrap(_run)
 

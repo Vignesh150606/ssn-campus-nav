@@ -210,27 +210,9 @@ async function postJSON(path, body) {
 }
 
 /** Submit route feedback (shown when navigation ends or the destination is
- *  reached). Returns { feedback_id } so a screenshot can optionally follow
- *  via uploadFeedbackScreenshot. */
+ *  reached). */
 export function submitFeedback(payload) {
   return postJSON('/api/feedback', payload)
-}
-
-/** Optional screenshot attach for a feedback submission. */
-export async function uploadFeedbackScreenshot(feedbackId, file) {
-  const form = new FormData()
-  form.append('file', file)
-  const res = await fetchWithTimeout(`${API_BASE}/api/feedback/${encodeURIComponent(feedbackId)}/screenshot`, {
-    method: 'POST',
-    body: form,
-  }, 30000)
-  if (!res.ok) {
-    const detail = await res.json().catch(() => ({}))
-    const err = new Error(detail.detail || `Request failed: ${res.status}`)
-    err.status = res.status
-    throw err
-  }
-  return res.json()
 }
 
 export { API_BASE }

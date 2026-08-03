@@ -62,6 +62,17 @@ export default function AdminFeedback({ token }) {
     }
   }
 
+  async function deleteFeedback(id) {
+    if (!window.confirm('Delete this feedback permanently? This cannot be undone.')) return
+    try {
+      await adminFetch(`/api/admin/feedback/${id}`, 'DELETE', null, token)
+      flash('Deleted.')
+      load()
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -154,6 +165,11 @@ export default function AdminFeedback({ token }) {
                   ✗ Reject
                 </button>
               </>
+            )}
+            {f.status !== 'pending' && (
+              <button onClick={() => deleteFeedback(f.id)} style={{ ...pill, background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)' }}>
+                🗑 Delete
+              </button>
             )}
           </div>
         </div>

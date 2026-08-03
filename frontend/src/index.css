@@ -447,6 +447,26 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
 }
 
 /* ---------- Bottom sheet ---------- */
+/* Bug fix — "sheet rises to cover almost the whole screen for a split
+   second every time Home remounts" (e.g. Admin -> Home, or any other
+   route change back to Home): this base rule used to carry
+   `animation: sheet-up 0.4s ...` (a "slide up + fade in" entrance
+   effect) unconditionally. Both actual usages of this class —
+   .preview-mode and .browse-mode below — are fixed-height +
+   JS-driven-transform tier sheets with their own explicit
+   same-paint-frame CSS transform fallback specifically so there's no
+   visible jump on mount (see their comments). A currently-running CSS
+   *animation* on `transform` takes precedence over an inline style on
+   that same property for its whole duration, regardless of what JS has
+   already set — so this leftover animation fought the correct fallback
+   transform on every fresh mount, animating toward `translateY(0)` (the
+   box's un-transformed position — at `height: 86dvh`, nearly the full
+   screen) before finally handing back to the correct position once the
+   animation finished 0.4s later. Neither modifier below wants this: an
+   entrance animation only makes sense for a sheet with no competing
+   positioning system of its own, which is exactly what .voice-settings-
+   panel (still using the same `sheet-up` keyframes, unaffected by this
+   change) is and this isn't. */
 .results-sheet {
   position: absolute;
   left: var(--safe-l); right: var(--safe-r); bottom: 0;
@@ -460,7 +480,6 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
   display: flex;
   flex-direction: column;
   padding-bottom: env(safe-area-inset-bottom, 0);
-  animation: sheet-up 0.4s cubic-bezier(0.32, 0.72, 0, 1);
 }
 .results-sheet.empty { height: 0; padding: 0; border: none; box-shadow: none; }
 /* Bug 7 — same fixed-height + transform technique as .nav-bottom-sheet:
@@ -4587,4 +4606,42 @@ select:-webkit-autofill {
 }
 .copilot-card-menu-error {
   color: var(--danger, #dc2626);
+}
+
+/* ---------- Reduced motion ---------- */
+/* Animation-smoothing pass: the app had zero prefers-reduced-motion
+   support anywhere, across 55 transitions and 19 keyframe animations —
+   including several infinite/looping ones (gps-pulse, dest-pulse,
+   accuracy-breathe, pulse-dot, copilot-pulse, copilot-typing,
+   skeleton-shimmer) that are exactly the category most likely to bother
+   someone with vestibular motion sensitivity, or who's simply set this
+   OS-level preference. Standard blanket reset — collapses every
+   animation/transition to an imperceptible instant rather than trying to
+   enumerate and judge each of the 19 keyframes individually, which risks
+   missing one. `scroll-behavior: auto` also disables any smooth-scroll
+   snapping for the same reason.
+   Deliberately NOT touching per-element timing/easing values themselves
+   (durations, cubic-beziers) — those are already fairly consistent
+   (~0.15s ease across most UI feedback) and several are load-bearing for
+   correctness, not just polish: e.g. .map-layer's `transition: bottom`
+   is intentionally toggled off during active drag-tracking elsewhere in
+   this file (see html.nav-sheet-driving) specifically so it doesn't lag
+   a frame behind the sheet — a blanket rewrite of durations would fight
+   that same logic. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Exempted: these two spinners communicate "still loading", not
+     decoration — freezing them mid-rotation via the blanket rule above
+     would read as broken/stuck rather than calm. A single simple
+     rotation isn't the kind of motion (parallax, scaling, bouncing)
+     prefers-reduced-motion is meant to suppress. */
+  .nav-recalc-dot, .boot-gate-spinner {
+    animation-duration: 1s !important;
+    animation-iteration-count: infinite !important;
+  }
 }

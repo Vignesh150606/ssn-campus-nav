@@ -8,11 +8,24 @@ const POLL_INTERVAL_MS = 20_000  // re-fetch every 20 s so new approved events a
 
 // P1 — localStorage secondary cache.
 // Primary persistence is the backend API. The cache lets approved events
-// survive browser refresh / reopening the app even when the server has
-// restarted (Render free-tier cold-start or ephemeral-filesystem wipe).
-// We only cache non-empty results so a transient empty response never wipes
-// a good cache. The cache is intentionally NOT the primary layer — it is
-// always superseded by the next successful API fetch.
+// survive browser refresh / reopening the app while the network is briefly
+// unavailable. The cache is intentionally NOT the primary layer — it is
+// always superseded by the next successful API fetch, empty or not.
+//
+// Bug fix — "shows deleted events for a split second every time I open
+// Fest Schedule": this used to refuse to persist an empty result
+// ("never overwrite cache with empty list"), reasoning that a transient
+// empty response shouldn't wipe a good cache — written for the old
+// pre-Supabase architecture (see data_access.py's "Events (was:
+// events.json)") where a Render cold-start could wipe an ephemeral local
+// file. Events now live in Supabase, a persistent store unaffected by
+// backend restarts, so a `getEvents()` call that reaches this function
+// (i.e. resolved via .then(), never .catch()) is a confirmed real answer,
+// not a guess — including a confirmed-empty one, e.g. because every event
+// was deliberately deleted. Refusing to persist that meant the stale
+// pre-deletion snapshot lived in localStorage forever (or until the 48h
+// TTL below), so EVERY visit to this page re-seeded the initial render
+// from it and had to visibly self-correct once the real fetch landed.
 const EVENTS_CACHE_KEY = 'ssn_campus_events_v1'
 
 function loadEventsCache() {
@@ -22,13 +35,13 @@ function loadEventsCache() {
     const { data, ts } = JSON.parse(raw)
     // Expire cache after 48 h so stale events don't linger indefinitely
     if (Date.now() - ts > 48 * 60 * 60 * 1000) return null
-    return Array.isArray(data) && data.length ? data : null
+    return Array.isArray(data) ? data : null
   } catch { return null }
 }
 
 function saveEventsCache(events) {
   try {
-    if (!events?.length) return   // never overwrite cache with empty list
+    if (!Array.isArray(events)) return
     localStorage.setItem(EVENTS_CACHE_KEY, JSON.stringify({ data: events, ts: Date.now() }))
   } catch { /* storage quota exceeded or private mode — silently ignore */ }
 }

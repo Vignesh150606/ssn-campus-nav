@@ -11,7 +11,7 @@
  * full-screen takeover.
  */
 import { useState } from 'react'
-import { submitFeedback, uploadFeedbackScreenshot } from '../api'
+import { submitFeedback } from '../api'
 
 const CATEGORIES = [
   { key: 'incorrect_route',   label: 'Incorrect route' },
@@ -50,7 +50,6 @@ export default function RouteFeedbackDialog({ open, context, onClose }) {
   const [accurate, setAccurate] = useState(null) // true | false | null
   const [categories, setCategories] = useState([])
   const [comment, setComment] = useState('')
-  const [screenshot, setScreenshot] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
   const [error, setError] = useState(null)
@@ -59,7 +58,7 @@ export default function RouteFeedbackDialog({ open, context, onClose }) {
 
   function reset() {
     setRating(0); setAccurate(null); setCategories([]); setComment('')
-    setScreenshot(null); setSubmitting(false); setDone(false); setError(null)
+    setSubmitting(false); setDone(false); setError(null)
   }
 
   function close() {
@@ -75,7 +74,7 @@ export default function RouteFeedbackDialog({ open, context, onClose }) {
     setSubmitting(true)
     setError(null)
     try {
-      const res = await submitFeedback({
+      await submitFeedback({
         destination_id: context?.destinationId ?? null,
         destination_name: context?.destinationName ?? null,
         rating: rating || null,
@@ -85,11 +84,6 @@ export default function RouteFeedbackDialog({ open, context, onClose }) {
         distance_m: context?.distanceM ?? null,
         arrived: !!context?.arrived,
       })
-      if (screenshot && res?.feedback_id) {
-        // Best-effort — a failed screenshot upload shouldn't undo an
-        // otherwise-successful feedback submission.
-        uploadFeedbackScreenshot(res.feedback_id, screenshot).catch(() => {})
-      }
       setDone(true)
       setTimeout(close, 1400)
     } catch (e) {
@@ -185,16 +179,6 @@ export default function RouteFeedbackDialog({ open, context, onClose }) {
                 background: 'var(--canvas)', color: 'var(--ink)', resize: 'vertical', marginBottom: 10,
               }}
             />
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.78rem', color: 'var(--muted)', marginBottom: 14, cursor: 'pointer' }}>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setScreenshot(e.target.files?.[0] || null)}
-                style={{ fontSize: '0.75rem' }}
-              />
-              {screenshot ? '1 screenshot attached' : 'Attach a screenshot (optional)'}
-            </label>
 
             {error && <div style={{ color: 'var(--danger)', fontSize: '0.78rem', marginBottom: 10 }}>{error}</div>}
 

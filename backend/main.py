@@ -891,31 +891,9 @@ class FeedbackStatusUpdate(BaseModel):
 @app.post("/api/feedback")
 def submit_feedback(body: FeedbackCreate, _rl: None = Depends(rate_limit(20, 600))):
     """Public — submit route feedback (shown when navigation ends or the
-    destination is reached). Returns the new feedback id so the frontend
-    can optionally follow up with POST /api/feedback/{id}/screenshot."""
+    destination is reached)."""
     row = data_access.create_feedback(body.model_dump())
     return {"message": "Thanks for the feedback!", "feedback_id": row.get("id")}
-
-
-@app.post("/api/feedback/{feedback_id}/screenshot")
-async def upload_feedback_screenshot(feedback_id: str, file: UploadFile = File(...), _rl: None = Depends(rate_limit(20, 600))):
-    """Public — optional screenshot attach. Same create-then-attach pattern
-    as the existing event-image upload flow above."""
-    content = await _read_upload_bounded(file)
-    try:
-        public_url, storage_path = data_access.upload_feedback_screenshot_file(
-            feedback_id, file.filename or "screenshot", content,
-            file.content_type or "application/octet-stream",
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    try:
-        row = data_access.attach_feedback_screenshot(feedback_id, public_url, storage_path)
-    except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e)) from e
-    if not row:
-        raise HTTPException(status_code=404, detail=f"Feedback '{feedback_id}' not found")
-    return {"url": public_url}
 
 
 @app.get("/api/admin/feedback")
@@ -933,6 +911,18 @@ def update_feedback(feedback_id: str, body: FeedbackStatusUpdate, admin: dict = 
     if not row:
         raise HTTPException(status_code=404, detail=f"Feedback '{feedback_id}' not found")
     return row
+
+
+@app.delete("/api/admin/feedback/{feedback_id}")
+def delete_feedback(feedback_id: str, admin: dict = Depends(require_role("superadmin"))):
+    """Admin — permanently delete a feedback row once it's been triaged
+    (AdminFeedback.jsx only shows the Delete action once status is no
+    longer 'pending'). Also removes its screenshot file from Storage, if
+    any, so a deleted row doesn't leave an orphaned file behind."""
+    ok = data_access.delete_feedback(feedback_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"Feedback '{feedback_id}' not found")
+    return {"message": "Feedback deleted."}
 
 
 # ---------------------------------------------------------------------------

@@ -1,76 +1,21 @@
 {
-  "n_requested": 80,
-  "total_tests": 160,
-  "passed": 160,
+  "n_requested": 40,
+  "total_tests": 80,
+  "passed": 80,
   "failed": 0,
   "failures": [],
   "results": {
     "location_to_location": [
       {
-        "from": "cdc-block",
-        "to": "ssn-cricket-ground",
-        "distance_m": 766.3,
-        "straight_line_m": 709.3,
+        "from": "food-aswins",
+        "to": "food-snowcube",
+        "distance_m": 347.0,
+        "straight_line_m": 282.7,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
-        "worst_point_gap_m": 88.9,
-        "path_points": 26
-      },
-      {
-        "from": "ssn-fountain",
-        "to": "ssn-cricket-ground",
-        "distance_m": 711.2,
-        "straight_line_m": 666.2,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 88.9,
-        "path_points": 23
-      },
-      {
-        "from": "admin-block",
-        "to": "ssn-cricket-ground",
-        "distance_m": 659.5,
-        "straight_line_m": 613.6,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 88.9,
-        "path_points": 20
-      },
-      {
-        "from": "eee-block",
-        "to": "girls-hostel",
-        "distance_m": 592.8,
-        "straight_line_m": 452.1,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 80.7,
-        "path_points": 26
-      },
-      {
-        "from": "eee-block",
-        "to": "mech-block",
-        "distance_m": 471.3,
-        "straight_line_m": 356.5,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.3,
-        "path_points": 19
-      },
-      {
-        "from": "civil-block",
-        "to": "biomed-block",
-        "distance_m": 183.1,
-        "straight_line_m": 139.0,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 44.2,
-        "path_points": 7
+        "worst_point_gap_m": 37.7,
+        "path_points": 18
       },
       {
         "from": "food-aswins",
@@ -85,42 +30,20 @@
       },
       {
         "from": "parking",
-        "to": "cse-block",
-        "distance_m": 901.9,
-        "straight_line_m": 738.3,
+        "to": "mini-hall-1",
+        "distance_m": 1295.6,
+        "straight_line_m": 1122.5,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
         "worst_point_gap_m": 98.4,
-        "path_points": 25
+        "path_points": 38
       },
       {
-        "from": "tcs-auditorium",
-        "to": "ece-block",
-        "distance_m": 727.4,
-        "straight_line_m": 492.9,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 52.8,
-        "path_points": 26
-      },
-      {
-        "from": "food-metro",
-        "to": "central-library",
-        "distance_m": 130.0,
-        "straight_line_m": 120.5,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 49.1,
-        "path_points": 8
-      },
-      {
-        "from": "food-snowcube",
-        "to": "main-gate",
-        "distance_m": 1054.6,
-        "straight_line_m": 972.3,
+        "from": "main-gate",
+        "to": "biomed-block",
+        "distance_m": 1047.1,
+        "straight_line_m": 738.1,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
@@ -128,37 +51,15 @@
         "path_points": 30
       },
       {
-        "from": "eee-block",
-        "to": "central-library",
-        "distance_m": 326.4,
-        "straight_line_m": 195.2,
+        "from": "clock-tower",
+        "to": "mini-hall-1",
+        "distance_m": 477.9,
+        "straight_line_m": 358.0,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.3,
-        "path_points": 15
-      },
-      {
-        "from": "food-rishabhs",
-        "to": "main-canteen",
-        "distance_m": 354.8,
-        "straight_line_m": 222.6,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 45.5,
-        "path_points": 20
-      },
-      {
-        "from": "open-air-theatre",
-        "to": "food-rishabhs",
-        "distance_m": 411.7,
-        "straight_line_m": 311.7,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 66.2,
-        "path_points": 13
+        "worst_point_gap_m": 56.7,
+        "path_points": 22
       },
       {
         "from": "sports-complex-main",
@@ -172,48 +73,37 @@
         "path_points": 14
       },
       {
-        "from": "food-aswins",
-        "to": "eee-block",
-        "distance_m": 657.9,
-        "straight_line_m": 454.0,
+        "from": "ssn-cricket-ground",
+        "to": "cdc-block",
+        "distance_m": 766.3,
+        "straight_line_m": 709.3,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.3,
-        "path_points": 29
+        "worst_point_gap_m": 88.9,
+        "path_points": 26
       },
       {
-        "from": "food-rishabhs",
-        "to": "girls-hostel",
-        "distance_m": 290.0,
-        "straight_line_m": 233.3,
+        "from": "parking",
+        "to": "cse-block",
+        "distance_m": 901.9,
+        "straight_line_m": 738.3,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
-        "worst_point_gap_m": 80.7,
-        "path_points": 16
+        "worst_point_gap_m": 98.4,
+        "path_points": 25
       },
       {
-        "from": "clock-tower",
-        "to": "boys-hostel-gate",
-        "distance_m": 543.5,
-        "straight_line_m": 403.9,
+        "from": "cse-block",
+        "to": "food-snowcube",
+        "distance_m": 301.7,
+        "straight_line_m": 234.5,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
-        "worst_point_gap_m": 74.0,
-        "path_points": 18
-      },
-      {
-        "from": "food-rishabhs",
-        "to": "mech-block",
-        "distance_m": 168.4,
-        "straight_line_m": 115.5,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 65.6,
-        "path_points": 9
+        "worst_point_gap_m": 52.8,
+        "path_points": 12
       },
       {
         "from": "medical-center",
@@ -227,28 +117,6 @@
         "path_points": 7
       },
       {
-        "from": "parking",
-        "to": "it-block",
-        "distance_m": 899.3,
-        "straight_line_m": 786.6,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 98.4,
-        "path_points": 24
-      },
-      {
-        "from": "boys-hostel-gate",
-        "to": "mini-hall-1",
-        "distance_m": 906.4,
-        "straight_line_m": 669.7,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 74.1,
-        "path_points": 32
-      },
-      {
         "from": "it-block",
         "to": "parking",
         "distance_m": 899.3,
@@ -260,114 +128,26 @@
         "path_points": 24
       },
       {
-        "from": "ece-block",
-        "to": "cse-block",
-        "distance_m": 187.4,
-        "straight_line_m": 147.8,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 52.8,
-        "path_points": 9
-      },
-      {
-        "from": "food-metro",
-        "to": "biomed-block",
-        "distance_m": 428.1,
-        "straight_line_m": 327.4,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.3,
-        "path_points": 15
-      },
-      {
-        "from": "food-aswins",
-        "to": "main-canteen",
-        "distance_m": 256.8,
-        "straight_line_m": 208.0,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 54.4,
-        "path_points": 12
-      },
-      {
-        "from": "admin-block",
+        "from": "open-air-theatre",
         "to": "girls-hostel",
-        "distance_m": 256.3,
-        "straight_line_m": 196.8,
+        "distance_m": 500.2,
+        "straight_line_m": 357.2,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
         "worst_point_gap_m": 80.7,
-        "path_points": 14
+        "path_points": 18
       },
       {
-        "from": "mech-block",
-        "to": "food-metro",
-        "distance_m": 194.2,
-        "straight_line_m": 134.5,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 65.6,
-        "path_points": 11
-      },
-      {
-        "from": "eee-block",
-        "to": "biomed-block",
-        "distance_m": 183.1,
-        "straight_line_m": 139.0,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 44.2,
-        "path_points": 7
-      },
-      {
-        "from": "food-rishabhs",
-        "to": "boys-hostel-office",
-        "distance_m": 654.7,
-        "straight_line_m": 464.0,
+        "from": "boys-hostel-office",
+        "to": "ssn-fountain",
+        "distance_m": 569.5,
+        "straight_line_m": 413.4,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
         "worst_point_gap_m": 74.2,
-        "path_points": 31
-      },
-      {
-        "from": "clock-tower",
-        "to": "biomed-block",
-        "distance_m": 682.7,
-        "straight_line_m": 409.0,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.1,
-        "path_points": 23
-      },
-      {
-        "from": "cse-block",
-        "to": "main-canteen",
-        "distance_m": 432.9,
-        "straight_line_m": 341.1,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 74.2,
-        "path_points": 21
-      },
-      {
-        "from": "mini-hall-1",
-        "to": "boys-hostel-gate",
-        "distance_m": 785.1,
-        "straight_line_m": 669.7,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 74.0,
-        "path_points": 23
+        "path_points": 26
       },
       {
         "from": "food-aswins",
@@ -381,48 +161,103 @@
         "path_points": 23
       },
       {
-        "from": "food-metro",
-        "to": "food-snowcube",
-        "distance_m": 54.5,
-        "straight_line_m": 36.5,
+        "from": "food-rishabhs",
+        "to": "girls-hostel",
+        "distance_m": 290.0,
+        "straight_line_m": 233.3,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
-        "worst_point_gap_m": 24.4,
-        "path_points": 6
+        "worst_point_gap_m": 80.7,
+        "path_points": 16
       },
       {
-        "from": "open-air-theatre",
-        "to": "admin-block",
-        "distance_m": 430.7,
-        "straight_line_m": 295.5,
+        "from": "it-block",
+        "to": "cdc-block",
+        "distance_m": 259.4,
+        "straight_line_m": 71.5,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
         "worst_point_gap_m": 74.2,
+        "path_points": 12
+      },
+      {
+        "from": "ece-block",
+        "to": "cdc-block",
+        "distance_m": 169.4,
+        "straight_line_m": 90.4,
+        "deterministic": true,
+        "no_impossible_shortcut": true,
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 50.4,
+        "path_points": 8
+      },
+      {
+        "from": "food-rishabhs",
+        "to": "food-aswins",
+        "distance_m": 355.0,
+        "straight_line_m": 288.2,
+        "deterministic": true,
+        "no_impossible_shortcut": true,
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 37.7,
+        "path_points": 19
+      },
+      {
+        "from": "food-snowcube",
+        "to": "mech-block",
+        "distance_m": 160.4,
+        "straight_line_m": 108.5,
+        "deterministic": true,
+        "no_impossible_shortcut": true,
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 65.6,
+        "path_points": 8
+      },
+      {
+        "from": "food-snowcube",
+        "to": "sports-complex",
+        "distance_m": 407.9,
+        "straight_line_m": 199.7,
+        "deterministic": true,
+        "no_impossible_shortcut": true,
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 62.9,
         "path_points": 20
       },
       {
-        "from": "eee-block",
-        "to": "food-metro",
-        "distance_m": 288.4,
-        "straight_line_m": 223.9,
+        "from": "civil-block",
+        "to": "food-pr",
+        "distance_m": 111.1,
+        "straight_line_m": 71.5,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.3,
-        "path_points": 11
+        "worst_point_gap_m": 44.2,
+        "path_points": 5
       },
       {
-        "from": "cse-block",
-        "to": "sports-complex",
-        "distance_m": 494.0,
-        "straight_line_m": 373.9,
+        "from": "ssn-fountain",
+        "to": "ssn-cricket-ground",
+        "distance_m": 711.2,
+        "straight_line_m": 666.2,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
-        "worst_point_gap_m": 74.2,
-        "path_points": 22
+        "worst_point_gap_m": 88.9,
+        "path_points": 23
+      },
+      {
+        "from": "ece-block",
+        "to": "cse-block",
+        "distance_m": 187.4,
+        "straight_line_m": 147.8,
+        "deterministic": true,
+        "no_impossible_shortcut": true,
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 52.8,
+        "path_points": 9
       },
       {
         "from": "food-rishabhs",
@@ -437,344 +272,14 @@
       },
       {
         "from": "open-air-theatre",
-        "to": "eee-block",
-        "distance_m": 428.7,
-        "straight_line_m": 282.2,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 62.3,
-        "path_points": 15
-      },
-      {
-        "from": "ssn-fountain",
-        "to": "clock-tower",
-        "distance_m": 162.4,
-        "straight_line_m": 137.4,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 26.6,
-        "path_points": 11
-      },
-      {
-        "from": "civil-block",
-        "to": "clock-tower",
-        "distance_m": 547.8,
-        "straight_line_m": 378.2,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.3,
-        "path_points": 25
-      },
-      {
-        "from": "central-library",
-        "to": "it-block",
-        "distance_m": 169.5,
-        "straight_line_m": 75.9,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 52.8,
-        "path_points": 9
-      },
-      {
-        "from": "food-snowcube",
         "to": "admin-block",
-        "distance_m": 44.8,
-        "straight_line_m": 33.2,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 10.8,
-        "path_points": 6
-      },
-      {
-        "from": "sports-complex-main",
-        "to": "it-block",
-        "distance_m": 521.4,
-        "straight_line_m": 329.4,
+        "distance_m": 430.7,
+        "straight_line_m": 295.5,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
         "worst_point_gap_m": 74.2,
-        "path_points": 22
-      },
-      {
-        "from": "snu-academic",
-        "to": "food-snowcube",
-        "distance_m": 371.1,
-        "straight_line_m": 293.3,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 65.6,
-        "path_points": 15
-      },
-      {
-        "from": "main-gate",
-        "to": "biomed-block",
-        "distance_m": 1047.1,
-        "straight_line_m": 738.1,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 98.4,
-        "path_points": 30
-      },
-      {
-        "from": "food-aswins",
-        "to": "food-snowcube",
-        "distance_m": 347.0,
-        "straight_line_m": 282.7,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 37.7,
-        "path_points": 18
-      },
-      {
-        "from": "ece-block",
-        "to": "cdc-block",
-        "distance_m": 169.4,
-        "straight_line_m": 90.4,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 50.4,
-        "path_points": 8
-      },
-      {
-        "from": "food-snowcube",
-        "to": "eee-block",
-        "distance_m": 331.6,
-        "straight_line_m": 257.0,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.3,
-        "path_points": 14
-      },
-      {
-        "from": "it-block",
-        "to": "food-aswins",
-        "distance_m": 430.4,
-        "straight_line_m": 214.2,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 74.2,
-        "path_points": 19
-      },
-      {
-        "from": "open-air-theatre",
-        "to": "girls-hostel",
-        "distance_m": 500.2,
-        "straight_line_m": 357.2,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 80.7,
-        "path_points": 18
-      },
-      {
-        "from": "cse-block",
-        "to": "food-snowcube",
-        "distance_m": 301.7,
-        "straight_line_m": 234.5,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 52.8,
-        "path_points": 12
-      },
-      {
-        "from": "parking",
-        "to": "food-snowcube",
-        "distance_m": 1054.6,
-        "straight_line_m": 972.3,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 98.4,
-        "path_points": 30
-      },
-      {
-        "from": "sports-complex",
-        "to": "open-air-theatre",
-        "distance_m": 626.2,
-        "straight_line_m": 455.3,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.1,
-        "path_points": 23
-      },
-      {
-        "from": "clock-tower",
-        "to": "mini-hall-1",
-        "distance_m": 477.9,
-        "straight_line_m": 358.0,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 56.7,
-        "path_points": 22
-      },
-      {
-        "from": "food-snowcube",
-        "to": "sports-complex",
-        "distance_m": 407.9,
-        "straight_line_m": 199.7,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 62.9,
         "path_points": 20
-      },
-      {
-        "from": "main-gate",
-        "to": "food-pr",
-        "distance_m": 1107.1,
-        "straight_line_m": 800.3,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 98.4,
-        "path_points": 32
-      },
-      {
-        "from": "boys-hostel-office",
-        "to": "ssn-fountain",
-        "distance_m": 569.5,
-        "straight_line_m": 413.4,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 74.2,
-        "path_points": 26
-      },
-      {
-        "from": "biomed-block",
-        "to": "ssn-cricket-ground",
-        "distance_m": 1038.1,
-        "straight_line_m": 890.3,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 88.9,
-        "path_points": 26
-      },
-      {
-        "from": "boys-hostel-office",
-        "to": "main-canteen",
-        "distance_m": 755.4,
-        "straight_line_m": 604.7,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 71.2,
-        "path_points": 31
-      },
-      {
-        "from": "food-rishabhs",
-        "to": "food-aswins",
-        "distance_m": 355.0,
-        "straight_line_m": 288.2,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 37.7,
-        "path_points": 19
-      },
-      {
-        "from": "boys-hostel-office",
-        "to": "central-library",
-        "distance_m": 655.4,
-        "straight_line_m": 342.5,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 73.8,
-        "path_points": 17
-      },
-      {
-        "from": "food-pr",
-        "to": "open-air-theatre",
-        "distance_m": 353.6,
-        "straight_line_m": 241.7,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 62.3,
-        "path_points": 13
-      },
-      {
-        "from": "food-snowcube",
-        "to": "mech-block",
-        "distance_m": 160.4,
-        "straight_line_m": 108.5,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 65.6,
-        "path_points": 8
-      },
-      {
-        "from": "main-canteen",
-        "to": "cse-block",
-        "distance_m": 432.9,
-        "straight_line_m": 341.1,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 74.2,
-        "path_points": 21
-      },
-      {
-        "from": "civil-block",
-        "to": "food-pr",
-        "distance_m": 111.1,
-        "straight_line_m": 71.5,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 44.2,
-        "path_points": 5
-      },
-      {
-        "from": "eee-block",
-        "to": "admin-block",
-        "distance_m": 355.7,
-        "straight_line_m": 270.5,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.3,
-        "path_points": 17
-      },
-      {
-        "from": "clock-tower",
-        "to": "medical-center",
-        "distance_m": 682.5,
-        "straight_line_m": 450.3,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.1,
-        "path_points": 21
-      },
-      {
-        "from": "girls-hostel",
-        "to": "it-block",
-        "distance_m": 365.4,
-        "straight_line_m": 249.8,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 80.7,
-        "path_points": 16
       },
       {
         "from": "cdc-block",
@@ -788,92 +293,103 @@
         "path_points": 8
       },
       {
-        "from": "food-pr",
-        "to": "main-gate",
-        "distance_m": 1107.1,
-        "straight_line_m": 800.3,
+        "from": "food-metro",
+        "to": "biomed-block",
+        "distance_m": 428.1,
+        "straight_line_m": 327.4,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
-        "worst_point_gap_m": 98.4,
-        "path_points": 32
+        "worst_point_gap_m": 69.3,
+        "path_points": 15
       },
       {
-        "from": "mech-block",
-        "to": "ssn-football-ground",
-        "distance_m": 475.2,
-        "straight_line_m": 340.7,
+        "from": "clock-tower",
+        "to": "biomed-block",
+        "distance_m": 682.7,
+        "straight_line_m": 409.0,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
-        "worst_point_gap_m": 73.9,
-        "path_points": 14
+        "worst_point_gap_m": 69.1,
+        "path_points": 23
       },
       {
-        "from": "it-block",
-        "to": "cdc-block",
-        "distance_m": 259.4,
-        "straight_line_m": 71.5,
+        "from": "snu-academic",
+        "to": "food-snowcube",
+        "distance_m": 371.1,
+        "straight_line_m": 293.3,
+        "deterministic": true,
+        "no_impossible_shortcut": true,
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 65.6,
+        "path_points": 15
+      },
+      {
+        "from": "boys-hostel-office",
+        "to": "central-library",
+        "distance_m": 655.4,
+        "straight_line_m": 342.5,
+        "deterministic": true,
+        "no_impossible_shortcut": true,
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 73.8,
+        "path_points": 17
+      },
+      {
+        "from": "food-aswins",
+        "to": "eee-block",
+        "distance_m": 657.9,
+        "straight_line_m": 454.0,
+        "deterministic": true,
+        "no_impossible_shortcut": true,
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 69.3,
+        "path_points": 29
+      },
+      {
+        "from": "food-rishabhs",
+        "to": "boys-hostel-office",
+        "distance_m": 654.7,
+        "straight_line_m": 464.0,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
         "worst_point_gap_m": 74.2,
-        "path_points": 12
+        "path_points": 31
       },
       {
-        "from": "parking",
-        "to": "mini-hall-1",
-        "distance_m": 1295.6,
-        "straight_line_m": 1122.5,
+        "from": "eee-block",
+        "to": "biomed-block",
+        "distance_m": 183.1,
+        "straight_line_m": 139.0,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
-        "worst_point_gap_m": 98.4,
-        "path_points": 38
+        "worst_point_gap_m": 44.2,
+        "path_points": 7
       },
       {
-        "from": "food-metro",
-        "to": "cse-block",
-        "distance_m": 275.2,
-        "straight_line_m": 234.4,
+        "from": "eee-block",
+        "to": "admin-block",
+        "distance_m": 355.7,
+        "straight_line_m": 270.5,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
-        "worst_point_gap_m": 52.8,
-        "path_points": 13
+        "worst_point_gap_m": 69.3,
+        "path_points": 17
       },
       {
-        "from": "biomed-block",
-        "to": "food-pr",
-        "distance_m": 108.0,
-        "straight_line_m": 67.6,
+        "from": "cse-block",
+        "to": "sports-complex",
+        "distance_m": 494.0,
+        "straight_line_m": 373.9,
         "deterministic": true,
         "no_impossible_shortcut": true,
         "path_connectivity_ok": true,
-        "worst_point_gap_m": 42.2,
-        "path_points": 5
-      },
-      {
-        "from": "biomed-block",
-        "to": "main-gate",
-        "distance_m": 1047.1,
-        "straight_line_m": 738.1,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 98.4,
-        "path_points": 30
-      },
-      {
-        "from": "ssn-cricket-ground",
-        "to": "cdc-block",
-        "distance_m": 766.3,
-        "straight_line_m": 709.3,
-        "deterministic": true,
-        "no_impossible_shortcut": true,
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 88.9,
-        "path_points": 26
+        "worst_point_gap_m": 74.2,
+        "path_points": 22
       },
       {
         "from": "food-aswins",
@@ -885,104 +401,340 @@
         "path_connectivity_ok": true,
         "worst_point_gap_m": 37.7,
         "path_points": 21
+      },
+      {
+        "from": "clock-tower",
+        "to": "medical-center",
+        "distance_m": 682.5,
+        "straight_line_m": 450.3,
+        "deterministic": true,
+        "no_impossible_shortcut": true,
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 69.1,
+        "path_points": 21
+      },
+      {
+        "from": "admin-block",
+        "to": "ssn-cricket-ground",
+        "distance_m": 659.5,
+        "straight_line_m": 613.6,
+        "deterministic": true,
+        "no_impossible_shortcut": true,
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 88.9,
+        "path_points": 20
+      },
+      {
+        "from": "food-rishabhs",
+        "to": "main-canteen",
+        "distance_m": 354.8,
+        "straight_line_m": 222.6,
+        "deterministic": true,
+        "no_impossible_shortcut": true,
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 45.5,
+        "path_points": 20
+      },
+      {
+        "from": "food-snowcube",
+        "to": "admin-block",
+        "distance_m": 44.8,
+        "straight_line_m": 33.2,
+        "deterministic": true,
+        "no_impossible_shortcut": true,
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 10.8,
+        "path_points": 6
       }
     ],
     "point_to_location": [
       {
         "from_point": [
-          12.750659,
-          80.199913
+          12.75241,
+          80.200395
         ],
-        "to": "ece-block",
-        "distance_m": 751.4,
-        "snapped_to": "n_70",
+        "to": "open-air-theatre",
+        "distance_m": 401.5,
+        "snapped_to": "n_66",
         "path_connectivity_ok": true,
-        "worst_point_gap_m": 83.0,
-        "path_points": 26
+        "worst_point_gap_m": 51.5,
+        "path_points": 15
       },
       {
         "from_point": [
-          12.752377,
-          80.198368
+          12.753075,
+          80.194423
         ],
-        "to": "central-library",
-        "distance_m": 393.6,
-        "snapped_to": "n_41",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.1,
-        "path_points": 18
-      },
-      {
-        "from_point": [
-          12.74963,
-          80.199631
-        ],
-        "to": "ece-block",
-        "distance_m": 587.6,
-        "snapped_to": "n_165",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 73.8,
-        "path_points": 16
-      },
-      {
-        "from_point": [
-          12.751365,
-          80.19525
-        ],
-        "to": "food-aswins",
-        "distance_m": 341.6,
-        "snapped_to": "n_37",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 37.7,
-        "path_points": 18
-      },
-      {
-        "from_point": [
-          12.753131,
-          80.194759
-        ],
-        "to": "ece-block",
-        "distance_m": 408.1,
+        "to": "main-canteen",
+        "distance_m": 53.3,
         "snapped_to": "n_24",
         "path_connectivity_ok": true,
-        "worst_point_gap_m": 50.4,
+        "worst_point_gap_m": 11.1,
+        "path_points": 3
+      },
+      {
+        "from_point": [
+          12.752363,
+          80.19858
+        ],
+        "to": "open-air-theatre",
+        "distance_m": 181.7,
+        "snapped_to": "n_3",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 33.9,
+        "path_points": 10
+      },
+      {
+        "from_point": [
+          12.752112,
+          80.198253
+        ],
+        "to": "food-pr",
+        "distance_m": 427.6,
+        "snapped_to": "n_43",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 62.3,
+        "path_points": 18
+      },
+      {
+        "from_point": [
+          12.752692,
+          80.196876
+        ],
+        "to": "food-aswins",
+        "distance_m": 116.0,
+        "snapped_to": "n_30",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 25.7,
+        "path_points": 8
+      },
+      {
+        "from_point": [
+          12.751447,
+          80.189076
+        ],
+        "to": "food-pr",
+        "distance_m": 1070.7,
+        "snapped_to": "n_168",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 88.9,
+        "path_points": 27
+      },
+      {
+        "from_point": [
+          12.753004,
+          80.196449
+        ],
+        "to": "mini-hall-1",
+        "distance_m": 527.9,
+        "snapped_to": "n_110",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 56.7,
+        "path_points": 24
+      },
+      {
+        "from_point": [
+          12.752258,
+          80.200706
+        ],
+        "to": "main-gate",
+        "distance_m": 414.7,
+        "snapped_to": "n_6",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 98.4,
+        "path_points": 9
+      },
+      {
+        "from_point": [
+          12.749826,
+          80.198267
+        ],
+        "to": "boys-hostel-gate",
+        "distance_m": 401.1,
+        "snapped_to": "n_79",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 74.0,
+        "path_points": 14
+      },
+      {
+        "from_point": [
+          12.751526,
+          80.195116
+        ],
+        "to": "main-canteen",
+        "distance_m": 336.4,
+        "snapped_to": "n_85",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 45.5,
         "path_points": 19
       },
       {
         "from_point": [
-          12.751867,
-          80.196908
+          12.751096,
+          80.19635
         ],
-        "to": "biomed-block",
-        "distance_m": 483.7,
-        "snapped_to": "n_127",
+        "to": "ssn-football-ground",
+        "distance_m": 643.1,
+        "snapped_to": "n_175",
         "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.1,
+        "worst_point_gap_m": 73.9,
         "path_points": 20
       },
       {
         "from_point": [
-          12.75179,
-          80.192037
+          12.75097,
+          80.197003
         ],
-        "to": "biomed-block",
-        "distance_m": 848.0,
-        "snapped_to": "n_147",
+        "to": "food-rishabhs",
+        "distance_m": 236.5,
+        "snapped_to": "n_122",
         "path_connectivity_ok": true,
-        "worst_point_gap_m": 73.9,
+        "worst_point_gap_m": 52.8,
+        "path_points": 10
+      },
+      {
+        "from_point": [
+          12.751635,
+          80.195921
+        ],
+        "to": "clock-tower",
+        "distance_m": 184.2,
+        "snapped_to": "n_190",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 26.6,
+        "path_points": 11
+      },
+      {
+        "from_point": [
+          12.752675,
+          80.194299
+        ],
+        "to": "food-snowcube",
+        "distance_m": 380.3,
+        "snapped_to": "n_21",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 62.9,
+        "path_points": 19
+      },
+      {
+        "from_point": [
+          12.752553,
+          80.198446
+        ],
+        "to": "eee-block",
+        "distance_m": 573.6,
+        "snapped_to": "n_120",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 62.3,
+        "path_points": 23
+      },
+      {
+        "from_point": [
+          12.751565,
+          80.199842
+        ],
+        "to": "main-canteen",
+        "distance_m": 709.2,
+        "snapped_to": "n_69",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 74.1,
+        "path_points": 24
+      },
+      {
+        "from_point": [
+          12.751703,
+          80.197224
+        ],
+        "to": "food-metro",
+        "distance_m": 295.2,
+        "snapped_to": "n_8",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 74.2,
+        "path_points": 16
+      },
+      {
+        "from_point": [
+          12.751272,
+          80.190892
+        ],
+        "to": "open-air-theatre",
+        "distance_m": 923.0,
+        "snapped_to": "n_172",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 66.2,
+        "path_points": 26
+      },
+      {
+        "from_point": [
+          12.7506,
+          80.195278
+        ],
+        "to": "ece-block",
+        "distance_m": 170.5,
+        "snapped_to": "n_84",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 49.1,
+        "path_points": 7
+      },
+      {
+        "from_point": [
+          12.752378,
+          80.196046
+        ],
+        "to": "mini-hall-1",
+        "distance_m": 414.0,
+        "snapped_to": "n_25",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 56.7,
+        "path_points": 20
+      },
+      {
+        "from_point": [
+          12.751529,
+          80.198487
+        ],
+        "to": "eee-block",
+        "distance_m": 442.3,
+        "snapped_to": "n_191",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 62.3,
+        "path_points": 15
+      },
+      {
+        "from_point": [
+          12.752786,
+          80.194127
+        ],
+        "to": "cse-block",
+        "distance_m": 490.0,
+        "snapped_to": "n_22",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 74.2,
         "path_points": 22
       },
       {
         "from_point": [
-          12.750346,
-          80.195183
+          12.751639,
+          80.196086
+        ],
+        "to": "ssn-fountain",
+        "distance_m": 55.9,
+        "snapped_to": "n_190",
+        "path_connectivity_ok": true,
+        "worst_point_gap_m": 15.2,
+        "path_points": 7
+      },
+      {
+        "from_point": [
+          12.751568,
+          80.199862
         ],
         "to": "ssn-cricket-ground",
-        "distance_m": 694.8,
-        "snapped_to": "n_35",
+        "distance_m": 1285.4,
+        "snapped_to": "n_69",
         "path_connectivity_ok": true,
         "worst_point_gap_m": 88.9,
-        "path_points": 18
+        "path_points": 39
       },
       {
         "from_point": [
@@ -1175,678 +927,6 @@
         "path_connectivity_ok": true,
         "worst_point_gap_m": 98.4,
         "path_points": 32
-      },
-      {
-        "from_point": [
-          12.751118,
-          80.18971
-        ],
-        "to": "civil-block",
-        "distance_m": 911.1,
-        "snapped_to": "n_192",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 88.9,
-        "path_points": 22
-      },
-      {
-        "from_point": [
-          12.752654,
-          80.194253
-        ],
-        "to": "admin-block",
-        "distance_m": 357.2,
-        "snapped_to": "n_21",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 62.9,
-        "path_points": 18
-      },
-      {
-        "from_point": [
-          12.751608,
-          80.199921
-        ],
-        "to": "snu-academic",
-        "distance_m": 990.0,
-        "snapped_to": "n_69",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 98.1,
-        "path_points": 29
-      },
-      {
-        "from_point": [
-          12.749608,
-          80.196152
-        ],
-        "to": "tcs-auditorium",
-        "distance_m": 878.7,
-        "snapped_to": "n_155",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 62.3,
-        "path_points": 30
-      },
-      {
-        "from_point": [
-          12.749439,
-          80.197139
-        ],
-        "to": "snu-academic",
-        "distance_m": 742.0,
-        "snapped_to": "n_184",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.9,
-        "path_points": 21
-      },
-      {
-        "from_point": [
-          12.752789,
-          80.197235
-        ],
-        "to": "admin-block",
-        "distance_m": 286.9,
-        "snapped_to": "n_30",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 26.6,
-        "path_points": 16
-      },
-      {
-        "from_point": [
-          12.750472,
-          80.19372
-        ],
-        "to": "boys-hostel-gate",
-        "distance_m": 788.6,
-        "snapped_to": "n_181",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 74.0,
-        "path_points": 23
-      },
-      {
-        "from_point": [
-          12.749443,
-          80.196244
-        ],
-        "to": "food-aswins",
-        "distance_m": 628.2,
-        "snapped_to": "n_155",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.3,
-        "path_points": 28
-      },
-      {
-        "from_point": [
-          12.751302,
-          80.195173
-        ],
-        "to": "ssn-fountain",
-        "distance_m": 85.9,
-        "snapped_to": "n_37",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 28.2,
-        "path_points": 7
-      },
-      {
-        "from_point": [
-          12.74956,
-          80.199069
-        ],
-        "to": "tcs-auditorium",
-        "distance_m": 729.9,
-        "snapped_to": "n_78",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 62.3,
-        "path_points": 24
-      },
-      {
-        "from_point": [
-          12.752721,
-          80.198181
-        ],
-        "to": "boys-hostel-office",
-        "distance_m": 426.9,
-        "snapped_to": "n_113",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 71.2,
-        "path_points": 21
-      },
-      {
-        "from_point": [
-          12.752612,
-          80.194435
-        ],
-        "to": "open-air-theatre",
-        "distance_m": 592.5,
-        "snapped_to": "n_23",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.1,
-        "path_points": 21
-      },
-      {
-        "from_point": [
-          12.751526,
-          80.195779
-        ],
-        "to": "girls-hostel",
-        "distance_m": 227.3,
-        "snapped_to": "n_17",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 80.7,
-        "path_points": 13
-      },
-      {
-        "from_point": [
-          12.749545,
-          80.197843
-        ],
-        "to": "boys-hostel-gate",
-        "distance_m": 444.6,
-        "snapped_to": "n_158",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 74.0,
-        "path_points": 16
-      },
-      {
-        "from_point": [
-          12.750504,
-          80.196013
-        ],
-        "to": "mini-hall-1",
-        "distance_m": 346.5,
-        "snapped_to": "n_49",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 65.5,
-        "path_points": 12
-      },
-      {
-        "from_point": [
-          12.752408,
-          80.193994
-        ],
-        "to": "boys-hostel-gate",
-        "distance_m": 740.0,
-        "snapped_to": "n_148",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 74.0,
-        "path_points": 26
-      },
-      {
-        "from_point": [
-          12.751669,
-          80.191289
-        ],
-        "to": "boys-hostel-office",
-        "distance_m": 1123.5,
-        "snapped_to": "n_92",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 74.2,
-        "path_points": 42
-      },
-      {
-        "from_point": [
-          12.752685,
-          80.195239
-        ],
-        "to": "biomed-block",
-        "distance_m": 699.4,
-        "snapped_to": "n_76",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.3,
-        "path_points": 28
-      },
-      {
-        "from_point": [
-          12.750787,
-          80.196526
-        ],
-        "to": "cse-block",
-        "distance_m": 149.9,
-        "snapped_to": "n_47",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 52.8,
-        "path_points": 7
-      },
-      {
-        "from_point": [
-          12.751042,
-          80.196252
-        ],
-        "to": "parking",
-        "distance_m": 1010.4,
-        "snapped_to": "n_175",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 98.4,
-        "path_points": 30
-      },
-      {
-        "from_point": [
-          12.751849,
-          80.196761
-        ],
-        "to": "ssn-cricket-ground",
-        "distance_m": 855.8,
-        "snapped_to": "n_127",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 88.9,
-        "path_points": 28
-      },
-      {
-        "from_point": [
-          12.75179,
-          80.193035
-        ],
-        "to": "civil-block",
-        "distance_m": 587.6,
-        "snapped_to": "n_12",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.3,
-        "path_points": 21
-      },
-      {
-        "from_point": [
-          12.750918,
-          80.196511
-        ],
-        "to": "open-air-theatre",
-        "distance_m": 249.1,
-        "snapped_to": "n_47",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 66.2,
-        "path_points": 7
-      },
-      {
-        "from_point": [
-          12.750918,
-          80.198159
-        ],
-        "to": "food-metro",
-        "distance_m": 354.3,
-        "snapped_to": "n_123",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 66.2,
-        "path_points": 12
-      },
-      {
-        "from_point": [
-          12.752475,
-          80.196074
-        ],
-        "to": "boys-hostel-office",
-        "distance_m": 575.2,
-        "snapped_to": "n_25",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 71.2,
-        "path_points": 22
-      },
-      {
-        "from_point": [
-          12.751865,
-          80.197578
-        ],
-        "to": "sports-complex-main",
-        "distance_m": 505.6,
-        "snapped_to": "n_194",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 62.9,
-        "path_points": 19
-      },
-      {
-        "from_point": [
-          12.753088,
-          80.194372
-        ],
-        "to": "food-metro",
-        "distance_m": 479.1,
-        "snapped_to": "n_151",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 62.9,
-        "path_points": 24
-      },
-      {
-        "from_point": [
-          12.751544,
-          80.19448
-        ],
-        "to": "food-aswins",
-        "distance_m": 412.9,
-        "snapped_to": "n_11",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 65.2,
-        "path_points": 21
-      },
-      {
-        "from_point": [
-          12.752668,
-          80.194215
-        ],
-        "to": "cse-block",
-        "distance_m": 471.1,
-        "snapped_to": "n_21",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 74.2,
-        "path_points": 21
-      },
-      {
-        "from_point": [
-          12.752529,
-          80.200356
-        ],
-        "to": "eee-block",
-        "distance_m": 822.3,
-        "snapped_to": "n_5",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 62.3,
-        "path_points": 28
-      },
-      {
-        "from_point": [
-          12.751844,
-          80.193092
-        ],
-        "to": "snu-academic",
-        "distance_m": 72.8,
-        "snapped_to": "n_20",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 56.0,
-        "path_points": 3
-      },
-      {
-        "from_point": [
-          12.750079,
-          80.19416
-        ],
-        "to": "main-gate",
-        "distance_m": 1295.9,
-        "snapped_to": "n_145",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 98.4,
-        "path_points": 39
-      },
-      {
-        "from_point": [
-          12.751302,
-          80.189685
-        ],
-        "to": "snu-academic",
-        "distance_m": 533.1,
-        "snapped_to": "n_192",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 88.9,
-        "path_points": 13
-      },
-      {
-        "from_point": [
-          12.752852,
-          80.196686
-        ],
-        "to": "cdc-block",
-        "distance_m": 237.4,
-        "snapped_to": "n_118",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 26.6,
-        "path_points": 15
-      },
-      {
-        "from_point": [
-          12.750577,
-          80.193316
-        ],
-        "to": "parking",
-        "distance_m": 1340.1,
-        "snapped_to": "n_18",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 98.4,
-        "path_points": 40
-      },
-      {
-        "from_point": [
-          12.753321,
-          80.195402
-        ],
-        "to": "open-air-theatre",
-        "distance_m": 503.0,
-        "snapped_to": "n_188",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 80.7,
-        "path_points": 18
-      },
-      {
-        "from_point": [
-          12.752765,
-          80.200466
-        ],
-        "to": "ssn-cricket-ground",
-        "distance_m": 1329.3,
-        "snapped_to": "n_4",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 88.9,
-        "path_points": 41
-      },
-      {
-        "from_point": [
-          12.750511,
-          80.193254
-        ],
-        "to": "snu-academic",
-        "distance_m": 230.4,
-        "snapped_to": "n_13",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 56.0,
-        "path_points": 10
-      },
-      {
-        "from_point": [
-          12.751607,
-          80.194626
-        ],
-        "to": "medical-center",
-        "distance_m": 624.7,
-        "snapped_to": "n_10",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.3,
-        "path_points": 24
-      },
-      {
-        "from_point": [
-          12.751041,
-          80.196803
-        ],
-        "to": "food-metro",
-        "distance_m": 180.6,
-        "snapped_to": "n_47",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 49.1,
-        "path_points": 9
-      },
-      {
-        "from_point": [
-          12.751913,
-          80.1983
-        ],
-        "to": "it-block",
-        "distance_m": 206.8,
-        "snapped_to": "n_124",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.1,
-        "path_points": 9
-      },
-      {
-        "from_point": [
-          12.753026,
-          80.197541
-        ],
-        "to": "it-block",
-        "distance_m": 396.2,
-        "snapped_to": "n_112",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.1,
-        "path_points": 15
-      },
-      {
-        "from_point": [
-          12.751279,
-          80.190684
-        ],
-        "to": "boys-hostel-gate",
-        "distance_m": 1070.0,
-        "snapped_to": "n_171",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 74.2,
-        "path_points": 38
-      },
-      {
-        "from_point": [
-          12.752833,
-          80.198285
-        ],
-        "to": "food-metro",
-        "distance_m": 468.2,
-        "snapped_to": "n_113",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 53.9,
-        "path_points": 24
-      },
-      {
-        "from_point": [
-          12.752503,
-          80.198521
-        ],
-        "to": "admin-block",
-        "distance_m": 429.8,
-        "snapped_to": "n_41",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 68.9,
-        "path_points": 20
-      },
-      {
-        "from_point": [
-          12.750613,
-          80.194429
-        ],
-        "to": "main-gate",
-        "distance_m": 1242.1,
-        "snapped_to": "n_87",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 98.4,
-        "path_points": 37
-      },
-      {
-        "from_point": [
-          12.749518,
-          80.197722
-        ],
-        "to": "ssn-cricket-ground",
-        "distance_m": 1031.9,
-        "snapped_to": "n_157",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 88.9,
-        "path_points": 27
-      },
-      {
-        "from_point": [
-          12.750859,
-          80.199765
-        ],
-        "to": "food-aswins",
-        "distance_m": 599.9,
-        "snapped_to": "n_70",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 83.0,
-        "path_points": 17
-      },
-      {
-        "from_point": [
-          12.750051,
-          80.195917
-        ],
-        "to": "boys-hostel-office",
-        "distance_m": 627.1,
-        "snapped_to": "n_50",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 73.8,
-        "path_points": 21
-      },
-      {
-        "from_point": [
-          12.750627,
-          80.193835
-        ],
-        "to": "food-metro",
-        "distance_m": 214.1,
-        "snapped_to": "n_181",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 56.7,
-        "path_points": 8
-      },
-      {
-        "from_point": [
-          12.750977,
-          80.198743
-        ],
-        "to": "main-canteen",
-        "distance_m": 606.8,
-        "snapped_to": "n_62",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 69.1,
-        "path_points": 24
-      },
-      {
-        "from_point": [
-          12.749508,
-          80.197605
-        ],
-        "to": "girls-hostel",
-        "distance_m": 710.5,
-        "snapped_to": "n_180",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 80.7,
-        "path_points": 30
-      },
-      {
-        "from_point": [
-          12.751507,
-          80.193604
-        ],
-        "to": "food-metro",
-        "distance_m": 228.6,
-        "snapped_to": "n_139",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 65.6,
-        "path_points": 12
-      },
-      {
-        "from_point": [
-          12.750632,
-          80.199773
-        ],
-        "to": "main-canteen",
-        "distance_m": 812.6,
-        "snapped_to": "n_70",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 83.0,
-        "path_points": 26
-      },
-      {
-        "from_point": [
-          12.753214,
-          80.194247
-        ],
-        "to": "boys-hostel-gate",
-        "distance_m": 760.4,
-        "snapped_to": "n_151",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 74.0,
-        "path_points": 27
-      },
-      {
-        "from_point": [
-          12.750989,
-          80.196229
-        ],
-        "to": "girls-hostel",
-        "distance_m": 331.8,
-        "snapped_to": "n_175",
-        "path_connectivity_ok": true,
-        "worst_point_gap_m": 80.7,
-        "path_points": 16
       }
     ]
   }
