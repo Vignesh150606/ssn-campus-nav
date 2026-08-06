@@ -15,6 +15,7 @@ export default function OfflineIndicator() {
 
   return (
     <div
+      className="offline-indicator"
       role="status"
       aria-live="polite"
       title={
@@ -41,7 +42,17 @@ export default function OfflineIndicator() {
         aria-hidden="true"
         style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--warning-ink)', flexShrink: 0 }}
       />
-      {hasCache ? 'Offline' : 'Offline — limited'}
+      {/* UI/UX review — the "no cache yet" case needs the longer, more
+          important warning (there's nothing this device can fall back on
+          right now), but on the narrowest phones that text alone was
+          wide enough to overlap the brand title next to it (confirmed
+          against a real render). Splitting the "— limited" qualifier
+          into its own span lets a narrow-viewport rule hide just that
+          part — the shorter "Offline" still shows, the full detail is
+          still one long-press/hover away via the title attribute above,
+          and the common case (hasCache: true, just "Offline") is
+          untouched either way. */}
+      Offline{!hasCache && <span className="offline-indicator-detail"> — limited</span>}
     </div>
   )
 }

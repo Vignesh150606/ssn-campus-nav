@@ -110,6 +110,22 @@
 /* ---------- Reset & base ---------- */
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
+/* UI/UX review (screenshot-guided) — Issue 1: any single element anywhere
+   in the app that ever needs more horizontal room than it's given (a
+   header row, a badge, anything without its own explicit overflow
+   handling) was able to force the ENTIRE page wider than the viewport,
+   leaving a dead strip of the plain --canvas background down one edge
+   for the whole height of the screen and shifting/clipping unrelated
+   content elsewhere. See the .app-header fixes below for the specific
+   case that surfaced this (a header pushed just past its available
+   width by the Offline badge), but this rule is the general guard the
+   task explicitly asks for: no single future crowded row should ever be
+   able to do this again. Every element that's legitimately meant to
+   scroll horizontally (.chip-row, .devtools-tabbar, etc.) already scrolls
+   *within itself* via its own `overflow-x: auto` — none of them rely on
+   the page itself being scrollable, so this has no effect on any of
+   them. */
+html, body { overflow-x: hidden; }
 body {
   margin: 0;
   font-family: var(--font-sans);
@@ -196,6 +212,36 @@ input, select, textarea { font-family: inherit; color: inherit; }
   font-size: 0.98rem;
   letter-spacing: -0.01em;
   color: var(--ink);
+  /* UI/UX review — Issue 1 (root cause): as a flex item of .app-header
+     (below), this had no min-width, so its default `min-width: auto`
+     let it claim its full content's natural width no matter how little
+     room .app-header actually had. That's exactly backwards for the
+     one element in this row that's safe to compress: on a narrow phone,
+     .app-header nav's items (below) are all `white-space: nowrap` and
+     genuinely can't give up any more width without truncating something
+     load-bearing (a nav label, the Offline status), so the flex algorithm
+     took the space from here instead — but a bare <span> can still wrap
+     onto a second line while shrinking, so "Campus Navigator" broke into
+     "Campus" / "Navigator" and, since .app-header has a fixed `height`
+     (not `min-height`), that second line just overflowed the header's
+     own box rather than growing it. min-width: 0 lets this flex item
+     actually shrink below its content's natural size; the span below
+     turns that shrink into a clean single-line ellipsis instead of a
+     wrap. */
+  min-width: 0;
+}
+.brand span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Confirmed against a real render at 358px: min-width: 0 alone let the
+     flex algorithm take this all the way down to 0 (the logo doesn't
+     shrink — an <img> holds its intrinsic aspect ratio — so this text
+     absorbed the entire deficit and disappeared completely, with "Fest
+     Schedule" crowding in right where the title used to be). A floor
+     keeps at least a legible fragment of "Campus Navigator" on screen
+     at any width instead of the title vanishing outright. */
+  min-width: 4.5em;
 }
 /* Phase 4.2 — SSN logo in header. Always original colours — no dark-mode
    inversion. The brand blue reads clearly on both the light and dark header
@@ -209,13 +255,14 @@ input, select, textarea { font-family: inherit; color: inherit; }
 }
 /* No [data-theme="dark"] rule: SSN blue is the brand colour regardless of
    the UI theme. Inverting it changes it to a non-brand colour. */
-.app-header nav { display: flex; gap: 4px; align-items: center; }
+.app-header nav { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
 .app-header nav a {
   font-size: 0.82rem;
   font-weight: 500;
   padding: 7px 12px;
   border-radius: 999px;
   color: var(--ink-2);
+  white-space: nowrap;
   transition: background 0.15s ease, color 0.15s ease;
 }
 .app-header nav a:hover { background: var(--ring); color: var(--ink); }
@@ -413,6 +460,18 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
   scrollbar-width: none;
   padding: 2px 2px;
   margin: 0 -2px;
+  /* UI/UX review — Issue 2: this row hard-cuts mid-chip at whatever
+     width the viewport allows (see the "Fo[od]" chip in the screenshot
+     review) with nothing to signal that's deliberate — at a glance it
+     reads as a rendering glitch, not an invitation to scroll for more
+     categories. A trailing fade is the standard, non-layout-affecting
+     way to signal "more content this way": it doesn't change what's
+     visible or how scrolling works, so nothing about this row's actual
+     behavior changes, only the very edge of it reads as intentional
+     now. No fade on the leading edge — there's nothing to hint at when
+     the row is already scrolled to its start. */
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
 }
 .chip-row::-webkit-scrollbar { display: none; }
 
@@ -1455,6 +1514,43 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
 @media (max-width: 380px) {
   .app-header nav a { padding: 6px 10px; font-size: 0.78rem; }
   .route-preview-dest { font-size: 1.25rem; }
+  /* UI/UX review — Issue 1: a few more px back for the brand title
+     (see .brand/.brand span above) on the narrowest phones, where
+     .app-header nav now has three items (Fest Schedule, Admin, and the
+     Offline badge when offline) instead of the two this was originally
+     tuned for. Nothing here changes what's shown, only how tightly it's
+     packed — the brand no longer needs to be given room to wrap into
+     (it truncates instead either way), this just means it truncates
+     less on the phones most likely to need it. */
+  .app-header { padding: 0 12px; gap: 8px; }
+  .app-header nav { gap: 2px; }
+  /* Confirmed against a real render: even with the fixes above, the
+     *longest* the Offline badge gets ("Offline — limited", shown only
+     when this device has no cached data at all yet) was still enough on
+     its own, alongside Fest Schedule + Admin + the theme toggle, to push
+     .brand's title into overlapping nav rather than just truncating —
+     two things resisting compression can't both win. The detail suffix
+     is the one piece of this row that's least essential (the same
+     information is still one long-press away via the badge's own title
+     attribute), so it's what gives way first, not the title or any nav
+     label. */
+  .offline-indicator-detail { display: none; }
+}
+
+@media (max-width: 430px) {
+  /* Confirmed against a real render: even the reduced nav footprint
+     above (Fest Schedule + Admin + Offline + the theme toggle, all
+     already at their own minimums) leaves no room for any of the brand
+     title without overlapping nav, all the way up to phones around
+     360-390px wide — a very common width class, not an edge case.
+     Below this point the title's min-width was fighting a battle it
+     couldn't win; dropping to just the logomark is the same trade-off
+     most apps with a wordmark + several nav items make at this width
+     class. The full name is still one tap away (the logo is still the
+     link home) and nothing about what's clickable changes, only how
+     much text sits next to it. */
+  .brand span { display: none; }
+  .brand { gap: 0; }
 }
 
 /* ===================================================================
