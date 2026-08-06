@@ -356,6 +356,29 @@ export default function Home() {
   // FAB stack, zoom control) floating wherever the last real tier left
   // them.
   const browseSheet = useDraggableSheet(browseSheetPeeks, 'half', !navMode && !previewActive, undefined, sheetEmpty)
+  // Bug fix — root cause of "returning to Home after navigating (or backing
+  // out of a route preview) flashes an oversized panel that then collapses":
+  // navSheet and previewSheet above both reset themselves to a known-good
+  // tier the INSTANT they become the active sheet (see the two effects
+  // above this one) — browseSheet was the one sheet of the three missing
+  // that same reset. Without it, browseSheet's `tier` state simply carries
+  // over from whatever it was last left at (e.g. dragged to 'full' to
+  // browse the location list before starting navigation), completely
+  // unrelated to what's actually useful the moment the user is back on
+  // Home. The instant `!navMode && !previewActive` flips true again,
+  // useDraggableSheet's own "moment this instance becomes active,
+  // re-assert its current height" effect (see that hook's file header)
+  // faithfully restores that stale peek — which, combined with this
+  // sheet's DOM only just now remounting (`{!navMode && (...)}` in the JSX
+  // below), is what reads as a panel snapping open and then immediately
+  // being wrong/collapsing back. Resetting to 'half' — this sheet's own
+  // initialTier, the same baseline a first-ever app load already starts
+  // at — the moment it (re)activates makes every return to browsing behave
+  // identically regardless of what state it was left in before.
+  useEffect(() => {
+    if (!navMode && !previewActive) browseSheet.snapToTier('half')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navMode, previewActive])
 
   // Priority X.2 (Phase 4.2.7) — pressing Enter/Search on the mobile
   // keyboard dismisses it (handled in SearchBar itself) and moves focus

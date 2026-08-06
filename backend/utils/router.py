@@ -66,6 +66,23 @@ def _load():
     return _graph_cache, segs
 
 
+def get_graph() -> dict:
+    """Public, read-only accessor for the raw walkway graph (nodes, edges,
+    location_edges) — added for offline support (Task 1): the frontend
+    needs its own copy of this exact graph to compute routes client-side
+    when it can't reach /api/route at all, via
+    frontend/src/offline/offlineRouter.js (a deliberately separate, simpler
+    mirror of this file's Dijkstra — see that file's own docstring for why
+    it isn't a port of this module). Safe to expose as-is: this data is
+    build-time generated, never contains anything sensitive, and (per
+    _load's own comment) never changes at runtime, unlike road_segments.json
+    below, which already has its own public endpoint (GET /api/road-segments)
+    for exactly the same reason. Returns the cached in-memory copy, not a
+    fresh disk read, for the same reason _load() caches it."""
+    graph, _ = _load()
+    return graph
+
+
 def _validate_cap_table_against_graph(graph):
     """Item 10 — UNVERIFIED_CONNECTOR_CAP_M (below) hardcodes specific
     field-verified node IDs as safety exceptions. `_nearest_node` looks

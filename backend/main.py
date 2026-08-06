@@ -42,7 +42,7 @@ import data_access
 from auth import authenticate_admin, create_access_token, get_current_active_admin, require_role, hash_password, verify_password, generate_password, rate_limit, JWT_EXPIRES_HOURS
 from db import SupabaseUnavailableError
 from utils.qr_generator import generate_event_qr
-from utils.router import find_route as _find_route, find_route_from_point as _find_route_from_point
+from utils.router import find_route as _find_route, find_route_from_point as _find_route_from_point, get_graph as _get_graph
 from utils import copilot as _copilot
 
 logging.basicConfig(level=logging.INFO)
@@ -720,6 +720,19 @@ def update_account(payload: AccountUpdateRequest, admin: dict = Depends(get_curr
 def get_road_segments():
     """Public — list all road segments and their open/closed status."""
     return data_access.get_road_segments()
+
+
+@app.get("/api/graph")
+def get_graph():
+    """Public, read-only — the raw walkway graph (nodes/edges/location_edges)
+    utils/router.py computes routes over. Added for Task 1 (offline support):
+    the frontend caches this once while online (see src/offline/db.js) so
+    src/offline/offlineRouter.js can keep computing real routes when
+    /api/route itself can't be reached at all. Same public/no-auth shape as
+    /api/road-segments just above, for the same reason — this is exactly
+    the data every /api/route response is already derived from, just
+    exposed directly instead of pre-computed server-side."""
+    return _get_graph()
 
 
 @app.patch("/api/admin/road-segments/{seg_id}/close")

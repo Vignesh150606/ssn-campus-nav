@@ -11,6 +11,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { runTurn } from './copilotEngine'
+import { useOnlineStatus } from '../offline/useOnlineStatus'
 
 const STARTER_PROMPTS = [
   'Take me to Main Auditorium',
@@ -153,6 +154,7 @@ export default function ChatbotWidget({
   const [messages, setMessages]   = useState([])
   const [input, setInput]         = useState('')
   const [busy, setBusy]           = useState(false)
+  const { online } = useOnlineStatus()
   const stateRef      = useRef({})
   const listRef       = useRef(null)
   const inputRef      = useRef(null)
@@ -193,6 +195,21 @@ export default function ChatbotWidget({
     if (!trimmed || busy) return
     setMessages(m => [...m, { role: 'user', text: trimmed }])
     setInput('')
+    // Task 1 (offline support) — Campus Copilot's replies always require a
+    // round trip to the backend (see copilotEngine.js's runTurn ->
+    // copilotApi.js's copilotChat); there's no on-device fallback for this
+    // one, unlike locations/events/routing. Checking first and saying so
+    // plainly means offline feels like an expected, explained state
+    // instead of the generic "couldn't reach the campus service" failure
+    // below, which is meant for a genuine mid-session server hiccup, not
+    // "you have no connection at all right now."
+    if (!online) {
+      setMessages(m => [...m, {
+        role: 'assistant',
+        text: "Campus Copilot needs an internet connection to answer — you're offline right now. Directions and the map still work with your last saved campus data.",
+      }])
+      return
+    }
     setBusy(true)
     try {
       const { replyText, cards, action, suggestions, newState } = await runTurn(

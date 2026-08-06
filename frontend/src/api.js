@@ -11,14 +11,21 @@
 // logging lives, rather than scattered across every screen that calls
 // these functions. See ./analytics/analyticsClient.js.
 //
-// The offline-routing fallbacks this file used to also carry (a network
-// failure falling back to an on-device cached graph/location bundle) have
-// been removed — the app is intended for on-campus use where connectivity
-// is assumed, and every export below now has the exact same signature and
-// behaviour it had before that offline-first experience was added.
+// Task 1 (offline support) — getLocations/getEvents/getRoadSegments/
+// getGraph each cache their result via offline/offlineBundle.js the
+// moment a network call succeeds, and fall back to that same cache if a
+// later call fails. getRoute/getRouteFromCoords fall back to computing
+// the route on-device via offline/offlineRouter.js, using whatever of
+// that cached data is available. Every fallback below is genuinely
+// best-effort: if nothing has ever been cached yet (a device's very
+// first-ever launch, offline from the start), the original network error
+// is what gets thrown, same as before this was added — see each
+// function's own comment for specifics.
 
 import { API_BASE } from './apiBase'
 import { track } from './analytics/analyticsClient'
+import { cacheBundleResource, getCachedBundleResource } from './offline/offlineBundle'
+import { routeBetweenLocations, routeFromPoint } from './offline/offlineRouter'
 
 // Previously plain fetch() with no timeout. LocationProvider.jsx's
 // maybeRecalculate() sets recalculatingRef.current = true before calling
@@ -63,27 +70,82 @@ async function getJSON(path) {
 
 export async function getLocations(category) {
   const q = category ? `?category=${encodeURIComponent(category)}` : ''
-  return getJSON(`/api/locations${q}`)
+  try {
+    const data = await getJSON(`/api/locations${q}`)
+    // Only the unfiltered list is cached — every real caller in this app
+    // (Home.jsx) always calls getLocations() with no category and filters
+    // client-side, so caching a filtered subset under the same key would
+    // silently corrupt the offline cache for everyone else. Guarded here
+    // anyway rather than assumed, in case that ever changes.
+    if (!category) cacheBundleResource('locations', data)
+    return data
+  } catch (err) {
+    const cached = await getCachedBundleResource('locations')
+    if (!cached) throw err
+    return category
+      ? cached.filter(l => (l.category || '').toLowerCase() === category.toLowerCase())
+      : cached
+  }
 }
 
 export async function searchLocations(q) {
   if (!q) return []
-  const results = await getJSON(`/api/locations/search?q=${encodeURIComponent(q)}`)
-  track('search', { query: q, result_count: results.length })
-  return results
+  try {
+    const results = await getJSON(`/api/locations/search?q=${encodeURIComponent(q)}`)
+    track('search', { query: q, result_count: results.length })
+    return results
+  } catch (err) {
+    const cached = await getCachedBundleResource('locations')
+    if (!cached) throw err
+    // Offline degradation only — a plain substring match over name/
+    // department/category, not a port of the backend's fuzzy/alias/
+    // relevance-ranked search (data_access.py's search_locations). Good
+    // enough that search isn't completely dead with no connection; not
+    // meant to match backend results exactly.
+    const ql = q.trim().toLowerCase()
+    const results = cached.filter(l =>
+      (l.name || '').toLowerCase().includes(ql) ||
+      (l.department || '').toLowerCase().includes(ql) ||
+      (l.category || '').toLowerCase().includes(ql)
+    )
+    track('search', { query: q, result_count: results.length, offline: true })
+    return results
+  }
 }
 
 export async function getLocation(id) {
-  return getJSON(`/api/locations/${id}`)
+  try {
+    return await getJSON(`/api/locations/${id}`)
+  } catch (err) {
+    const cached = await getCachedBundleResource('locations')
+    const found = cached?.find(l => l.id === id)
+    if (found) return found
+    throw err
+  }
 }
 
 export async function getEvents(fest) {
   const q = fest ? `?fest=${encodeURIComponent(fest)}` : ''
-  return getJSON(`/api/events${q}`)
+  try {
+    const data = await getJSON(`/api/events${q}`)
+    if (!fest) cacheBundleResource('events', data)
+    return data
+  } catch (err) {
+    const cached = await getCachedBundleResource('events')
+    if (!cached) throw err
+    return fest ? cached.filter(e => (e.fest || '').toLowerCase() === fest.toLowerCase()) : cached
+  }
 }
 
 export async function getEvent(id) {
-  return getJSON(`/api/events/${id}`)
+  try {
+    return await getJSON(`/api/events/${id}`)
+  } catch (err) {
+    const cached = await getCachedBundleResource('events')
+    const found = cached?.find(e => e.id === id)
+    if (found) return found
+    throw err
+  }
 }
 
 // ── Routing ──────────────────────────────────────────────────────────────
@@ -95,8 +157,29 @@ export async function getEvent(id) {
 // the only caller that passes it) from every other, user-initiated route
 // request, so "most requested routes" and "most rerouted paths" can be
 // told apart in the analytics summary.
-async function _routeQuery(query, meta) {
-  const r = await getJSON(`/api/route?${query}`)
+//
+// Task 1 (offline support): if /api/route can't be reached at all,
+// `offlineFallback` computes the same shape of response on-device via
+// offline/offlineRouter.js, using whatever graph/locations/road-segments
+// were cached from a previous successful online session (see
+// loadOfflineRouteInputs below). If nothing has been cached yet, the
+// fallback itself throws, and that error (not the original network one)
+// is what the caller sees — its message says exactly that, since "no
+// internet, and nothing to fall back to either" is a genuinely different
+// situation from an ordinary network failure.
+async function _routeQuery(query, meta, offlineFallback) {
+  let r
+  let usedOffline = false
+  try {
+    r = await getJSON(`/api/route?${query}`)
+  } catch (networkErr) {
+    try {
+      r = await offlineFallback()
+      usedOffline = true
+    } catch {
+      throw networkErr
+    }
+  }
   track(meta.isReroute ? 'reroute' : 'route_requested', {
     destination_id: meta.toId ?? null,
     from_id: meta.fromId ?? null,
@@ -106,17 +189,37 @@ async function _routeQuery(query, meta) {
     accuracy_m: meta.accuracyM ?? null,
     snapped_to: r.snapped_to ?? null,
     warning: !!r.warning,
-    offline: false,
+    offline: usedOffline,
   })
   return r
 }
 
+/** Loads the three inputs offline/offlineRouter.js needs, all previously
+ *  cached by a successful getGraph/getRoadSegments/getLocations call.
+ *  Throws (not returns null) when any of them is missing, since that's a
+ *  genuinely different, more specific situation than "route request
+ *  failed" — see _routeQuery above. */
+async function loadOfflineRouteInputs() {
+  const [graph, roadSegments, locations] = await Promise.all([
+    getCachedBundleResource('graph'),
+    getCachedBundleResource('road-segments'),
+    getCachedBundleResource('locations'),
+  ])
+  if (!graph || !roadSegments || !locations) {
+    throw new Error('No offline route data cached yet — connect to the internet at least once first.')
+  }
+  return { graph, roadSegments, locationsById: new Map(locations.map((l) => [l.id, l])) }
+}
+
 export function getRoute(fromId, toId, meta = {}) {
-  return _routeQuery(`from_id=${encodeURIComponent(fromId)}&to_id=${encodeURIComponent(toId)}`, {
-    ...meta,
-    fromId,
-    toId,
-  })
+  return _routeQuery(
+    `from_id=${encodeURIComponent(fromId)}&to_id=${encodeURIComponent(toId)}`,
+    { ...meta, fromId, toId },
+    async () => {
+      const { graph, roadSegments, locationsById } = await loadOfflineRouteInputs()
+      return routeBetweenLocations(graph, roadSegments, locationsById, fromId, toId)
+    }
+  )
 }
 
 /** Same as getRoute, but starting from a live GPS coordinate instead of a
@@ -141,24 +244,52 @@ export function getRoute(fromId, toId, meta = {}) {
  *
  *  `meta.isReroute`, when true, tags this as an automatic on-route
  *  recalculation for analytics purposes only — see _routeQuery above.
- *  Omit it (the default) for a user-initiated route request. */
+ *  Omit it (the default) for a user-initiated route request.
+ *
+ *  Offline fallback note: offline/offlineRouter.js's snap-to-nearest-node
+ *  is a simpler, single-candidate version of the backend's — it doesn't
+ *  use accuracyM/preferNodeId (see that file's own docstring for why).
+ *  Both are still accepted and forwarded to the real backend call above;
+ *  they just have no effect on the one response that's computed offline. */
 export function getRouteFromCoords(lat, lng, toId, accuracyM, preferNodeId, meta = {}) {
   const acc = accuracyM != null ? `&accuracy=${accuracyM}` : ''
   const prefer = preferNodeId ? `&prefer_node=${encodeURIComponent(preferNodeId)}` : ''
-  return _routeQuery(`from_lat=${lat}&from_lng=${lng}&to_id=${encodeURIComponent(toId)}${acc}${prefer}`, {
-    ...meta,
-    toId,
-    fromLat: lat,
-    fromLng: lng,
-    fromGps: true,
-    accuracyM,
-  })
+  return _routeQuery(
+    `from_lat=${lat}&from_lng=${lng}&to_id=${encodeURIComponent(toId)}${acc}${prefer}`,
+    { ...meta, toId, fromLat: lat, fromLng: lng, fromGps: true, accuracyM },
+    async () => {
+      const { graph, roadSegments, locationsById } = await loadOfflineRouteInputs()
+      return routeFromPoint(graph, roadSegments, locationsById, lat, lng, toId)
+    }
+  )
 }
 
 /** Road segments (with open/closed state) — reused on the frontend to
- *  surface "passes through X road" entries in the route preview panel. */
+ *  surface "passes through X road" entries in the route preview panel.
+ *  Also one of the three inputs offline routing needs — see
+ *  loadOfflineRouteInputs above. */
 export async function getRoadSegments() {
-  return getJSON('/api/road-segments')
+  try {
+    const data = await getJSON('/api/road-segments')
+    cacheBundleResource('road-segments', data)
+    return data
+  } catch (err) {
+    const cached = await getCachedBundleResource('road-segments')
+    if (cached) return cached
+    throw err
+  }
+}
+
+/** The raw walkway graph (nodes/edges/location_edges) — added for Task 1
+ *  (offline support). Nothing in the UI reads this directly; it exists
+ *  purely so offline routing has a graph to compute over at all. Cached
+ *  the same way as everything else above, no fallback of its own to
+ *  return since a failed fetch here just means loadOfflineRouteInputs
+ *  won't find anything cached under 'graph' yet either. */
+export async function getGraph() {
+  const data = await getJSON('/api/graph')
+  cacheBundleResource('graph', data)
+  return data
 }
 
 /** Phase 4.2 — food court menu image for today (or a specific date). UI

@@ -270,6 +270,28 @@ export function useDraggableSheet(snapPeeks, initialTier = 'collapsed', active =
     listenersRef.current = null
   }, [])
 
+  // Bug fix — state-lifecycle root cause, companion to the browseSheet
+  // reset in Home.jsx: an in-flight `animateTo` snap (its rAF loop) or an
+  // in-progress drag previously kept running past the exact moment this
+  // sheet instance stopped being the active/visible one — the belt-and-
+  // braces cleanup further up this file only tears those down when the
+  // WHOLE HOOK unmounts, which never happens here (Home.jsx calls
+  // useDraggableSheet unconditionally for all three sheets; only their
+  // DOM is conditionally rendered). So a snap animation started right
+  // before the user exits navigation (or backs out of a preview) could
+  // still be mid-flight when this sheet deactivates, and its next tick(s)
+  // would go on writing peekRef/`--sheet-h` for a sheet nothing on screen
+  // corresponds to anymore, however briefly, until activeRef itself
+  // caught up. Tying the same teardown to `active` going false — not just
+  // to unmount — means a sheet always stops moving the instant it's no
+  // longer the one on screen, never a frame later.
+  useEffect(() => {
+    if (!active) {
+      cancelAnimationFrame(rafRef.current)
+      stopDragListening()
+    }
+  }, [active, stopDragListening])
+
   const onPointerDown = useCallback((e) => {
     // Only the primary mouse button / a real touch/pen point starts a drag.
     if (e.button != null && e.button !== 0) return

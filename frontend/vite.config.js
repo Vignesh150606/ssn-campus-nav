@@ -103,8 +103,29 @@ export default defineConfig(({ command, mode }) => {
         // That matches "fest/event/admin only show data after one refresh"
         // exactly. Map tiles are static images and have no such conflict,
         // so CacheFirst stays for those.
+        //
+        // Task 1 (offline support) — /api/* still deliberately has no
+        // runtime-caching rule here, for the exact reason above: it would
+        // reintroduce the same two-caches-disagree bug. Offline resilience
+        // for /api/* data instead lives at the app level now (src/api.js +
+        // src/offline/*, an IndexedDB cache with its own explicit
+        // freshness/fallback rules the app controls directly), the same
+        // layer EventsList's own cache already used. Fonts and images
+        // below are added because neither has that same conflict — a
+        // cached font file or poster image doesn't "go stale" the way an
+        // event list or a route does.
         clientsClaim: true,
         skipWaiting: true,
+        // SPA deep links (e.g. /event/abc123, /events, /admin) have no
+        // precached HTML of their own — only '/' (start_url) does. Without
+        // this, refreshing (or cold-launching) on one of those routes
+        // while offline 404s at the network layer before React Router
+        // ever gets a chance to run. This tells the generated service
+        // worker to serve the precached app shell for any navigation
+        // request that isn't itself precached, letting client-side
+        // routing take over exactly like an online first paint would.
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.hostname.includes('tile.openstreetmap.org'),
@@ -112,6 +133,48 @@ export default defineConfig(({ command, mode }) => {
             options: {
               cacheName: 'map-tiles',
               expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 7 },
+            },
+          },
+          {
+            // Google Fonts' CSS file (index.html's <link> tag) — this is
+            // the small stylesheet listing @font-face rules, not the font
+            // binaries themselves (those are the gstatic.com rule below).
+            // Google occasionally updates which specific font files a
+            // given CSS request maps to, so this one prefers the network
+            // when available and only falls back to cache when it can't
+            // be reached — unlike the webfont files themselves, which are
+            // immutable per URL and safe to cache-first.
+            urlPattern: ({ url }) => url.hostname === 'fonts.googleapis.com',
+            handler: 'StaleWhileRevalidate',
+            options: { cacheName: 'google-fonts-stylesheets' },
+          },
+          {
+            // The actual .woff2 font files. Standard workbox recipe for
+            // Google Fonts: each URL is content-addressed/immutable, so
+            // CacheFirst with a long expiration is safe, and
+            // cacheableResponse is required since these are cross-origin
+            // (opaque) responses that would otherwise never be considered
+            // "successful" enough to cache.
+            urlPattern: ({ url }) => url.hostname === 'fonts.gstatic.com',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-webfonts',
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
+          },
+          {
+            // Poster/venue-menu images served from Supabase Storage.
+            // Stale-while-revalidate: show whatever's cached immediately
+            // (so a venue card never blocks on a slow image), refresh it
+            // in the background for next time — appropriate here since,
+            // unlike locations/events/routes, a slightly-stale poster
+            // image has no correctness impact.
+            urlPattern: ({ url }) => url.hostname.endsWith('.supabase.co') && url.pathname.includes('/storage/'),
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'supabase-images',
+              expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
         ],

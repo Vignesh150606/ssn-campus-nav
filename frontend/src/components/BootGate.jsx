@@ -21,7 +21,8 @@
  *              and give the user something to do).
  */
 import { useEffect, useState } from 'react'
-import { checkHealth } from '../api'
+import { checkHealth, getGraph, getRoadSegments, getLocations } from '../api'
+import { useOnlineStatus } from '../offline/useOnlineStatus'
 
 const SLOW_MESSAGE_AFTER_MS = 22_000
 const GIVE_UP_AFTER_MS = 60_000
@@ -45,9 +46,27 @@ function seedEventsCache() {
     .catch(() => { /* non-fatal — EventsList will fetch normally */ })
 }
 
+// Task 1 (offline support) — warms the on-device cache offline routing
+// needs (see offline/db.js, offline/offlineBundle.js, api.js) the moment
+// the backend is first confirmed reachable, rather than waiting on
+// Home.jsx's own mount to call getLocations()/getRoadSegments(). Each of
+// these already caches itself on success (see api.js) — this just makes
+// sure that happens even if the user's very first session lands on a
+// route other than Home (an EventPage deep link, say) or ends before
+// Home.jsx gets there itself.
+function seedOfflineCache() {
+  getGraph().catch(() => {})
+  getRoadSegments().catch(() => {})
+  getLocations().catch(() => {})
+}
+
 export default function BootGate({ children }) {
   const [status, setStatus] = useState('checking') // checking | slow | ready | failed
   const [retryKey, setRetryKey] = useState(0)
+  // Task 1 (offline support) — reuses the same online/offline tracking
+  // OfflineIndicator.jsx already relies on (see offline/offlineBundle.js),
+  // rather than this component polling navigator.onLine itself.
+  const { online } = useOnlineStatus()
 
   useEffect(() => {
     let cancelled = false
@@ -59,6 +78,7 @@ export default function BootGate({ children }) {
       if (cancelled) return
       if (ok) {
         seedEventsCache()
+        seedOfflineCache()
         setStatus('ready')
         return
       }
@@ -83,10 +103,28 @@ export default function BootGate({ children }) {
     }
   }, [retryKey])
 
-  if (status === 'ready') return children
+  // Bug fix (Task 1 — offline support) — a device with no network at all
+  // can never pass checkHealth() above, so this gate used to leave it
+  // stuck polling for a full 60s and then landing on a 'failed' dead-end
+  // whose only action (Retry) just repeats the same doomed check —
+  // "test app restart while offline" and "test airplane mode" would both
+  // hang here with no way into the app at all. The rest of the app now
+  // runs without a connection (cached data + offline routing — see
+  // api.js and offline/*), so once we already know there's no network —
+  // whether that was already true before the very first health check
+  // could resolve, or becomes true partway through polling — this gate
+  // has nothing left to usefully protect against: let the app straight
+  // through and let the header's OfflineIndicator carry the message
+  // instead of a second, boot-time one. Derived directly from render
+  // (not its own state, not set from inside the effect above) so it
+  // reacts the instant `online` changes, from any status this gate is
+  // currently in, with no extra state-lifecycle wiring of its own.
+  const effectiveStatus = online ? status : 'ready'
 
-  const failed = status === 'failed'
-  const slow = status === 'slow'
+  if (effectiveStatus === 'ready') return children
+
+  const failed = effectiveStatus === 'failed'
+  const slow = effectiveStatus === 'slow'
 
   return (
     <div className="boot-gate" role="status" aria-live="polite">
