@@ -24,7 +24,6 @@ can't accidentally ship unprotected).
 """
 import math
 from collections import defaultdict
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -117,7 +116,7 @@ def get_graph_statistics():
 
 @router.get("/snap")
 def snap_debug(lat: float = Query(...), lng: float = Query(...),
-               accuracy_m: Optional[float] = Query(None), to_id: Optional[str] = Query(None)):
+               accuracy_m: float | None = Query(None), to_id: str | None = Query(None)):
     """Which node a given lat/lng snaps to, and the snap distance — the
     exact same _nearest_node() the live app uses for reroute-on-deviation,
     just exposed directly for debugging instead of buried inside a full

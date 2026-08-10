@@ -14,7 +14,6 @@ Output:  docs/graph/  (created at the project root, alongside README.md)
 import json
 import math
 import os
-import sys
 from collections import defaultdict
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -126,7 +125,6 @@ def write_edge_list(graph):
 def write_graphviz(graph, degree):
     max_deg = max(degree.values()) if degree else 1
     lines = ["graph walkway_graph {", '  layout="neato";', '  node [shape=point, width=0.05];', '  edge [color="#3A6EA5", penwidth=0.6];']
-    nodes = {n['id']: n for n in graph['nodes']}
     lat0 = sum(n['lat'] for n in graph['nodes']) / len(graph['nodes'])
     for n in graph['nodes']:
         x = (n['lng']) * math.cos(math.radians(lat0)) * 500
@@ -168,7 +166,6 @@ def write_visual(graph, degree, locations):
     import matplotlib.pyplot as plt
     from matplotlib.lines import Line2D
 
-    nodes = {n['id']: n for n in graph['nodes']}
     max_deg = max(degree.values()) if degree else 1
 
     fig, ax = plt.subplots(figsize=(16, 20), dpi=150)

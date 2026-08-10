@@ -30,8 +30,8 @@ Supabase does, so assertions here stick to fields that don't depend on
 that (status, ownership, submitted_by/reviewed_by, audit actions) rather
 than e.g. asserting on event_images contents.
 """
-import sys
 import os
+import sys
 import uuid
 from datetime import datetime, timezone
 
@@ -126,8 +126,9 @@ import data_access  # noqa: E402
 data_access.get_client = lambda: FakeClient()
 auth.get_client = lambda: FakeClient()
 
-import main  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+
+import main  # noqa: E402
 
 client = TestClient(main.app)
 

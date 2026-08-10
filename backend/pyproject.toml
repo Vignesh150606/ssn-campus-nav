@@ -1,0 +1,40 @@
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# Practical rule set for this project: real correctness/bug categories
+# (pyflakes, pycodestyle errors, bugbear, blind-except, bandit security)
+# plus safe style modernization (pyupgrade, isort, simplify). Left off
+# ruff's unconfigured default (which pulled in far more categories than
+# this project has ever curated against, e.g. flake8-2020) so `ruff
+# check .` stays an actionable signal rather than several hundred lines
+# of first-time noise.
+select = ["E4", "E7", "E9", "F", "B", "BLE", "S", "UP", "I", "SIM", "RUF"]
+
+ignore = [
+    # FastAPI's own required dependency-injection idiom is
+    # `def endpoint(x = Depends(get_current_user))` — a function call in
+    # a default argument is how FastAPI resolves the dependency per
+    # request. Not the mutable-default-argument bug this rule exists
+    # for; every hit in this codebase is a `Depends(...)` call. See
+    # https://fastapi.tiangolo.com/tutorial/dependencies/ (FastAPI's own
+    # docs use this exact pattern throughout).
+    "B008",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Test/dev-tooling scripts, not the running app:
+"scripts/smoke_test_rbac.py" = [
+    "S105",  # hardcoded string is a fake JWT secret for an in-memory
+             # test double (see the file's own module docstring) — not a
+             # real credential.
+]
+"scripts/route_quality_test.py" = [
+    "S311",  # `random` here generates test coordinates/scenarios, not
+             # anything security- or cryptography-sensitive.
+]
+"scripts/build_walkway_graph.py" = [
+    "S314",  # parses this project's own locally-supplied KML survey
+             # files (offline, one-time graph build), not
+             # externally-supplied/untrusted XML.
+]

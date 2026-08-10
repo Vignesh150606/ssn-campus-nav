@@ -11,11 +11,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { computeUpcomingTurn } from '../utils/geo'
 
-const STORAGE_KEY = 'ssn-nav-voice-settings'
-// Default changed to off. Only affects users with no saved preference yet
-// (loadSettings below merges over this default, so anyone who already
-// explicitly turned voice guidance on or off keeps that choice — this
-// does not silently override an existing user's own setting).
+// Bug fix: bumped from 'ssn-nav-voice-settings' to '...-v2'. The default
+// below was already `enabled: false`, but loadSettings() merges *over*
+// whatever's already in localStorage — so anyone who had this app open
+// during an earlier build (before the off-default existed, when it was
+// effectively on-by-default) still had `enabled: true` sitting in their
+// browser, and every session since kept silently honoring that stale
+// value as if it were a deliberate recent choice. Voice must default off
+// in every condition, including a returning browser with old state, not
+// only a genuinely first-ever visit — so this is a one-time, intentional
+// key bump: it abandons any pre-existing stored value (old key is simply
+// never read again) and gives every browser, new or returning, a clean
+// `enabled: false` start. Explicit choices made from here on (new key)
+// are still persisted and respected exactly as before.
+const STORAGE_KEY = 'ssn-nav-voice-settings-v2'
 const DEFAULT_SETTINGS = { enabled: false, volume: 1, rate: 1 }
 
 // Pre-announce at this distance (early warning)

@@ -10,6 +10,7 @@ then re-run generate_all() so printed QR posters point to the live site.
 """
 
 import os
+
 import qrcode
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -56,7 +57,7 @@ def generate_event_qr(event_id: str) -> str:
 def generate_all(events_json_path: str) -> list[str]:
     import json
 
-    with open(events_json_path, "r", encoding="utf-8") as f:
+    with open(events_json_path, encoding="utf-8") as f:
         events = json.load(f)
 
     paths = []

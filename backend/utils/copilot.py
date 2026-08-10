@@ -30,9 +30,8 @@ genuinely open-ended phrasing, it can be slotted in right where the final
 out_of_scope/unknown fallback returns, without changing the public
 interface.
 """
-import re
 import difflib
-from typing import Optional
+import re
 
 # ---------------------------------------------------------------------------
 # Vocabulary
@@ -397,7 +396,7 @@ def parse_classroom_code(text: str):
 # Main classification
 # ---------------------------------------------------------------------------
 
-def classify(message: str, locations: list, context: Optional[dict] = None) -> dict:
+def classify(message: str, locations: list, context: dict | None = None) -> dict:
     """
     The single entry point. `locations` is the already-loaded
     locations.json list (main.py passes it in — this module never reads

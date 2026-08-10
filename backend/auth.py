@@ -17,11 +17,10 @@ restart, which means tokens stop working across restarts, which is
 exactly the nudge a developer needs to go set a real secret before
 deploying.
 """
+import logging
 import os
 import secrets
-import logging
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 import jwt
 from fastapi import Depends, HTTPException, Request, status
@@ -264,7 +263,7 @@ def authenticate_admin(username: str, password: str) -> dict:
 
 
 def get_current_admin(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> dict:
     """FastAPI dependency — drop this in any admin route instead of the old
     `secret: str = Query(...)` parameter. Raises 401 if the bearer token is

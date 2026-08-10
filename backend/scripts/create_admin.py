@@ -24,8 +24,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from auth import hash_password  # noqa: E402
-from db import get_client  # noqa: E402
+from auth import hash_password
+from db import get_client
 
 
 def main():

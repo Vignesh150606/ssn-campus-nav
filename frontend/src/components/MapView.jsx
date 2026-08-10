@@ -368,6 +368,25 @@ function NavigationController({
   // used for onDragRef further down this file.
   const onToggleHeadingUpRef = useRef(onToggleHeadingUp)
   useEffect(() => { onToggleHeadingUpRef.current = onToggleHeadingUp }, [onToggleHeadingUp])
+
+  // Bug fix (compass needle frozen in Native mode — the default mode):
+  // Native mode's setBearing wrapper below is created once per patch
+  // lifecycle and closes over whatever it captures at that moment, so it
+  // needs the same stale-closure-avoidance ref pattern as the toggle
+  // bridge above rather than reading the `onRotationChange` prop directly.
+  const onRotationChangeRef = useRef(onRotationChange)
+  useEffect(() => { onRotationChangeRef.current = onRotationChange }, [onRotationChange])
+
+  // `map` (from useMap()) is a Leaflet instance, not React-managed state —
+  // Leaflet's entire API is imperative mutation of the instance
+  // (map.setView(), map.on(), map.setBearing(), etc.), so this lint
+  // rule's hook-purity assumption doesn't hold for it. Every `map.xxx =`
+  // assignment between here and the matching eslint-enable below is this
+  // same, deliberate pattern: bridging React state onto the map instance
+  // for native Leaflet DOM/controls to read, or wrapping one of Leaflet's
+  // own methods at a single documented choke point. Scoped to exactly the
+  // block that needs it rather than disabled file- or project-wide.
+  /* eslint-disable react-hooks/immutability */
   useEffect(() => {
     if (!map) return
     map._headingUpToggle = () => onToggleHeadingUpRef.current?.()
@@ -378,6 +397,7 @@ function NavigationController({
     map._headingUpActive = headingUp
     map.rotateControl?._restyle?.()
   }, [map, isMapAlive, headingUp])
+  /* eslint-enable react-hooks/immutability */
 
   // ── Helper: set bearing + notify parent ────────────────────────────
   const lastBearingRef = useRef(0)
@@ -477,6 +497,14 @@ function NavigationController({
   // + headingUp are both active, and fully restored the instant either
   // turns off, so Smart mode's own direct map.setBearing() calls
   // (applyBearingRaw) are never touched by it.
+  //
+  // Same Leaflet-instance false positive as the toggle-bridge block
+  // above: this whole effect's job IS wrapping/restoring one of
+  // Leaflet's own instance methods (map.setBearing) and flagging
+  // instance/control state (map._nativeBearingPatched,
+  // map.compassBearing.enable()/disable()) — imperative by design, not
+  // React state that render should own.
+  /* eslint-disable react-hooks/immutability */
   useEffect(() => {
     if (!isMapAlive() || !map.compassBearing) return
     const wantNative = headingMode === 'native' && headingUp
@@ -504,12 +532,35 @@ function NavigationController({
         const NOISE_FLOOR_DEG = 0.5   // below this: true sensor quantization noise, ignore
         const TURN_DEG        = 12    // a single ~100ms-tick jump this big can only be a real turn
         const SLOW_GAIN        = 0.12  // damping applied to small/continuous deltas (wrist wobble, gait sway)
+        // Bug fix — compass needle frozen in Native mode (the default
+        // mode new users start in): this wrapper is the single choke
+        // point Native mode's rotation actually flows through (leaflet-
+        // rotate's own CompassBearing handler calls map.setBearing()
+        // directly, bypassing applyBearingRaw entirely — see the big
+        // comment above), but it never told the parent the bearing had
+        // changed. onRotationChange (→ Home.jsx's setCurrentBearing →
+        // NavCompass's mapHeading prop) was only ever wired into Smart
+        // mode's applyBearingRaw, so the decorative compass needle
+        // silently stayed pinned at its initial value for every user on
+        // Native mode — i.e. everyone who hadn't manually switched to
+        // Smart in settings, since 'native' is the default. Map rotation
+        // itself was never affected (leaflet-rotate handled that fine on
+        // its own); only the separate needle overlay was stuck. Fixed by
+        // notifying through the same ref-bridged callback Smart mode
+        // uses, converting back out of leaflet-rotate's inverted bearing
+        // convention to the plain compass degrees every other consumer
+        // in this app expects (the exact inverse of applyBearingRaw's
+        // own `360 - deg` conversion, documented above).
+        const notifyRotation = (internalBearing) => {
+          onRotationChangeRef.current?.(((360 - internalBearing) % 360 + 360) % 360)
+        }
         let smoothed = null
         map.setBearing = (theta) => {
           const wrapped = ((theta % 360) + 360) % 360
           if (smoothed == null) {
             smoothed = wrapped
             originalSetBearing(wrapped)
+            notifyRotation(wrapped)
             return
           }
           let delta = wrapped - smoothed
@@ -554,6 +605,7 @@ function NavigationController({
           }
 
           originalSetBearing(smoothed)
+          notifyRotation(smoothed)
         }
         map._nativeBearingPatched = true
         map._nativeBearingRestore = () => {
@@ -573,13 +625,15 @@ function NavigationController({
   // Belt-and-braces: if this instance unmounts (nav session ends) while
   // Native mode's raw listener (and/or its setBearing wrapper) is still
   // attached, detach both explicitly rather than relying only on
-  // leaflet-rotate's own teardown ordering.
+  // leaflet-rotate's own teardown ordering. Same Leaflet-instance
+  // disable scope as above — this is its cleanup counterpart.
   useEffect(() => {
     return () => {
       if (map?._mapPane && map.compassBearing?.enabled()) map.compassBearing.disable()
       map?._nativeBearingRestore?.()
     }
   }, [map])
+  /* eslint-enable react-hooks/immutability */
 
   // ── Camera follow + look-ahead (lower-third positioning) ───────────
   useEffect(() => {

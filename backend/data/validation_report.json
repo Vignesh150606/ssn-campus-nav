@@ -1,8 +1,8 @@
 {
-  "generated_from": "/home/claude/audit/ssn-campus-nav-1a18850b3a67b06eb0c8dee844835f6892475dd5/backend/data/walkway_graph.json",
+  "generated_from": "/home/claude/work/ssn-campus-nav-main/backend/data/walkway_graph.json",
   "structural": {
     "nodes": 195,
-    "edges": 248,
+    "edges": 249,
     "location_edges": 32,
     "duplicate_edges": 0,
     "zero_length_edges": 0,

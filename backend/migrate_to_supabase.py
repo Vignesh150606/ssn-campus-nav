@@ -22,14 +22,14 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from db import get_client  # noqa: E402
+from db import get_client
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 
 def _load(name):
-    with open(os.path.join(DATA_DIR, name), "r", encoding="utf-8") as f:
+    with open(os.path.join(DATA_DIR, name), encoding="utf-8") as f:
         return json.load(f)
 
 

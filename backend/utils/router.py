@@ -4,11 +4,11 @@ Campus router — Dijkstra with:
 2. Admin road closures (segments marked closed are skipped, fallback to open graph)
 3. Full waypoint path for live turn-by-turn guidance
 """
-import json
-import math
 import heapq
-import os
+import json
 import logging
+import math
+import os
 
 logger = logging.getLogger("ssn-campus-nav.router")
 

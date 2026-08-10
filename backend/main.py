@@ -26,10 +26,9 @@ issued by POST /api/admin/login). Every /api/admin/* route now requires
 `Authorization: Bearer <token>` instead of `?secret=`.
 """
 
-import os
-import math
 import logging
-from typing import List, Optional
+import math
+import os
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,11 +38,23 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import data_access
-from auth import authenticate_admin, create_access_token, get_current_active_admin, require_role, hash_password, verify_password, generate_password, rate_limit, JWT_EXPIRES_HOURS
+from auth import (
+    JWT_EXPIRES_HOURS,
+    authenticate_admin,
+    create_access_token,
+    generate_password,
+    get_current_active_admin,
+    hash_password,
+    rate_limit,
+    require_role,
+    verify_password,
+)
 from db import SupabaseUnavailableError
-from utils.qr_generator import generate_event_qr
-from utils.router import find_route as _find_route, find_route_from_point as _find_route_from_point, get_graph as _get_graph
 from utils import copilot as _copilot
+from utils.qr_generator import generate_event_qr
+from utils.router import find_route as _find_route
+from utils.router import find_route_from_point as _find_route_from_point
+from utils.router import get_graph as _get_graph
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ssn-campus-nav")
@@ -72,6 +83,7 @@ app.add_middleware(
 # devtools.py — see that file's own docstring for the exact steps to
 # remove this feature later if you don't want it.
 from devtools import router as _devtools_router  # noqa: E402
+
 app.include_router(_devtools_router)
 
 
@@ -145,7 +157,7 @@ async def _read_upload_bounded(file: UploadFile, max_bytes: int = data_access.MA
 # ---------------------------------------------------------------------------
 
 @app.get("/api/locations")
-def list_locations(category: Optional[str] = None):
+def list_locations(category: str | None = None):
     """List all campus locations, optionally filtered by category
     (academic, hostel, sports, dining, library, auditorium, admin, gate, parking, medical)."""
     return data_access.get_locations(category)
@@ -170,7 +182,7 @@ def get_location(location_id: str):
 # ---------------------------------------------------------------------------
 
 @app.get("/api/events")
-def list_events(fest: Optional[str] = None, date: Optional[str] = None):
+def list_events(fest: str | None = None, date: str | None = None):
     """List fest events, each enriched with its venue's coordinates.
     Optionally filter by fest name (e.g. 'Invente') or date (YYYY-MM-DD).
     Only verified events are returned — same as Phase 2."""
@@ -211,12 +223,12 @@ def get_event_qr(event_id: str):
 
 @app.get("/api/route")
 def get_route(
-    from_id: Optional[str] = Query(None, description="Starting location id, e.g. 'main-gate'. Omit if using from_lat/from_lng."),
+    from_id: str | None = Query(None, description="Starting location id, e.g. 'main-gate'. Omit if using from_lat/from_lng."),
     to_id: str = Query(..., description="Destination location id, e.g. 'eee-block'"),
-    from_lat: Optional[float] = Query(None, description="Live GPS latitude — used instead of from_id for on-the-move rerouting."),
-    from_lng: Optional[float] = Query(None, description="Live GPS longitude — used instead of from_id for on-the-move rerouting."),
-    accuracy: Optional[float] = Query(None, description="Reported accuracy (metres) of from_lat/from_lng, if known. Used to sanity-check the nearest-node snap against a farther-but-cheaper-looking candidate — see utils/router.py _nearest_node."),
-    prefer_node: Optional[str] = Query(None, description="The walkway node id the in-progress route was last snapped to (its own previous 'snapped_to'), if any. Used to avoid flipping between two comparably-costed branches on GPS noise alone — see utils/router.py _nearest_node."),
+    from_lat: float | None = Query(None, description="Live GPS latitude — used instead of from_id for on-the-move rerouting."),
+    from_lng: float | None = Query(None, description="Live GPS longitude — used instead of from_id for on-the-move rerouting."),
+    accuracy: float | None = Query(None, description="Reported accuracy (metres) of from_lat/from_lng, if known. Used to sanity-check the nearest-node snap against a farther-but-cheaper-looking candidate — see utils/router.py _nearest_node."),
+    prefer_node: str | None = Query(None, description="The walkway node id the in-progress route was last snapped to (its own previous 'snapped_to'), if any. Used to avoid flipping between two comparably-costed branches on GPS noise alone — see utils/router.py _nearest_node."),
 ):
     """
     Walking route to a campus location.
@@ -343,17 +355,17 @@ class EventCreate(BaseModel):
     description: str
     open_to_external: bool = True
     # Phase 10 — rich event detail fields
-    organizer: Optional[str] = None          # organising club / person
-    category: Optional[str] = None           # Workshop, Competition, Performance, Exhibition…
-    contact_info: Optional[str] = None       # email or phone
-    registration_link: Optional[str] = None  # URL
-    poster_url: Optional[str] = None         # hero image URL
-    photo_urls: Optional[List[str]] = []     # gallery (0-10 URLs)
+    organizer: str | None = None          # organising club / person
+    category: str | None = None           # Workshop, Competition, Performance, Exhibition…
+    contact_info: str | None = None       # email or phone
+    registration_link: str | None = None  # URL
+    poster_url: str | None = None         # hero image URL
+    photo_urls: list[str] | None = []     # gallery (0-10 URLs)
     # Phase 11 — room / floor / wing (venue detail for classrooms / labs)
-    building: Optional[str] = None           # e.g. "EEE Block"
-    room_number: Optional[str] = None        # e.g. "EEE-302"
-    floor: Optional[str] = None              # e.g. "3rd Floor"
-    wing: Optional[str] = None               # e.g. "Left Wing"
+    building: str | None = None           # e.g. "EEE Block"
+    room_number: str | None = None        # e.g. "EEE-302"
+    floor: str | None = None              # e.g. "3rd Floor"
+    wing: str | None = None               # e.g. "Left Wing"
 
 
 @app.post("/api/admin/events")
@@ -381,23 +393,23 @@ class EventUpdate(BaseModel):
     exclude_unset=True below); everything else on the event is left as-is.
     Does not include poster_url/photo_urls — image management stays on the
     existing /images endpoints, unchanged."""
-    name: Optional[str] = None
-    fest: Optional[str] = None
-    department: Optional[str] = None
-    location_id: Optional[str] = None
-    date: Optional[str] = None
-    start_time: Optional[str] = None
-    end_time: Optional[str] = None
-    description: Optional[str] = None
-    open_to_external: Optional[bool] = None
-    organizer: Optional[str] = None
-    category: Optional[str] = None
-    contact_info: Optional[str] = None
-    registration_link: Optional[str] = None
-    building: Optional[str] = None
-    room_number: Optional[str] = None
-    floor: Optional[str] = None
-    wing: Optional[str] = None
+    name: str | None = None
+    fest: str | None = None
+    department: str | None = None
+    location_id: str | None = None
+    date: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    description: str | None = None
+    open_to_external: bool | None = None
+    organizer: str | None = None
+    category: str | None = None
+    contact_info: str | None = None
+    registration_link: str | None = None
+    building: str | None = None
+    room_number: str | None = None
+    floor: str | None = None
+    wing: str | None = None
 
 
 @app.patch("/api/admin/events/{event_id}")
@@ -542,7 +554,7 @@ def delete_event_image(event_id: str, image_id: str, admin: dict = Depends(get_c
 
 class FestAdminCreate(BaseModel):
     username: str
-    password: Optional[str] = None  # omit to auto-generate one (returned once in the response)
+    password: str | None = None  # omit to auto-generate one (returned once in the response)
 
 
 @app.get("/api/admin/fest-admins")
@@ -597,7 +609,7 @@ def enable_fest_admin(admin_id: str, admin: dict = Depends(require_role("superad
 
 
 class PasswordResetRequest(BaseModel):
-    password: Optional[str] = None  # omit to auto-generate one (returned once in the response)
+    password: str | None = None  # omit to auto-generate one (returned once in the response)
 
 
 @app.post("/api/admin/fest-admins/{admin_id}/reset-password")
@@ -646,12 +658,12 @@ def get_audit_log(limit: int = Query(200, ge=1, le=1000), admin: dict = Depends(
 
 class AccountUpdateRequest(BaseModel):
     current_password: str
-    new_username: Optional[str] = None
-    new_password: Optional[str] = None
-    confirm_password: Optional[str] = None
+    new_username: str | None = None
+    new_password: str | None = None
+    confirm_password: str | None = None
 
 
-def _password_is_strong(pw: str) -> Optional[str]:
+def _password_is_strong(pw: str) -> str | None:
     """Returns an error message if the password is too weak, else None."""
     if len(pw) < 8:
         return "Password must be at least 8 characters."
@@ -773,7 +785,7 @@ def _friendly_menu_error(exc: Exception, action: str) -> HTTPException:
 
 
 @app.get("/api/locations/{venue_id}/menu")
-def get_venue_menu(venue_id: str, date: Optional[str] = Query(None, description="YYYY-MM-DD, defaults to today")):
+def get_venue_menu(venue_id: str, date: str | None = Query(None, description="YYYY-MM-DD, defaults to today")):
     """Public — get today's menu image for a food court / dining venue."""
     try:
         if not data_access.venue_exists(venue_id):
@@ -791,7 +803,7 @@ async def upload_venue_menu(
     venue_id: str,
     file: UploadFile = File(...),
     date: str = Form(..., description="YYYY-MM-DD"),
-    description: Optional[str] = Form(None),
+    description: str | None = Form(None),
     admin: dict = Depends(require_role("superadmin")),
 ):
     """Admin — upload (or replace) the menu image for a venue on a specific date."""
@@ -852,12 +864,12 @@ def diagnose_menu_system(admin: dict = Depends(require_role("superadmin"))):
 
 class AnalyticsEvent(BaseModel):
     event_type: str
-    payload: Optional[dict] = None
+    payload: dict | None = None
 
 
 class AnalyticsBatch(BaseModel):
-    session_id: Optional[str] = None
-    events: List[AnalyticsEvent]
+    session_id: str | None = None
+    events: list[AnalyticsEvent]
 
 
 @app.post("/api/analytics/events")
@@ -885,20 +897,20 @@ def analytics_summary(days: int = Query(30, ge=1, le=365), admin: dict = Depends
 # ---------------------------------------------------------------------------
 
 class FeedbackCreate(BaseModel):
-    destination_id: Optional[str] = None
-    destination_name: Optional[str] = None
-    rating: Optional[int] = None
-    accurate: Optional[bool] = None
-    categories: Optional[List[str]] = []
-    comment: Optional[str] = None
-    distance_m: Optional[float] = None
+    destination_id: str | None = None
+    destination_name: str | None = None
+    rating: int | None = None
+    accurate: bool | None = None
+    categories: list[str] | None = []
+    comment: str | None = None
+    distance_m: float | None = None
     arrived: bool = False
 
 
 class FeedbackStatusUpdate(BaseModel):
-    status: Optional[str] = None
-    resolution: Optional[str] = None
-    admin_notes: Optional[str] = None
+    status: str | None = None
+    resolution: str | None = None
+    admin_notes: str | None = None
 
 
 @app.post("/api/feedback")
@@ -910,7 +922,7 @@ def submit_feedback(body: FeedbackCreate, _rl: None = Depends(rate_limit(20, 600
 
 
 @app.get("/api/admin/feedback")
-def list_feedback(status: Optional[str] = Query(None), admin: dict = Depends(require_role("superadmin"))):
+def list_feedback(status: str | None = Query(None), admin: dict = Depends(require_role("superadmin"))):
     """Admin — list route feedback, optionally filtered by status
     (pending / reviewed / resolved), newest first."""
     return data_access.list_feedback_admin(status)
@@ -954,7 +966,7 @@ def delete_feedback(feedback_id: str, admin: dict = Depends(require_role("supera
 
 class CopilotChatRequest(BaseModel):
     message: str
-    context: Optional[dict] = None
+    context: dict | None = None
 
 
 @app.post("/api/copilot/chat")

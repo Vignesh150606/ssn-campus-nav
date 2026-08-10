@@ -14,13 +14,12 @@ Two things are deliberately NOT here, by design (see SUPABASE_MIGRATION.md):
 - the walkway routing graph (walkway_graph.json) is never touched —
   utils/router.py keeps reading it straight off disk, untouched.
 """
+import logging
 import os
 import re
 import uuid
-import logging
 from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
-from typing import List, Optional
 
 from db import SupabaseUnavailableError, get_client
 
@@ -51,7 +50,7 @@ _IMAGE_MAGIC_PREFIXES = {
 }
 
 
-def _sniff_image_content_type(content: bytes) -> Optional[str]:
+def _sniff_image_content_type(content: bytes) -> str | None:
     for magic, mime in _IMAGE_MAGIC_PREFIXES.items():
         if content.startswith(magic):
             return mime
@@ -108,7 +107,7 @@ def _wrap(fn, *args, **kwargs):
 _VENUE_COLUMNS = "id, name, category, department, lat, lng, floors, accessible, description, facilities"
 
 
-def get_locations(category: Optional[str] = None) -> List[dict]:
+def get_locations(category: str | None = None) -> list[dict]:
     def _run():
         client = get_client()
         q = client.table("venues").select(_VENUE_COLUMNS)
@@ -182,7 +181,7 @@ def _relevance_rank(row: dict, ql: str) -> tuple:
     return (tier, name)
 
 
-def search_locations(q: str) -> List[dict]:
+def search_locations(q: str) -> list[dict]:
     def _run():
         client = get_client()
         ql = q.strip().lower()
@@ -258,7 +257,7 @@ def search_locations(q: str) -> List[dict]:
     return _wrap(_run)
 
 
-def get_location(location_id: str) -> Optional[dict]:
+def get_location(location_id: str) -> dict | None:
     def _run():
         client = get_client()
         result = (
@@ -281,7 +280,7 @@ def venue_exists(location_id: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _get_or_create_category_id(client, name: Optional[str]) -> Optional[int]:
+def _get_or_create_category_id(client, name: str | None) -> int | None:
     if not name:
         return None
     existing = client.table("event_categories").select("id").eq("name", name).limit(1).execute()
@@ -300,7 +299,7 @@ def _get_or_create_category_id(client, name: Optional[str]) -> Optional[int]:
 # ---------------------------------------------------------------------------
 
 
-def _serialize_event(row: dict, location_mode: str = "minimal", admin_names: Optional[dict] = None) -> dict:
+def _serialize_event(row: dict, location_mode: str = "minimal", admin_names: dict | None = None) -> dict:
     """Turn a Supabase row (with embedded event_categories/event_images/venues)
     back into the exact flat shape the frontend has always received.
 
@@ -352,7 +351,7 @@ def _serialize_event(row: dict, location_mode: str = "minimal", admin_names: Opt
     return out
 
 
-def list_public_events(fest: Optional[str] = None, date: Optional[str] = None) -> List[dict]:
+def list_public_events(fest: str | None = None, date: str | None = None) -> list[dict]:
     def _run():
         client = get_client()
         q = client.table("events").select(_EVENT_SELECT_WITH_VENUE).eq("status", "verified")
@@ -366,7 +365,7 @@ def list_public_events(fest: Optional[str] = None, date: Optional[str] = None) -
     return _wrap(_run)
 
 
-def get_event(event_id: str) -> Optional[dict]:
+def get_event(event_id: str) -> dict | None:
     def _run():
         client = get_client()
         result = (
@@ -384,7 +383,7 @@ def get_event(event_id: str) -> Optional[dict]:
     return _wrap(_run)
 
 
-def get_event_meta(event_id: str) -> Optional[dict]:
+def get_event_meta(event_id: str) -> dict | None:
     """Just {id, created_by, status} — for authorization checks (does this
     Fest Admin own this event? is it still editable?) without pulling and
     serializing the full row. Distinct from get_event(), which is the
@@ -406,7 +405,7 @@ def event_exists(event_id: str) -> bool:
     return _wrap(_run)
 
 
-def list_all_events_admin(requesting_admin_id: Optional[str] = None, requesting_role: Optional[str] = None) -> List[dict]:
+def list_all_events_admin(requesting_admin_id: str | None = None, requesting_role: str | None = None) -> list[dict]:
     """List events for the admin dashboard.
 
     A Super Admin sees every event (unchanged from before the Fest Admin
@@ -438,7 +437,7 @@ def _slugify_event_id(name: str) -> str:
     return f"{slug}-{uuid.uuid4().hex[:6]}"
 
 
-def create_event(payload: dict, created_by_admin_id: Optional[str] = None) -> str:
+def create_event(payload: dict, created_by_admin_id: str | None = None) -> str:
     """payload matches the EventCreate pydantic model's .model_dump().
     Returns the new event's id. Raises ValueError if location_id is unknown
     (main.py turns that into the same 400 response as before)."""
@@ -499,7 +498,7 @@ def create_event(payload: dict, created_by_admin_id: Optional[str] = None) -> st
     return _wrap(_run)
 
 
-def verify_event(event_id: str, reviewer_id: Optional[str] = None) -> bool:
+def verify_event(event_id: str, reviewer_id: str | None = None) -> bool:
     def _run():
         client = get_client()
         now = datetime.now(timezone.utc).isoformat()
@@ -519,7 +518,7 @@ def verify_event(event_id: str, reviewer_id: Optional[str] = None) -> bool:
     return _wrap(_run)
 
 
-def reject_event(event_id: str, reason: str = "", reviewer_id: Optional[str] = None) -> bool:
+def reject_event(event_id: str, reason: str = "", reviewer_id: str | None = None) -> bool:
     def _run():
         client = get_client()
         result = (
@@ -545,7 +544,7 @@ def reject_event(event_id: str, reason: str = "", reviewer_id: Optional[str] = N
     return _wrap(_run)
 
 
-def request_changes_event(event_id: str, notes: str, reviewer_id: Optional[str] = None) -> bool:
+def request_changes_event(event_id: str, notes: str, reviewer_id: str | None = None) -> bool:
     """The third review outcome alongside verify/reject — sends the
     submission back to the Fest Admin with review_notes explaining what
     needs to change, without deleting or fully rejecting it. They can edit
@@ -636,7 +635,7 @@ def delete_event(event_id: str) -> bool:
     return _wrap(_run)
 
 
-def add_event_image(event_id: str, url: str, storage_path: Optional[str], is_poster: bool) -> dict:
+def add_event_image(event_id: str, url: str, storage_path: str | None, is_poster: bool) -> dict:
     """Used by the new /api/admin/events/{id}/images upload endpoint.
     If is_poster=True, any existing poster row for this event is replaced
     (mirrors the old behaviour where poster_url was a single field)."""
@@ -718,7 +717,7 @@ def upload_event_image_file(event_id: str, filename: str, content: bytes, conten
 # exactly the privilege boundary the RBAC redesign is for.
 # ---------------------------------------------------------------------------
 
-def list_fest_admins() -> List[dict]:
+def list_fest_admins() -> list[dict]:
     """For the "Manage Fest Admins" page — includes who created each one
     (resolved to a username, not just an id) and current status."""
     def _run():
@@ -743,7 +742,7 @@ def list_fest_admins() -> List[dict]:
     return _wrap(_run)
 
 
-def get_admin(admin_id: str) -> Optional[dict]:
+def get_admin(admin_id: str) -> dict | None:
     def _run():
         client = get_client()
         rows = client.table("admins").select("id, username, role, disabled").eq("id", admin_id).limit(1).execute().data or []
@@ -752,7 +751,7 @@ def get_admin(admin_id: str) -> Optional[dict]:
     return _wrap(_run)
 
 
-def get_admin_with_hash(admin_id: str) -> Optional[dict]:
+def get_admin_with_hash(admin_id: str) -> dict | None:
     """Includes password_hash — internal use only (verifying "current
     password" on the Account Settings page), never returned from an API
     response. Distinct from get_admin(), which is safe to serialize."""
@@ -764,7 +763,7 @@ def get_admin_with_hash(admin_id: str) -> Optional[dict]:
     return _wrap(_run)
 
 
-def update_own_account(admin_id: str, new_username: Optional[str] = None, new_password_hash: Optional[str] = None) -> dict:
+def update_own_account(admin_id: str, new_username: str | None = None, new_password_hash: str | None = None) -> dict:
     """Self-service account update (production audit Part 8) — works for
     either role, since changing your OWN credentials never touches the
     RBAC role boundary (see main.py's endpoint for why it's gated with
@@ -857,9 +856,9 @@ def delete_admin(admin_id: str) -> bool:
 # Audit log
 # ---------------------------------------------------------------------------
 
-def record_audit(actor_id: Optional[str], actor_username: str, action: str,
-                  target_type: Optional[str] = None, target_id: Optional[str] = None,
-                  details: Optional[dict] = None) -> None:
+def record_audit(actor_id: str | None, actor_username: str, action: str,
+                  target_type: str | None = None, target_id: str | None = None,
+                  details: dict | None = None) -> None:
     """Best-effort — same philosophy as last_login_at above: a hiccup
     writing an audit row must never block the actual admin action it's
     describing (e.g. disabling a compromised account right now matters
@@ -884,7 +883,7 @@ def record_audit(actor_id: Optional[str], actor_username: str, action: str,
                         actor_username, action, target_type, target_id, exc_info=True)
 
 
-def list_audit_log(limit: int = 200) -> List[dict]:
+def list_audit_log(limit: int = 200) -> list[dict]:
     def _run():
         client = get_client()
         return (
@@ -927,7 +926,7 @@ def _segment_row_to_legacy_shape(row: dict) -> dict:
     }
 
 
-def get_road_segments() -> List[dict]:
+def get_road_segments() -> list[dict]:
     def _run():
         client = get_client()
         rows = client.table("road_segments").select("*").order("id").execute().data or []
@@ -967,7 +966,7 @@ def sync_road_segments_cache() -> None:
         json.dump(segments, f, indent=2)
 
 
-def set_segment_closed(seg_id: str, closed: bool) -> Optional[dict]:
+def set_segment_closed(seg_id: str, closed: bool) -> dict | None:
     def _run():
         client = get_client()
         result = (
@@ -993,7 +992,7 @@ MENU_IMAGES_BUCKET = "venue-menus"
 _MENU_COLUMNS = "id, venue_id, date, image_url, storage_path, description, created_at, updated_at"
 
 
-def get_menu(venue_id: str, date: Optional[str] = None) -> Optional[dict]:
+def get_menu(venue_id: str, date: str | None = None) -> dict | None:
     """Return today's (or a specific date's) menu for a venue, or None."""
     def _run():
         client = get_client()
@@ -1011,7 +1010,7 @@ def get_menu(venue_id: str, date: Optional[str] = None) -> Optional[dict]:
     return _wrap(_run)
 
 
-def list_menus(venue_id: str) -> List[dict]:
+def list_menus(venue_id: str) -> list[dict]:
     """List all menu rows for a venue (admin: see history)."""
     def _run():
         client = get_client()
@@ -1027,8 +1026,8 @@ def list_menus(venue_id: str) -> List[dict]:
 
 
 def upsert_menu(venue_id: str, date: str, image_url: str,
-                storage_path: Optional[str], description: Optional[str],
-                created_by_admin_id: Optional[str]) -> dict:
+                storage_path: str | None, description: str | None,
+                created_by_admin_id: str | None) -> dict:
     """Insert or replace the menu for (venue_id, date). Returns the row."""
     def _run():
         client = get_client()
@@ -1045,7 +1044,13 @@ def upsert_menu(venue_id: str, date: str, image_url: str,
             try:
                 client.storage.from_(MENU_IMAGES_BUCKET).remove([existing.data[0]["storage_path"]])
             except Exception:
-                pass  # non-fatal: proceed with upsert even if old file stuck
+                # non-fatal: proceed with upsert even if old file stuck.
+                # Logged (not silently swallowed) so an orphaned Storage
+                # object is at least visible/debuggable after the fact.
+                logger.warning(
+                    "venue_menus upsert: failed to remove old Storage object %r for venue_id=%r date=%r",
+                    existing.data[0]["storage_path"], venue_id, date, exc_info=True,
+                )
 
         result = (
             client.table("venue_menus")
@@ -1083,7 +1088,13 @@ def delete_menu(venue_id: str, date: str) -> bool:
             try:
                 client.storage.from_(MENU_IMAGES_BUCKET).remove([existing.data[0]["storage_path"]])
             except Exception:
-                pass
+                # non-fatal: still delete the DB row even if Storage
+                # cleanup fails. Logged so the leftover object is
+                # discoverable rather than silently orphaned.
+                logger.warning(
+                    "delete_menu: failed to remove Storage object %r for venue_id=%r date=%r",
+                    existing.data[0]["storage_path"], venue_id, date, exc_info=True,
+                )
         result = (
             client.table("venue_menus")
             .delete()
@@ -1190,13 +1201,19 @@ def delete_event_image(image_id: str, event_id: str) -> bool:
             try:
                 client.storage.from_(EVENT_IMAGES_BUCKET).remove([storage_path])
             except Exception:
-                pass  # non-fatal: delete DB row even if Storage remove fails
+                # non-fatal: delete DB row even if Storage remove fails.
+                # Logged so the leftover object is discoverable rather
+                # than silently orphaned.
+                logger.warning(
+                    "delete_event_image: failed to remove Storage object %r for image_id=%r event_id=%r",
+                    storage_path, image_id, event_id, exc_info=True,
+                )
         result = client.table("event_images").delete().eq("id", image_id).execute()
         return bool(result.data)
     return _wrap(_run)
 
 
-def list_event_images(event_id: str) -> List[dict]:
+def list_event_images(event_id: str) -> list[dict]:
     """Return all image rows for an event, sorted by sort_order."""
     def _run():
         client = get_client()
@@ -1237,7 +1254,7 @@ MAX_ANALYTICS_BATCH = 50
 WEAK_SIGNAL_THRESHOLD_M = 30
 
 
-def record_analytics_events(events: List[dict], session_id: Optional[str]) -> int:
+def record_analytics_events(events: list[dict], session_id: str | None) -> int:
     """Insert a batch of anonymized analytics events. Silently drops any
     event whose type isn't recognized (e.g. an older/newer cached frontend
     build) rather than failing the whole batch. Returns rows inserted."""
@@ -1259,7 +1276,7 @@ def record_analytics_events(events: List[dict], session_id: Optional[str]) -> in
     return _wrap(_run)
 
 
-def _count_by(rows: List[dict], key_fn, top: Optional[int] = None) -> List[dict]:
+def _count_by(rows: list[dict], key_fn, top: int | None = None) -> list[dict]:
     """Count occurrences of key_fn(row) across rows, sorted descending.
     Backs every 'Top N' list in the analytics summary below."""
     counts: dict = {}
@@ -1274,7 +1291,7 @@ def _count_by(rows: List[dict], key_fn, top: Optional[int] = None) -> List[dict]
     return [{"key": k, "count": c} for k, c in ordered]
 
 
-def _parse_ts(raw: Optional[str]):
+def _parse_ts(raw: str | None):
     if not raw:
         return None
     try:
@@ -1433,14 +1450,20 @@ def delete_feedback(feedback_id: str) -> bool:
             try:
                 client.storage.from_(FEEDBACK_SCREENSHOTS_BUCKET).remove([storage_path])
             except Exception:
-                pass  # best-effort — a storage hiccup shouldn't block deleting the row itself
+                # best-effort — a storage hiccup shouldn't block deleting
+                # the row itself. Logged so the leftover object is
+                # discoverable rather than silently orphaned.
+                logger.warning(
+                    "delete_feedback: failed to remove Storage object %r for feedback_id=%r",
+                    storage_path, feedback_id, exc_info=True,
+                )
         client.table("route_feedback").delete().eq("id", feedback_id).execute()
         return True
 
     return _wrap(_run)
 
 
-def list_feedback_admin(status: Optional[str] = None, limit: int = 200) -> List[dict]:
+def list_feedback_admin(status: str | None = None, limit: int = 200) -> list[dict]:
     def _run():
         client = get_client()
         q = client.table("route_feedback").select(_FEEDBACK_COLUMNS).order("created_at", desc=True).limit(limit)
@@ -1451,8 +1474,8 @@ def list_feedback_admin(status: Optional[str] = None, limit: int = 200) -> List[
     return _wrap(_run)
 
 
-def update_feedback_status(feedback_id: str, status: Optional[str], resolution: Optional[str],
-                           admin_notes: Optional[str]) -> Optional[dict]:
+def update_feedback_status(feedback_id: str, status: str | None, resolution: str | None,
+                           admin_notes: str | None) -> dict | None:
     def _run():
         client = get_client()
         updates = {}

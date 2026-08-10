@@ -31,7 +31,7 @@ DATA_DIR = os.path.join(BASE_DIR, 'data')
 LOCATIONS_PATH = os.path.join(DATA_DIR, 'locations.json')
 REPORT_PATH = os.path.join(DATA_DIR, 'route_quality_report.json')
 
-import router  # noqa: E402
+import router  # noqa: E402  # noqa: E402
 
 
 def haversine(lat1, lng1, lat2, lng2):
