@@ -11,6 +11,7 @@
 import { copilotChat } from './copilotApi'
 import { haversine } from '../utils/geo'
 import { nearestWithFacility } from '../utils/facilities'
+import { isSafeUrl } from '../utils/url'
 import { getEvents, getRoute, getRouteFromCoords, getVenueMenu } from '../api'
 import { displayLocationName } from '../constants'
 
@@ -86,7 +87,7 @@ function eventCard(ev, position) {
     eta,
     statusBadge,
     description: ev.description,
-    thumbnail: ev.poster_url || null,
+    thumbnail: isSafeUrl(ev.poster_url) ? ev.poster_url : null,
     fest: ev.fest,
     event: ev,
     location: ev.location

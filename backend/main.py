@@ -35,7 +35,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 import data_access
 from auth import (
@@ -69,13 +69,48 @@ app = FastAPI(
     version="0.3.0",
 )
 
-# Allow the frontend (Vite dev server, or any device scanning a QR code) to call this API.
+# CORS — security review fix (Aug 2026). This used to be wide open
+# (allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]), which let
+# *any* website's JS read this API through a visitor's browser. allow_credentials
+# is (and must stay) False — the CORS spec forbids combining "*" origins with
+# credentials — but a wildcard origin was still broader than this app needs,
+# since only the deployed frontend (and local dev) ever legitimately call it.
+#
+# Build an explicit allow-list instead, from FRONTEND_BASE_URL — an env var
+# already *required* in production for QR codes to work at all (see
+# utils/qr_generator.py), so this adds no new configuration burden. An
+# optional comma-separated ADDITIONAL_ALLOWED_ORIGINS covers Vercel preview
+# deployments or a custom domain. Falls back to "*" only when
+# FRONTEND_BASE_URL genuinely isn't set (bare local dev), so this can't
+# break an existing Render deployment, which already has it configured.
+_frontend_base_url = (os.environ.get("FRONTEND_BASE_URL") or "").strip().rstrip("/")
+_additional_origins = [
+    o.strip().rstrip("/")
+    for o in (os.environ.get("ADDITIONAL_ALLOWED_ORIGINS") or "").split(",")
+    if o.strip()
+]
+_allowed_origins = sorted(
+    {
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        *([_frontend_base_url] if _frontend_base_url else []),
+        *_additional_origins,
+    }
+)
+
+if not _frontend_base_url:
+    logger.warning(
+        "FRONTEND_BASE_URL is not set — CORS is falling back to allow_origins=['*'] "
+        "for local dev. Set FRONTEND_BASE_URL (and optionally "
+        "ADDITIONAL_ALLOWED_ORIGINS) in production so CORS is properly restricted."
+    )
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins if _frontend_base_url else ["*"],
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 # Production audit — Dev Tools (Graph Viewer/Snap Debug/Route Inspector/
@@ -95,17 +130,21 @@ def _supabase_unavailable_handler(request: Request, exc: SupabaseUnavailableErro
     everything from a real outage to a missing table/column, a bad query,
     or an unconfigured Storage bucket, with the real cause thrown away.
     That real cause (str(exc), set by _wrap) is exactly what's needed to
-    tell those apart, so: always log it server-side, and include it in the
-    response too — same as every other endpoint in this file already does
-    with str(e) (see e.g. the admin image/menu routes below). A 503 is
-    still the right status code (something the backend depends on isn't
-    answering correctly right now), it just no longer hides why.
+    tell those apart — but this handler fires for *every* route, including
+    fully public/unauthenticated ones, and str(exc) can contain raw
+    Supabase/Postgres internals (table names, query fragments, storage
+    config). Security review (Aug 2026) flagged returning that text to
+    every caller as an information-disclosure risk, so: always log it
+    server-side (that's the only audience that needs it — check the Render
+    logs), but send callers a generic message. A 503 is still the right
+    status code (something the backend depends on isn't answering
+    correctly right now), it just no longer hands out why over the wire.
     """
     detail = str(exc) or "unknown error"
     logger.error("Supabase call failed on %s %s: %s", request.method, request.url.path, detail)
     return JSONResponse(
         status_code=503,
-        content={"detail": f"Service temporarily unavailable: {detail}"},
+        content={"detail": "Service temporarily unavailable. Please try again shortly."},
     )
 
 
@@ -125,6 +164,29 @@ def _on_startup():
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _require_safe_url(value: str | None, field_name: str) -> str | None:
+    """Security review (Aug 2026) — registration_link / poster_url /
+    photo_urls were stored and later rendered (as <a href> and <img src> on
+    EventPage.jsx) with no validation at all. A Fest Admin account (or one
+    compromised via a leaked/guessed password) could paste a `javascript:`
+    URL into registration_link and it would render as a clickable link —
+    client-side script execution for anyone who clicked "Register Now".
+    Restricting these fields to actual http(s) links at the API boundary,
+    before they ever reach the database, closes that off regardless of what
+    the frontend does. Empty/None stays allowed (all three fields are
+    optional).
+    """
+    if value is None:
+        return value
+    value = value.strip()
+    if not value:
+        return None
+    scheme = value.split(":", 1)[0].lower() if ":" in value else ""
+    if scheme not in ("http", "https"):
+        raise ValueError(f"{field_name} must be an http:// or https:// URL")
+    return value
+
 
 def haversine_meters(lat1, lng1, lat2, lng2) -> float:
     """Great-circle distance between two points, in meters."""
@@ -367,6 +429,18 @@ class EventCreate(BaseModel):
     floor: str | None = None              # e.g. "3rd Floor"
     wing: str | None = None               # e.g. "Left Wing"
 
+    @field_validator("registration_link", "poster_url")
+    @classmethod
+    def _validate_single_url(cls, v, info):
+        return _require_safe_url(v, info.field_name)
+
+    @field_validator("photo_urls")
+    @classmethod
+    def _validate_photo_urls(cls, v):
+        if not v:
+            return v
+        return [u for u in (_require_safe_url(u, "photo_urls") for u in v) if u]
+
 
 @app.post("/api/admin/events")
 def create_event(payload: EventCreate, admin: dict = Depends(get_current_active_admin)):
@@ -410,6 +484,11 @@ class EventUpdate(BaseModel):
     room_number: str | None = None
     floor: str | None = None
     wing: str | None = None
+
+    @field_validator("registration_link")
+    @classmethod
+    def _validate_registration_link(cls, v, info):
+        return _require_safe_url(v, info.field_name)
 
 
 @app.patch("/api/admin/events/{event_id}")

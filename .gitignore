@@ -3,6 +3,12 @@ backend/__pycache__/
 backend/.venv/
 *.pyc
 
+## Security review (Aug 2026) — a stray dev-server log (backend/server.log)
+## and a legacy backup file with a hardcoded default secret
+## (backend/main.py.phase2.bak) were both previously committed by accident.
+*.log
+*.bak
+
 ## Frontend
 frontend/node_modules/
 frontend/dist/

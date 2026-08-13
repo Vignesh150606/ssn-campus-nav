@@ -165,13 +165,24 @@ _RATE_LIMIT_PRUNE_AFTER_S = 3600  # evict a bucket if it hasn't been hit in an h
 
 
 def _client_ip(request: Request) -> str:
-    """Best-effort client IP. Render (like most PaaS platforms) sits behind
-    a reverse proxy, so request.client.host would just be the proxy's own
-    address — X-Forwarded-For's first entry is the actual client when
-    present."""
+    """Best-effort client IP, for rate-limiting only (not an auth decision).
+
+    Security review (Aug 2026) — this used to trust the *first* entry of
+    X-Forwarded-For. That's spoofable on Render: Render appends the real
+    connecting IP to whatever X-Forwarded-For a client already sent rather
+    than clearing it first (confirmed on Render's own feedback board —
+    https://feedback.render.com/features/p/send-the-correct-xforwardedfor),
+    so a caller can set `X-Forwarded-For: 1.2.3.4` themselves and the first
+    entry becomes attacker-controlled, letting them cycle through fake IPs
+    to dodge the per-IP limiter entirely. The *last* entry is the one
+    Render's own edge appends and the caller cannot control, so that's the
+    trustworthy one for this single-reverse-proxy deployment.
+    """
     fwd = request.headers.get("x-forwarded-for")
     if fwd:
-        return fwd.split(",")[0].strip()
+        parts = [p.strip() for p in fwd.split(",") if p.strip()]
+        if parts:
+            return parts[-1]
     return request.client.host if request.client else "unknown"
 
 

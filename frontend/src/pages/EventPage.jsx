@@ -14,6 +14,7 @@ import { track } from '../analytics/analyticsClient'
 import { useLocationContext } from '../context/LocationContext'
 import { useVoiceGuidance } from '../hooks/useVoiceGuidance'
 import { haversine } from '../utils/geo'
+import { isSafeUrl } from '../utils/url'
 import { FEST_META, displayLocationName } from '../constants'
 
 const ENTRY_ID = 'main-gate'
@@ -175,8 +176,9 @@ export default function EventPage() {
     return haversine(position.lat, position.lng, event.location.lat, event.location.lng)
   }, [position, event])
 
-  const photos = event?.photo_urls?.filter(Boolean) || []
-  const poster  = event?.poster_url || null
+  const photos = event?.photo_urls?.filter(isSafeUrl) || []
+  const poster  = isSafeUrl(event?.poster_url) ? event.poster_url : null
+  const registrationLink = isSafeUrl(event?.registration_link) ? event.registration_link : null
 
   // ── Loading / error states ────────────────────────────────────────────
   if (loadError) return (
@@ -288,7 +290,7 @@ export default function EventPage() {
         )}
 
         {/* Contact & Registration */}
-        {(event.contact_info || event.registration_link) && (
+        {(event.contact_info || registrationLink) && (
           <div className="event-card">
             <div className="event-card-title">More Info</div>
             {event.contact_info && (
@@ -297,11 +299,11 @@ export default function EventPage() {
                 <span className="event-info-value">{event.contact_info}</span>
               </div>
             )}
-            {event.registration_link && (
+            {registrationLink && (
               <div className="event-info-row">
                 <span className="event-info-label">Register</span>
                 <a
-                  href={event.registration_link}
+                  href={registrationLink}
                   target="_blank"
                   rel="noreferrer"
                   className="event-reg-link"
