@@ -33,11 +33,11 @@ export default function VenueMenuInline({ venueId }) {
     return <div className="preview-menu-inline error">⚠️ Menu unavailable right now</div>
   }
   if (menu === false) {
-    return <div className="preview-menu-inline empty">🍽 No menu uploaded for today</div>
+    return <div className="preview-menu-inline empty">🍴 No menu uploaded for today</div>
   }
   return (
     <div className="preview-menu-inline">
-      🍽 {menu.description || "Today's menu is up — tap to view"}
+      🍴 {menu.description || "Today's menu is up — tap to view"}
     </div>
   )
 }

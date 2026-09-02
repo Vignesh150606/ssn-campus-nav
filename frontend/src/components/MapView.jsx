@@ -197,7 +197,19 @@ function userMarkerHtml(mode) {
     // arrowhead sitting proud of the dot, rather than a wide translucent
     // beam, so it reads clearly at a glance without looking derivative.
     const CX = 24, CY = 24
-    return `<div class="user-marker-rotate" style="width:48px;height:48px">
+    // Design import (Claude Design "SSN Campus Navigator" mockup) — the
+    // Active Navigation screen's user dot has a slow "breathing" halo
+    // (gpsBreathe: scale 0.85<->1.15, opacity 0.5<->0.15) that this puck
+    // never had. Placed as a sibling of the SVG below, inside the same
+    // .user-marker-rotate wrapper 'dot'/'acquiring' already use for their
+    // own gps-pulse halo — that wrapper's JS-driven rotation only ever
+    // writes an inline `transform: rotate()` on ITSELF, never touching a
+    // child element's own animation, so this can't conflict with heading
+    // rotation. Positioned to sit behind the puck's r:13 white halo.
+    return `<div class="user-marker-rotate" style="width:48px;height:48px;position:relative">
+      <div style="position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px;
+        border-radius:50%;background:rgba(66,133,244,0.35);
+        animation:gps-breathe 2.2s ease-in-out infinite"></div>
       <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
         <defs>
           <filter id="u-shadow" x="-50%" y="-50%" width="200%" height="200%">
@@ -766,6 +778,29 @@ function AutoResize() {
   return null
 }
 
+// Animated route-preview line ("marching ants" flowing toward the
+// destination). The motion comes from the .route-preview-dash CSS
+// animation (index.css) on the rendered <path>. react-leaflet applies
+// pathOptions via Leaflet's setStyle(), which does not carry the
+// `className` option onto the element, so the class is attached
+// imperatively through the layer ref instead. Only mounted during route
+// preview (the caller renders a plain static breadcrumb once navigating),
+// so the animation is never on the active-navigation line.
+function PreviewRouteLine({ positions }) {
+  const layerRef = useRef(null)
+  useEffect(() => {
+    const el = layerRef.current?.getElement?.()
+    if (el) el.classList.add('route-preview-dash')
+  }, [])
+  return (
+    <Polyline
+      ref={layerRef}
+      positions={positions}
+      pathOptions={{ color: '#6D28D9', weight: 6, opacity: 0.95, dashArray: '7, 9', lineCap: 'round', lineJoin: 'round' }}
+    />
+  )
+}
+
 function DetectDrag({ onDrag }) {
   const map = useMap()
   const onDragRef = useRef(onDrag)
@@ -904,7 +939,19 @@ export default function MapView({
            • ACTIVE NAV (remainingPath present) keeps the original subtle
              pale-gray treatment — here it's only a receding "already
              walked" breadcrumb behind the vivid live blue centerline
-             below, and should stay in the background, not compete with it. */}
+             below, and should stay in the background, not compete with it.
+
+          Design import (Claude Design "SSN Campus Navigator" mockup) — the
+          PREVIEW line there animates ("marching ants") toward the
+          destination before Start Navigation is pressed. This is drawn by
+          PreviewRouteLine (below), which attaches the .route-preview-dash
+          CSS animation (index.css) imperatively via the Leaflet layer ref
+          — NOT through pathOptions.className, because react-leaflet applies
+          pathOptions with Leaflet's setStyle(), which handles
+          color/weight/dashArray but silently ignores `className` (verified
+          against the built app). Deliberately only the preview line moves:
+          the ACTIVE NAV breadcrumb below is a plain static line, matching
+          the mockup's own Active Navigation screen. */}
       {routePath?.length >= 2 && !remainingPath?.length && (
         <Polyline
           positions={routePath.map(p => [p.lat, p.lng])}
@@ -918,14 +965,16 @@ export default function MapView({
         />
       )}
       {routePath?.length >= 2 && (
-        <Polyline
-          positions={routePath.map(p => [p.lat, p.lng])}
-          pathOptions={
-            remainingPath?.length
-              ? { color: '#94A3B8', weight: 6, opacity: 0.38, lineCap: 'round', lineJoin: 'round' }
-              : { color: '#6D28D9', weight: 6, opacity: 0.95, dashArray: '1, 12', lineCap: 'round', lineJoin: 'round' }
-          }
-        />
+        remainingPath?.length
+          ? (
+            <Polyline
+              positions={routePath.map(p => [p.lat, p.lng])}
+              pathOptions={{ color: '#94A3B8', weight: 6, opacity: 0.38, lineCap: 'round', lineJoin: 'round' }}
+            />
+          )
+          : (
+            <PreviewRouteLine positions={routePath.map(p => [p.lat, p.lng])} />
+          )
       )}
 
       {/* Remaining route — subtle outer glow layer */}

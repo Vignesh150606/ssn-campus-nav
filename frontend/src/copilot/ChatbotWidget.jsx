@@ -82,7 +82,7 @@ function ChatCard({ card, onPreview, onStart, onDetails }) {
             className="copilot-card-menu-img"
             loading="lazy"
           />
-          <span className="copilot-card-menu-badge">🍽 Today's Menu</span>
+          <span className="copilot-card-menu-badge">🍴 Today's Menu</span>
         </div>
       )}
       <div className="copilot-card-body">

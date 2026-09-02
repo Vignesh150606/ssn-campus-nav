@@ -275,7 +275,7 @@ export default function AdminDashboard() {
           textTransform:'uppercase',letterSpacing:'0.06em',marginRight:2}}>
           Role: Super Admin
         </span>
-        {[['events',`Events (${events.length})`],['roads','Road Closures'],['menus','🍽 Menus'],['analytics','📊 Analytics'],['feedback','💬 Feedback'],['festadmins','👥 Manage Fest Admins'],['devtools','🛠 Dev Tools'],['account','⚙ Account Settings'],['add','+ Add Event']].map(([t,label])=>(
+        {[['events',`Events (${events.length})`],['roads','Road Closures'],['menus','🍴 Menus'],['analytics','📊 Analytics'],['feedback','💬 Feedback'],['festadmins','👥 Manage Fest Admins'],['devtools','🛠 Dev Tools'],['account','⚙ Account Settings'],['add','+ Add Event']].map(([t,label])=>(
           <button key={t} onClick={()=>setTab(t)} style={{...pill,
             background:tab===t?'var(--ink)':'transparent',
             color:tab===t?'var(--canvas)':'var(--ink)',

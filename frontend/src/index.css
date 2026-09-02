@@ -35,6 +35,7 @@
   --warning-ink:#92400e;
   --danger:     #dc2626;
   --danger-bg:  #fef2f2;
+  --success:    #2e9e5b;
 
   --font-sans:    'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-display: 'Montserrat', 'Space Grotesk', 'Inter', system-ui, sans-serif;
@@ -99,6 +100,7 @@
   --warning-ink:#fcd34d;
   --danger:     #f87171;
   --danger-bg:  rgba(248, 113, 113, 0.12);
+  --success:    #34d399;
 
   --shadow-xs:  0 1px 2px rgba(0,0,0,0.4);
   --shadow-sm:  0 2px 8px -2px rgba(0,0,0,0.5);
@@ -139,9 +141,31 @@ a { color: inherit; text-decoration: none; }
 button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
 input, select, textarea { font-family: inherit; color: inherit; }
 
+/* Accessibility — a single, consistent, on-brand keyboard focus ring.
+   Scoped to :focus-visible so it only ever appears for keyboard/AT users
+   (Tab, arrow keys, screen readers) and never on a mouse/touch tap, so
+   the pointer experience the rest of this file was designed around is
+   unchanged. Replaces the browser's inconsistent default outline (which
+   several components already suppressed piecemeal) with one that respects
+   the theme tokens and stays visible against both surfaces. */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
 @keyframes gps-pulse {
   0%   { transform: scale(0.6); opacity: 0.7; }
   100% { transform: scale(2.4); opacity: 0; }
+}
+/* Design import — slow "breathing" halo behind the active-navigation puck
+   marker (MapView.jsx userMarkerHtml 'puck'), matching the mockup's
+   gpsBreathe. Distinct from gps-pulse above (an expanding, fading ping
+   used only for the browse-mode dot/acquiring markers) — this is a gentle
+   scale/opacity loop with no expansion, so it doesn't compete visually
+   with the route line while navigating. */
+@keyframes gps-breathe {
+  0%, 100% { transform: scale(0.85); opacity: 0.5; }
+  50%      { transform: scale(1.15); opacity: 0.15; }
 }
 @keyframes dest-pulse {
   0%   { transform: translateX(-50%) scale(0.7); opacity: 0.55; }
@@ -173,6 +197,17 @@ input, select, textarea { font-family: inherit; color: inherit; }
 }
 .user-accuracy-circle {
   animation: accuracy-breathe 3s ease-in-out infinite;
+}
+/* Design import — "marching ants" flow along the route-preview line
+   (MapView.jsx), signalling direction toward the destination before Start
+   Navigation is pressed. -16 = -(7 + 9), the dash+gap pair set on that
+   line, so the pattern loops seamlessly; a negative offset flows in the
+   path's own draw direction (start → destination). */
+.route-preview-dash {
+  animation: route-dash-flow 0.7s linear infinite;
+}
+@keyframes route-dash-flow {
+  to { stroke-dashoffset: -16; }
 }
 @keyframes sheet-up {
   from { transform: translateY(20px); opacity: 0; }
@@ -267,6 +302,15 @@ input, select, textarea { font-family: inherit; color: inherit; }
 }
 .app-header nav a:hover { background: var(--ring); color: var(--ink); }
 .app-header nav a.active { background: var(--ink); color: var(--surface); }
+/* "Admin" is a secondary, non-visitor-facing entrance, so it's deliberately
+   de-emphasised in the header — but only while it ISN'T the current page.
+   Previously this was an inline `opacity: 0.6` on the link itself, which
+   also dimmed its own .active state, so the tab looked washed-out/disabled
+   even while you were on it (unlike the solid-black "Fest Schedule" active
+   state). Scoping the dimming to :not(.active) keeps the browse-mode
+   de-emphasis while giving Admin the same full-strength active state as
+   every other nav item. */
+.app-header nav a.admin-link:not(.active) { opacity: 0.6; }
 
 .theme-toggle {
   width: 34px; height: 34px;
@@ -2603,10 +2647,30 @@ html.nav-sheet-driving .map-layer {
   animation: slide-up 0.4s cubic-bezier(0.34,1.56,0.64,1);
 }
 
-.arrival-emoji {
-  font-size: 3.2rem;
-  margin-bottom: 14px;
-  display: block;
+/* Design import (Claude Design "SSN Campus Navigator" mockup) — the
+   Arrived screen there uses a crafted checkmark badge with a "pop-in"
+   entrance instead of a plain emoji. Reuses this app's own --success
+   token (added above, replacing 3 scattered raw #2E9E5B hex values) and
+   plain inline SVG, matching how CompassWidget/RouteFeedbackDialog
+   already do icons here — no new component or dependency. The entrance
+   keyframe is automatically neutralized by the existing blanket
+   prefers-reduced-motion rule further down this file (it zeroes every
+   animation-duration except two explicitly-exempted loading spinners),
+   so no extra reduced-motion handling is needed here. */
+.arrival-badge {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 14px;
+  animation: celebrate-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes celebrate-in {
+  from { transform: scale(0.5) rotate(-8deg); opacity: 0; }
+  to   { transform: scale(1) rotate(0deg); opacity: 1; }
 }
 
 .arrival-title {
@@ -3089,7 +3153,8 @@ html.nav-sheet-driving .map-layer {
     padding: 28px 20px 22px;
     border-radius: 22px;
   }
-  .arrival-emoji    { font-size: 2.8rem; }
+  .arrival-badge    { width: 68px; height: 68px; }
+  .arrival-badge svg { width: 32px; height: 32px; }
   .arrival-title    { font-size: 1.3rem; }
   .arrival-btn      { padding: 14px; font-size: 0.9rem; }
 
@@ -3303,7 +3368,8 @@ html.nav-sheet-driving .map-layer {
     max-height: 90vh;
     overflow-y: auto;
   }
-  .arrival-emoji { font-size: 2.2rem; margin-bottom: 8px; }
+  .arrival-badge { width: 56px; height: 56px; margin-bottom: 8px; }
+  .arrival-badge svg { width: 26px; height: 26px; }
   .arrival-title { font-size: 1.2rem; }
   .arrival-actions { gap: 8px; }
   .arrival-btn { padding: 12px; }
@@ -4303,8 +4369,8 @@ select:-webkit-autofill {
 .venue-menu-open-tag {
   font-size: 0.68rem;
   font-weight: 700;
-  color: #2E9E5B;
-  background: rgba(46,158,91,0.1);
+  color: var(--success);
+  background: color-mix(in oklab, var(--success) 12%, transparent);
   padding: 2px 8px;
   border-radius: 999px;
   letter-spacing: 0.02em;
@@ -4578,8 +4644,8 @@ select:-webkit-autofill {
 }
 .venue-menu-admin-success {
   font-size: 0.8rem;
-  color: #2E9E5B;
-  background: #2E9E5B15;
+  color: var(--success);
+  background: color-mix(in oklab, var(--success) 12%, transparent);
   border-radius: 8px;
   padding: 8px 12px;
 }
@@ -4646,7 +4712,7 @@ select:-webkit-autofill {
   font-size: 0.8rem;
 }
 .venue-menu-admin-diag-list li { display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
-.venue-menu-admin-diag-list li.ok   { color: #2E9E5B; }
+.venue-menu-admin-diag-list li.ok   { color: var(--success); }
 .venue-menu-admin-diag-list li.fail { color: #D7263D; }
 .venue-menu-admin-diag-list code {
   font-family: var(--font-mono);

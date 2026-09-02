@@ -35,7 +35,7 @@ export default function App() {
         </NavLink>
         <nav>
           <NavLink to="/events">Fest Schedule</NavLink>
-          <NavLink to="/admin" style={{ opacity: 0.6 }}>Admin</NavLink>
+          <NavLink to="/admin" className="admin-link">Admin</NavLink>
           {/* Task 1 (offline support) — built earlier (Phase X) but never
               actually rendered anywhere; renders nothing at all while
               online, so this is a purely additive, zero-risk mount. */}

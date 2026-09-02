@@ -34,3 +34,6 @@ frontend/.env.development
 ## OS / editor
 .DS_Store
 .vscode/
+
+## Claude Code project memory — local only, not for the repo
+CLAUDE.md

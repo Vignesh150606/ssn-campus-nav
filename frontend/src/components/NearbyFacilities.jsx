@@ -13,7 +13,7 @@ import { displayLocationName } from '../constants'
 const CARDS = [
   { key: 'restroom',     icon: '🚻', label: 'Nearest Restroom' },
   { key: 'water_station',icon: '💧', label: 'Nearest Water Station' },
-  { key: 'canteen',      icon: '🍽️', label: 'Nearest Canteen' },
+  { key: 'canteen',      icon: '🍴', label: 'Nearest Canteen' },
 ]
 
 function formatDistance(m) {

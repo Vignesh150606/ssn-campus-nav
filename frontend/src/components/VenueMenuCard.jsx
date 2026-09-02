@@ -66,7 +66,7 @@ export default function VenueMenuCard({ venueId, venueName }) {
     return (
       <div className="venue-menu-card">
         <div className="venue-menu-header">
-          <span className="venue-menu-label">🍽 Today&apos;s Menu</span>
+          <span className="venue-menu-label">🍴 Today&apos;s Menu</span>
         </div>
         <div className="venue-menu-empty venue-menu-error">⚠️ {errorMsg}</div>
       </div>
@@ -81,7 +81,7 @@ export default function VenueMenuCard({ venueId, venueName }) {
     return (
       <div className="venue-menu-card">
         <div className="venue-menu-header">
-          <span className="venue-menu-label">🍽 Today&apos;s Menu</span>
+          <span className="venue-menu-label">🍴 Today&apos;s Menu</span>
         </div>
         <div className="venue-menu-empty">No menu uploaded for today.</div>
       </div>
@@ -94,7 +94,7 @@ export default function VenueMenuCard({ venueId, venueName }) {
     <div className="venue-menu-card">
       {/* Header row */}
       <div className="venue-menu-header">
-        <span className="venue-menu-label">🍽 Today&apos;s Menu</span>
+        <span className="venue-menu-label">🍴 Today&apos;s Menu</span>
         <span className="venue-menu-open-tag">Open Today</span>
       </div>
 

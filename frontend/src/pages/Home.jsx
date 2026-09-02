@@ -1074,7 +1074,16 @@ export default function Home() {
           locations={locations}
           destinationId={destination}
           routePath={displayRoutePath}
-          remainingPath={tracking ? remainingPath : displayRoutePath}
+          // MapView treats a non-empty remainingPath as "actively navigating"
+          // and switches from the violet dashed *preview* line to the solid
+          // blue active-nav line. That distinction should track navMode, not
+          // GPS state — previously this fell back to `displayRoutePath` whenever
+          // `tracking` was false (GPS denied, or not yet locked), so a route
+          // *preview* rendered as the active-nav line instead of the intended
+          // animated dashed preview. Gating on navMode makes the preview always
+          // look like a preview; active navigation is unchanged (navMode true →
+          // exact same expression as before).
+          remainingPath={navMode ? (tracking ? remainingPath : displayRoutePath) : null}
           onSelect={loc => setDestination(loc.id)}
           userPosition={position ? [position.lat, position.lng] : null}
           userAccuracy={accuracy ?? 0}
@@ -1541,7 +1550,11 @@ export default function Home() {
       {navMode && arrived && (
         <div className="arrival-overlay">
           <div className="arrival-card">
-            <div className="arrival-emoji">🎯</div>
+            <div className="arrival-badge" aria-hidden="true">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 12l5 5L20 6" />
+              </svg>
+            </div>
             <div className="arrival-title">You've Arrived!</div>
             <div className="arrival-subtitle">
               {destName && <span className="arrival-dest">{destName}</span>}
@@ -1612,7 +1625,7 @@ export default function Home() {
               <button className="arrival-btn secondary" onClick={handleClear}>
                 🔍 Go Somewhere Else
               </button>
-              <button className="arrival-btn secondary" onClick={handleShareLocation}>
+              <button className="arrival-btn secondary" onClick={() => handleShareLocation(navDestLoc)}>
                 {shareCopied ? '✓ Link Copied!' : '↗ Share Location'}
               </button>
             </div>
