@@ -1,8 +1,8 @@
 {
-  "generated_from": "/home/claude/work/ssn-campus-nav-main/backend/data/walkway_graph.json",
+  "generated_from": "D:\\Downloads\\campus-nav-kml-manus\\backend\\data\\walkway_graph.json",
   "structural": {
     "nodes": 195,
-    "edges": 249,
+    "edges": 250,
     "location_edges": 32,
     "duplicate_edges": 0,
     "zero_length_edges": 0,
