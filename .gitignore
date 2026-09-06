@@ -37,3 +37,9 @@ frontend/.env.development
 
 ## Claude Code project memory — local only, not for the repo
 CLAUDE.md
+
+## Generated graph diagnostic reports — rewritten by validate_walkway_graph.py
+## and route_quality_test.py on every run; noisy multi-thousand-line diffs,
+## no source data, safe to regenerate locally whenever needed.
+backend/data/validation_report.json
+backend/data/route_quality_report.json
