@@ -29,6 +29,7 @@ issued by POST /api/admin/login). Every /api/admin/* route now requires
 import logging
 import math
 import os
+import time
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -112,6 +113,33 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
+
+
+# Observability (Step 7, Sept 2026 concurrency fix) — request duration +
+# status per endpoint, without adding a per-request log line for the
+# common case: at 1000 concurrent users, logging every single fast 2xx
+# response would itself become I/O overhead on the same event loop this
+# fix is trying to unblock. So this only logs the requests worth knowing
+# about — slow ones and error ones — everything else is silent.
+# Endpoint-level Supabase latency + cache hit/miss for the two cached
+# reads live next to their cache (data_access.py's get_location_async /
+# get_event_async), logged the same way (misses at INFO, hits at DEBUG).
+_SLOW_REQUEST_THRESHOLD_S = 1.0
+
+
+@app.middleware("http")
+async def log_slow_and_failed_requests(request: Request, call_next):
+    start = time.monotonic()
+    response = await call_next(request)
+    elapsed_s = time.monotonic() - start
+    if response.status_code >= 500 or elapsed_s >= _SLOW_REQUEST_THRESHOLD_S:
+        level = logging.WARNING if response.status_code >= 500 else logging.INFO
+        logger.log(
+            level,
+            "%s %s -> %s in %.0fms",
+            request.method, request.url.path, response.status_code, elapsed_s * 1000,
+        )
+    return response
 
 # Production audit — Dev Tools (Graph Viewer/Snap Debug/Route Inspector/
 # Graph Stats/Export Graph), Super-Admin-only. Entirely self-contained in
@@ -232,8 +260,10 @@ def search_locations(q: str = Query(..., min_length=1, description="Search text"
 
 
 @app.get("/api/locations/{location_id}")
-def get_location(location_id: str):
-    loc = data_access.get_location(location_id)
+async def get_location(location_id: str):
+    # async + cached (get_location_async) — concurrency fix, see db.py
+    # get_async_client() docstring. Same response shape as before.
+    loc = await data_access.get_location_async(location_id)
     if not loc:
         raise HTTPException(status_code=404, detail=f"Location '{location_id}' not found")
     return loc
@@ -252,10 +282,15 @@ def list_events(fest: str | None = None, date: str | None = None):
 
 
 @app.get("/api/events/{event_id}")
-def get_event(event_id: str):
+async def get_event(event_id: str):
     """Get full details for one event, including its venue location.
-    This is the data that powers the page a fest visitor lands on after scanning a QR code."""
-    event = data_access.get_event(event_id)
+    This is the data that powers the page a fest visitor lands on after scanning a QR code.
+
+    async + cached (get_event_async) — this was the endpoint the Sept 2026
+    load test showed degrading hardest under concurrent load (every
+    QR-scanning visitor hits this). See db.py get_async_client() and
+    data_access.py's _EVENT_CACHE for the concurrency-fix write-up."""
+    event = await data_access.get_event_async(event_id)
     if not event:
         raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
     return event
@@ -284,7 +319,7 @@ def get_event_qr(event_id: str):
 # ---------------------------------------------------------------------------
 
 @app.get("/api/route")
-def get_route(
+async def get_route(
     from_id: str | None = Query(None, description="Starting location id, e.g. 'main-gate'. Omit if using from_lat/from_lng."),
     to_id: str = Query(..., description="Destination location id, e.g. 'eee-block'"),
     from_lat: float | None = Query(None, description="Live GPS latitude — used instead of from_id for on-the-move rerouting."),
@@ -302,7 +337,13 @@ def get_route(
       nearest walkway node — used for automatic recalculation while a user
       is actively navigating and has drifted off the original route.
     """
-    b = data_access.get_location(to_id)
+    # async + cached (get_location_async) — concurrency fix. _find_route /
+    # _find_route_from_point stay plain sync calls: they're pure in-memory
+    # Dijkstra over utils/router.py's cached graph (no I/O, sub-millisecond
+    # for this graph's size), so calling them directly here doesn't block
+    # the event loop in any way that matters — see PRODUCTION AUDIT / load
+    # test notes for why router.py itself is explicitly not touched.
+    b = await data_access.get_location_async(to_id)
     if not b:
         raise HTTPException(status_code=404, detail=f"Unknown to_id '{to_id}'")
 
@@ -316,7 +357,7 @@ def get_route(
             result = _find_route_from_point(from_lat, from_lng, to_id, accuracy_m=accuracy, prefer_node_id=prefer_node)
             from_payload = {"id": None, "name": "Current location", "lat": from_lat, "lng": from_lng}
         else:
-            a = data_access.get_location(from_id)
+            a = await data_access.get_location_async(from_id)
             if not a:
                 raise HTTPException(status_code=404, detail=f"Unknown from_id '{from_id}'")
             result = _find_route(from_id, to_id)

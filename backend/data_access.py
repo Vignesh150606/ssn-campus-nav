@@ -17,11 +17,13 @@ Two things are deliberately NOT here, by design (see SUPABASE_MIGRATION.md):
 import logging
 import os
 import re
+import threading
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 
-from db import SupabaseUnavailableError, get_client
+from db import SupabaseUnavailableError, get_async_client, get_client
 
 logger = logging.getLogger("ssn-campus-nav.data_access")
 
@@ -98,6 +100,88 @@ def _wrap(fn, *args, **kwargs):
         raise
     except Exception as exc:
         raise SupabaseUnavailableError(str(exc)) from exc
+
+
+async def _wrap_async(coro_fn):
+    """Async twin of _wrap() — same failure normalization, for the
+    async-client read paths below (get_location_async / get_event_async)."""
+    try:
+        return await coro_fn()
+    except SupabaseUnavailableError:
+        raise
+    except Exception as exc:
+        raise SupabaseUnavailableError(str(exc)) from exc
+
+
+class _TTLCache:
+    """Small bounded in-memory TTL cache.
+
+    Hand-rolled instead of pulling in a caching library (cachetools etc.):
+    what's cached here is tiny (~30 static venues; a handful of
+    concurrently-live events), so a dict + timestamps is simpler and adds
+    no new dependency. One instance per process/worker — see Step 4 in the
+    Sept 2026 concurrency fix notes for why that's fine here.
+
+    Thread-safe for the access pattern this module actually has: reads
+    happen from async route handlers (event loop thread) via
+    get_location_async/get_event_async, while invalidation happens from
+    the existing sync admin-mutation functions below, which FastAPI runs
+    in its sync thread pool. The lock only ever guards a plain dict
+    operation — never held across an `await` or a network call.
+    """
+
+    def __init__(self, ttl_seconds: float, max_entries: int):
+        self._ttl = ttl_seconds
+        self._max_entries = max_entries
+        self._store: dict[str, tuple[float, object]] = {}
+        self._lock = threading.Lock()
+
+    def get(self, key):
+        """Returns (value, hit: bool). hit=False on miss or expiry."""
+        with self._lock:
+            entry = self._store.get(key)
+            if entry is None:
+                return None, False
+            expires_at, value = entry
+            if time.monotonic() >= expires_at:
+                del self._store[key]
+                return None, False
+            return value, True
+
+    def set(self, key, value):
+        with self._lock:
+            if key not in self._store and len(self._store) >= self._max_entries:
+                # Bound the cache size. Eviction order doesn't matter much
+                # here — max_entries is sized well above the realistic
+                # data volume (see constants below), so this should never
+                # actually trigger; it's a hard safety cap, not a real LRU.
+                oldest_key = next(iter(self._store), None)
+                if oldest_key is not None:
+                    del self._store[oldest_key]
+            self._store[key] = (time.monotonic() + self._ttl, value)
+
+    def invalidate(self, key):
+        with self._lock:
+            self._store.pop(key, None)
+
+
+# Venues have no admin write path today (see module docstring — "no write
+# endpoint for them in Phase 2 either"), confirmed by grep: no
+# .update()/.insert()/.delete() call against the venues table anywhere in
+# this file. So this TTL is a defensive staleness *bound* (in case a venue
+# is ever edited directly in the DB while the process is running), not a
+# real invalidation requirement — there's no write path here to hook.
+_VENUE_CACHE_TTL_SECONDS = 300
+_VENUE_CACHE = _TTLCache(ttl_seconds=_VENUE_CACHE_TTL_SECONDS, max_entries=200)
+
+# Events ARE admin-editable, so this cache is paired with explicit
+# invalidate() calls in every mutation below that changes what get_event()
+# returns for a given id (verify/reject/request_changes/update/delete,
+# plus add/delete event image since poster_url/photo_urls are part of the
+# serialized shape). The TTL is a backstop for any path that turns out to
+# be missed, not the primary freshness mechanism.
+_EVENT_CACHE_TTL_SECONDS = 30
+_EVENT_CACHE = _TTLCache(ttl_seconds=_EVENT_CACHE_TTL_SECONDS, max_entries=200)
 
 
 # ---------------------------------------------------------------------------
@@ -273,6 +357,33 @@ def venue_exists(location_id: str) -> bool:
     return get_location(location_id) is not None
 
 
+async def get_location_async(location_id: str) -> dict | None:
+    """Async, cached twin of get_location() — used by the /api/route and
+    /api/locations/{id} handlers (both converted to `async def`, see
+    main.py) so a venue lookup no longer occupies a sync thread-pool
+    worker for the length of a Supabase round trip. Same response shape
+    as get_location(); the sync version is left as-is for any other
+    caller."""
+    cached, hit = _VENUE_CACHE.get(location_id)
+    if hit:
+        logger.debug("venue_cache hit id=%s", location_id)
+        return cached
+
+    async def _run():
+        client = await get_async_client()
+        result = await (
+            client.table("venues").select(_VENUE_COLUMNS).eq("id", location_id).limit(1).execute()
+        )
+        rows = result.data or []
+        return rows[0] if rows else None
+
+    start = time.monotonic()
+    value = await _wrap_async(_run)
+    logger.info("venue_cache miss id=%s supabase_latency_ms=%.1f", location_id, (time.monotonic() - start) * 1000)
+    _VENUE_CACHE.set(location_id, value)
+    return value
+
+
 # ---------------------------------------------------------------------------
 # Event categories — small lookup table, auto-populated from whatever the
 # admin types in the (still free-text) category field, so the UI doesn't
@@ -381,6 +492,40 @@ def get_event(event_id: str) -> dict | None:
         return _serialize_event(rows[0], location_mode="full")
 
     return _wrap(_run)
+
+
+async def get_event_async(event_id: str) -> dict | None:
+    """Async, cached twin of get_event() — this is the exact call the load
+    test showed degrading hardest under concurrency (/api/events/{id}, the
+    page a QR-scanning visitor lands on). Same public response shape as
+    get_event(); every admin mutation below that can change this shape
+    (verify/reject/request_changes/update/delete, add/delete image) calls
+    _EVENT_CACHE.invalidate(event_id) so a stale entry is never served
+    past the next write, regardless of the TTL."""
+    cached, hit = _EVENT_CACHE.get(event_id)
+    if hit:
+        logger.debug("event_cache hit id=%s", event_id)
+        return cached
+
+    async def _run():
+        client = await get_async_client()
+        result = await (
+            client.table("events")
+            .select(_EVENT_SELECT_WITH_VENUE)
+            .eq("id", event_id)
+            .limit(1)
+            .execute()
+        )
+        rows = result.data or []
+        if not rows:
+            return None
+        return _serialize_event(rows[0], location_mode="full")
+
+    start = time.monotonic()
+    value = await _wrap_async(_run)
+    logger.info("event_cache miss id=%s supabase_latency_ms=%.1f", event_id, (time.monotonic() - start) * 1000)
+    _EVENT_CACHE.set(event_id, value)
+    return value
 
 
 def get_event_meta(event_id: str) -> dict | None:
@@ -515,7 +660,9 @@ def verify_event(event_id: str, reviewer_id: str | None = None) -> bool:
         )
         return bool(result.data)
 
-    return _wrap(_run)
+    result = _wrap(_run)
+    _EVENT_CACHE.invalidate(event_id)  # status just changed to "verified" — don't serve the pending copy
+    return result
 
 
 def reject_event(event_id: str, reason: str = "", reviewer_id: str | None = None) -> bool:
@@ -541,7 +688,9 @@ def reject_event(event_id: str, reason: str = "", reviewer_id: str | None = None
         )
         return bool(result.data)
 
-    return _wrap(_run)
+    result = _wrap(_run)
+    _EVENT_CACHE.invalidate(event_id)
+    return result
 
 
 def request_changes_event(event_id: str, notes: str, reviewer_id: str | None = None) -> bool:
@@ -567,7 +716,9 @@ def request_changes_event(event_id: str, notes: str, reviewer_id: str | None = N
         )
         return bool(result.data)
 
-    return _wrap(_run)
+    result = _wrap(_run)
+    _EVENT_CACHE.invalidate(event_id)
+    return result
 
 
 def update_event(event_id: str, payload: dict, requesting_admin_id: str, requesting_role: str) -> str:
@@ -622,7 +773,10 @@ def update_event(event_id: str, payload: dict, requesting_admin_id: str, request
         client.table("events").update(updates).eq("id", event_id).execute()
         return "ok"
 
-    return _wrap(_run)
+    result = _wrap(_run)
+    if result == "ok":
+        _EVENT_CACHE.invalidate(event_id)
+    return result
 
 
 def delete_event(event_id: str) -> bool:
@@ -632,7 +786,9 @@ def delete_event(event_id: str) -> bool:
         result = client.table("events").delete().eq("id", event_id).execute()
         return bool(result.data)
 
-    return _wrap(_run)
+    result = _wrap(_run)
+    _EVENT_CACHE.invalidate(event_id)  # harmless no-op if nothing was actually deleted
+    return result
 
 
 def add_event_image(event_id: str, url: str, storage_path: str | None, is_poster: bool) -> dict:
@@ -672,7 +828,9 @@ def add_event_image(event_id: str, url: str, storage_path: str | None, is_poster
         )
         return result.data[0] if result.data else {"event_id": event_id, "url": url}
 
-    return _wrap(_run)
+    result = _wrap(_run)
+    _EVENT_CACHE.invalidate(event_id)  # poster_url/photo_urls are part of the cached serialized shape
+    return result
 
 
 def upload_event_image_file(event_id: str, filename: str, content: bytes, content_type: str) -> str:
@@ -1210,7 +1368,9 @@ def delete_event_image(image_id: str, event_id: str) -> bool:
                 )
         result = client.table("event_images").delete().eq("id", image_id).execute()
         return bool(result.data)
-    return _wrap(_run)
+    result = _wrap(_run)
+    _EVENT_CACHE.invalidate(event_id)
+    return result
 
 
 def list_event_images(event_id: str) -> list[dict]:

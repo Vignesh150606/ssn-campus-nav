@@ -22,6 +22,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 
 _client = None
+_async_client = None
 
 
 def get_client():
@@ -44,6 +45,38 @@ def get_client():
 
         _client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     return _client
+
+
+async def get_async_client():
+    """Lazily create and cache the async Supabase client.
+
+    Concurrency fix (Sept 2026 load test) — `get_client()` above returns
+    supabase-py's sync client, and FastAPI runs plain `def` route handlers
+    that call it in a small shared thread pool (default ~cpu_count()+4
+    threads). Under concurrent load, every in-flight request that's
+    waiting on a Supabase network round trip occupies one of those threads
+    for the full round trip, so the pool saturates fast and everything
+    else queues behind it. `create_async_client` returns a real async
+    client (httpx-based, via postgrest-py's AsyncPostgrestClient) — used
+    by `async def` route handlers so a slow Supabase call suspends on the
+    event loop instead of blocking a thread. This does NOT replace
+    `get_client()`: every other route (admin CRUD, auth, etc.) is
+    low-traffic and stays on the sync client deliberately, to keep this
+    change scoped to the endpoints the load test actually showed
+    degrading (see PRODUCTION_AUDIT_REPORT.md-style load-test notes).
+    """
+    global _async_client
+    if _async_client is None:
+        if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+            raise RuntimeError(
+                "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set as "
+                "environment variables. Copy backend/.env.example to "
+                "backend/.env and fill them in (see SUPABASE_MIGRATION.md)."
+            )
+        from supabase import create_async_client
+
+        _async_client = await create_async_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    return _async_client
 
 
 class SupabaseUnavailableError(Exception):
