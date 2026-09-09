@@ -14,6 +14,7 @@ Two things are deliberately NOT here, by design (see SUPABASE_MIGRATION.md):
 - the walkway routing graph (walkway_graph.json) is never touched —
   utils/router.py keeps reading it straight off disk, untouched.
 """
+import asyncio
 import logging
 import os
 import re
@@ -174,6 +175,19 @@ class _TTLCache:
 _VENUE_CACHE_TTL_SECONDS = 300
 _VENUE_CACHE = _TTLCache(ttl_seconds=_VENUE_CACHE_TTL_SECONDS, max_entries=200)
 
+# Request coalescing ("singleflight") — one asyncio.Task per key currently
+# being fetched from Supabase. Without this, a burst of concurrent
+# requests that all miss the same cold (or just-expired) key each fire
+# their own Supabase call — exactly the worst moment for that to happen,
+# since a cold cache means a fresh crowd (e.g. everyone scanning the QR
+# poster in the first seconds of an event). With it, the first miss
+# starts the one real fetch; every other concurrent miss for the same key
+# just awaits that same in-flight task instead of starting a duplicate.
+# Safe without a lock: asyncio is single-threaded, and there's no `await`
+# between checking this dict and populating it, so the check-then-set is
+# atomic with respect to other coroutines on this event loop.
+_VENUE_FETCH_INFLIGHT: dict[str, "asyncio.Task"] = {}
+
 # Events ARE admin-editable, so this cache is paired with explicit
 # invalidate() calls in every mutation below that changes what get_event()
 # returns for a given id (verify/reject/request_changes/update/delete,
@@ -182,6 +196,10 @@ _VENUE_CACHE = _TTLCache(ttl_seconds=_VENUE_CACHE_TTL_SECONDS, max_entries=200)
 # be missed, not the primary freshness mechanism.
 _EVENT_CACHE_TTL_SECONDS = 30
 _EVENT_CACHE = _TTLCache(ttl_seconds=_EVENT_CACHE_TTL_SECONDS, max_entries=200)
+
+# Same singleflight coalescing as _VENUE_FETCH_INFLIGHT above, keyed by
+# event_id instead of location_id.
+_EVENT_FETCH_INFLIGHT: dict[str, "asyncio.Task"] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -363,25 +381,41 @@ async def get_location_async(location_id: str) -> dict | None:
     main.py) so a venue lookup no longer occupies a sync thread-pool
     worker for the length of a Supabase round trip. Same response shape
     as get_location(); the sync version is left as-is for any other
-    caller."""
+    caller.
+
+    Coalesces concurrent misses for the same id into one Supabase call
+    (see _VENUE_FETCH_INFLIGHT) so a burst of simultaneous first-time
+    requests doesn't turn into a burst of duplicate fetches."""
     cached, hit = _VENUE_CACHE.get(location_id)
     if hit:
         logger.debug("venue_cache hit id=%s", location_id)
         return cached
 
-    async def _run():
-        client = await get_async_client()
-        result = await (
-            client.table("venues").select(_VENUE_COLUMNS).eq("id", location_id).limit(1).execute()
-        )
-        rows = result.data or []
-        return rows[0] if rows else None
+    existing = _VENUE_FETCH_INFLIGHT.get(location_id)
+    if existing is not None:
+        return await existing
 
-    start = time.monotonic()
-    value = await _wrap_async(_run)
-    logger.info("venue_cache miss id=%s supabase_latency_ms=%.1f", location_id, (time.monotonic() - start) * 1000)
-    _VENUE_CACHE.set(location_id, value)
-    return value
+    async def _fetch():
+        async def _run():
+            client = await get_async_client()
+            result = await (
+                client.table("venues").select(_VENUE_COLUMNS).eq("id", location_id).limit(1).execute()
+            )
+            rows = result.data or []
+            return rows[0] if rows else None
+
+        start = time.monotonic()
+        value = await _wrap_async(_run)
+        logger.info("venue_cache miss id=%s supabase_latency_ms=%.1f", location_id, (time.monotonic() - start) * 1000)
+        _VENUE_CACHE.set(location_id, value)
+        return value
+
+    task = asyncio.ensure_future(_fetch())
+    _VENUE_FETCH_INFLIGHT[location_id] = task
+    try:
+        return await task
+    finally:
+        _VENUE_FETCH_INFLIGHT.pop(location_id, None)
 
 
 # ---------------------------------------------------------------------------
@@ -501,31 +535,49 @@ async def get_event_async(event_id: str) -> dict | None:
     get_event(); every admin mutation below that can change this shape
     (verify/reject/request_changes/update/delete, add/delete image) calls
     _EVENT_CACHE.invalidate(event_id) so a stale entry is never served
-    past the next write, regardless of the TTL."""
+    past the next write, regardless of the TTL.
+
+    Coalesces concurrent misses for the same id into one Supabase call
+    (see _EVENT_FETCH_INFLIGHT) — this is the endpoint a whole crowd of
+    QR-scanning visitors hits for the *same* event_id at once, so without
+    coalescing a cold/expired cache turns one burst into N duplicate
+    fetches for identical data."""
     cached, hit = _EVENT_CACHE.get(event_id)
     if hit:
         logger.debug("event_cache hit id=%s", event_id)
         return cached
 
-    async def _run():
-        client = await get_async_client()
-        result = await (
-            client.table("events")
-            .select(_EVENT_SELECT_WITH_VENUE)
-            .eq("id", event_id)
-            .limit(1)
-            .execute()
-        )
-        rows = result.data or []
-        if not rows:
-            return None
-        return _serialize_event(rows[0], location_mode="full")
+    existing = _EVENT_FETCH_INFLIGHT.get(event_id)
+    if existing is not None:
+        return await existing
 
-    start = time.monotonic()
-    value = await _wrap_async(_run)
-    logger.info("event_cache miss id=%s supabase_latency_ms=%.1f", event_id, (time.monotonic() - start) * 1000)
-    _EVENT_CACHE.set(event_id, value)
-    return value
+    async def _fetch():
+        async def _run():
+            client = await get_async_client()
+            result = await (
+                client.table("events")
+                .select(_EVENT_SELECT_WITH_VENUE)
+                .eq("id", event_id)
+                .limit(1)
+                .execute()
+            )
+            rows = result.data or []
+            if not rows:
+                return None
+            return _serialize_event(rows[0], location_mode="full")
+
+        start = time.monotonic()
+        value = await _wrap_async(_run)
+        logger.info("event_cache miss id=%s supabase_latency_ms=%.1f", event_id, (time.monotonic() - start) * 1000)
+        _EVENT_CACHE.set(event_id, value)
+        return value
+
+    task = asyncio.ensure_future(_fetch())
+    _EVENT_FETCH_INFLIGHT[event_id] = task
+    try:
+        return await task
+    finally:
+        _EVENT_FETCH_INFLIGHT.pop(event_id, None)
 
 
 def get_event_meta(event_id: str) -> dict | None:

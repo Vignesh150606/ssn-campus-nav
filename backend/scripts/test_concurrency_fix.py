@@ -200,22 +200,48 @@ async def main():
     check("_TTLCache serves a fresh entry", hit_immediately is True)
     check("_TTLCache expires an entry past its TTL", hit_after_ttl is False)
 
-    # 7. Concurrency: many simultaneous requests for the same COLD key all
-    # resolve to the correct value without error. (A "cache stampede" —
-    # more than one of them may independently hit the fake Supabase layer
-    # before any of them has populated the cache — is expected here and
-    # is a documented trade-off, not a correctness bug: see module
-    # docstring. What matters is every caller still gets the right data.)
+    # 7. Concurrency + request coalescing: many simultaneous requests for
+    # the same COLD key (the "everyone scans the QR poster at once"
+    # scenario) all resolve to the correct value AND only trigger ONE
+    # real Supabase call between them — the singleflight coalescing in
+    # get_location_async/get_event_async (_VENUE_FETCH_INFLIGHT /
+    # _EVENT_FETCH_INFLIGHT) means concurrent misses share the one
+    # in-flight fetch instead of each firing their own.
     STORE["venues"].append({
         "id": "main-gate", "name": "Main Gate / Entrance", "category": "gate",
         "department": None, "lat": 12.75137, "lng": 80.204085,
         "floors": None, "accessible": True, "description": "", "facilities": None,
     })
     data_access._VENUE_CACHE.invalidate("main-gate")
+    ASYNC_CALL_COUNTS["venues"] = 0
     concurrent_results = await asyncio.gather(*[data_access.get_location_async("main-gate") for _ in range(25)])
     check(
         "25 concurrent get_location_async calls on a cold key all return the correct venue",
         all(r is not None and r["name"] == "Main Gate / Entrance" for r in concurrent_results),
+    )
+    check(
+        "...and only 1 real Supabase call was made for all 25 (coalesced, not a stampede)",
+        ASYNC_CALL_COUNTS["venues"] == 1,
+    )
+
+    # Same coalescing check on the event path — this is the hotter of the
+    # two in a real event (many visitors, one shared event_id).
+    STORE["events"].append({
+        "id": "coalesce-event", "name": "Coalesce Test Event", "fest": "Invente", "department": "CSE",
+        "location_id": "cse-block", "date": "2026-09-12", "start_time": "10:00", "end_time": "17:00",
+        "status": "verified", "created_by": "admin-1", "reviewed_by": None,
+        "approved_at": None, "review_notes": None, "reject_reason": None,
+        "created_at": datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat(),
+    })
+    ASYNC_CALL_COUNTS["events"] = 0
+    concurrent_event_results = await asyncio.gather(*[data_access.get_event_async("coalesce-event") for _ in range(25)])
+    check(
+        "25 concurrent get_event_async calls on a cold key all return the correct event",
+        all(r is not None and r["name"] == "Coalesce Test Event" for r in concurrent_event_results),
+    )
+    check(
+        "...and only 1 real Supabase call was made for all 25 (coalesced, not a stampede)",
+        ASYNC_CALL_COUNTS["events"] == 1,
     )
 
     # 8. Endpoint-level smoke test (TestClient drives the real async route
