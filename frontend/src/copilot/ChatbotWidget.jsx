@@ -222,10 +222,12 @@ export default function ChatbotWidget({
       if (replyText || cards?.length) {
         setMessages(m => [...m, { role: 'assistant', text: replyText, cards, suggestions }])
       }
-    } catch {
+    } catch (err) {
       setMessages(m => [...m, {
         role: 'assistant',
-        text: "Sorry, I couldn't reach the campus service. Please try again.",
+        text: err?.name === 'CopilotError'
+          ? err.message
+          : "Sorry, I couldn't reach the campus service. Please try again.",
       }])
     } finally {
       setBusy(false)

@@ -17,7 +17,7 @@
  * W2 (static snapshots) — images are now optimised for the fest crowd:
  *   - the browser shrinks/re-encodes to WebP (<=1080px) BEFORE uploading (saves
  *     admin mobile data; falls back to the original file if the browser can't);
- *   - the backend ALWAYS re-encodes to WebP <=150 KB and returns the final
+ *   - the backend re-encodes static images to WebP and returns the final
  *     size, which is shown after each upload;
  *   - every image is lazy-loaded + async-decoded.
  */
@@ -32,7 +32,9 @@ const MAX_UPLOAD_WIDTH = 1080
  *  The backend re-optimises regardless, so this is purely a bandwidth saver. */
 async function shrinkImage(file) {
   try {
-    if (!file.type.startsWith('image/') || file.type === 'image/gif') return file
+    // Canvas only draws one frame. GIF, APNG and animated WebP must reach
+    // the backend intact; only JPEG is guaranteed to be a still image here.
+    if (!['image/jpeg', 'image/jpg'].includes(file.type)) return file
     if (typeof createImageBitmap !== 'function') return file
     const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
     const scale = Math.min(1, MAX_UPLOAD_WIDTH / bmp.width)

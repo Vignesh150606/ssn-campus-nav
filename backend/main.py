@@ -37,10 +37,12 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
+from starlette.concurrency import run_in_threadpool
 
 import data_access
-import snapshots  # W2
-from starlette.concurrency import run_in_threadpool  # W2 (image re-encode runs off the event loop)
+import health as health_routes
+import protection
+import snapshots
 from auth import (
     JWT_EXPIRES_HOURS,
     authenticate_admin,
@@ -71,6 +73,9 @@ app = FastAPI(
     description="Backend for the Smart Campus Navigation System (SSN College of Engineering)",
     version="0.3.0",
 )
+
+protection.install(app)  # Install before CORS so early responses keep CORS headers.
+app.include_router(health_routes.router)
 
 # CORS — security review fix (Aug 2026). This used to be wide open
 # (allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]), which let
@@ -414,16 +419,9 @@ def root():
 
 
 @app.get("/api/health")
-def health():
-    """Phase 4A.1 — polled by the frontend's startup screen to detect when
-    the backend has finished waking up after a Render free-tier cold
-    start. Confirms both that this process is up *and* that Supabase is
-    actually reachable, since "the API responded" and "the API can serve
-    real data" are different things on a cold start. Returns 200 only
-    when both are true; the SupabaseUnavailableError handler above turns
-    a DB hiccup into a clean 503 rather than a raw 500."""
-    data_access.health_check()
-    return {"status": "ok"}
+async def health():
+    """Same 200/503 contract; concurrent callers share the cached DB probe."""
+    return await health_routes.api_health()
 
 
 # ---------------------------------------------------------------------------

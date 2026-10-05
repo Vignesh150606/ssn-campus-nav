@@ -1,24 +1,7 @@
 /**
- * BootGate.jsx — Phase 4A.1 stability work.
- *
- * Renders a polished full-screen startup screen until the backend (Render
- * free-tier cold start can take 20-50s) and Supabase are both confirmed
- * reachable, then mounts the real app. This is the root-cause fix for
- * "Fest Schedule / Admin Dashboard sometimes blank on first load, refresh
- * fixes it": every route used to mount immediately and race the very
- * first API call against a server that might still be waking up. Gating
- * the whole app behind one confirmed-healthy check means every page's
- * first real fetch happens against a server that's already awake.
- *
- * States:
- *   checking → polling normally, friendly "starting up" message
- *   slow     → still polling, ~20-30s elapsed, message escalates
- *   ready    → health check succeeded — render children, unmount this
- *   failed   → ~60s of continuous failure — show a Retry screen
- *              (polling keeps running silently in the background even
- *              here, so it still recovers on its own the moment the
- *              backend wakes up — Retry is just a way to nudge it sooner
- *              and give the user something to do).
+ * Show the app as soon as cached, baked or snapshot/live data is usable.
+ * Render health checks continue in the background until the backend wakes.
+ * With no usable data, retain the checking/slow/failed startup screen.
  */
 import { useEffect, useState } from 'react'
 import { checkHealth, getGraph, getRoadSegments, getLocations } from '../api'
@@ -47,9 +30,6 @@ function seedEventsCache() {
 export default function BootGate({ children }) {
   const [status, setStatus] = useState('checking') // checking | slow | ready | failed
   const [retryKey, setRetryKey] = useState(0)
-  // Task 1 (offline support) — reuses the same online/offline tracking
-  // OfflineIndicator.jsx already relies on (see offline/offlineBundle.js),
-  // rather than this component polling navigator.onLine itself.
 
   useEffect(() => {
     let cancelled = false
@@ -61,17 +41,21 @@ export default function BootGate({ children }) {
     hasCachedBootData().then((available) => {
       if (available && !cancelled) setStatus('ready')
     }).catch(() => {})
-    for (const load of [getGraph, getLocations, getRoadSegments, seedEventsCache]) {
-      load().then(() => { if (!cancelled) setStatus('ready') }).catch(() => {})
+    function warmData() {
+      for (const load of [getGraph, getLocations, getRoadSegments, seedEventsCache]) {
+        load().then(() => { if (!cancelled) setStatus('ready') }).catch(() => {})
+      }
     }
+    warmData()
 
     async function attempt() {
       if (cancelled) return
       const ok = await checkHealth(ATTEMPT_TIMEOUT_MS)
       if (cancelled) return
       if (ok) {
-        seedEventsCache().catch(() => {})
-        setStatus('ready')
+        // Health alone is not data. Retry initial reads now that the server
+        // is awake, and release the gate only when a dataset resolves.
+        warmData()
         return
       }
       attemptTimer = setTimeout(attempt, RETRY_INTERVAL_MS)
@@ -95,22 +79,6 @@ export default function BootGate({ children }) {
     }
   }, [retryKey])
 
-  // Bug fix (Task 1 — offline support) — a device with no network at all
-  // can never pass checkHealth() above, so this gate used to leave it
-  // stuck polling for a full 60s and then landing on a 'failed' dead-end
-  // whose only action (Retry) just repeats the same doomed check —
-  // "test app restart while offline" and "test airplane mode" would both
-  // hang here with no way into the app at all. The rest of the app now
-  // runs without a connection (cached data + offline routing — see
-  // api.js and offline/*), so once we already know there's no network —
-  // whether that was already true before the very first health check
-  // could resolve, or becomes true partway through polling — this gate
-  // has nothing left to usefully protect against: let the app straight
-  // through and let the header's OfflineIndicator carry the message
-  // instead of a second, boot-time one. Derived directly from render
-  // (not its own state, not set from inside the effect above) so it
-  // reacts the instant `online` changes, from any status this gate is
-  // currently in, with no extra state-lifecycle wiring of its own.
   const effectiveStatus = status
 
   if (effectiveStatus === 'ready') return children
