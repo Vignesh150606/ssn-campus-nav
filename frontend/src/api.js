@@ -24,7 +24,8 @@
 
 import { API_BASE } from './apiBase'
 import { track } from './analytics/analyticsClient'
-import { cacheBundleResource, getCachedBundleResource } from './offline/offlineBundle'
+import * as snap from './data/dataClient'  // W2: snapshot-first reads
+import { getCachedBundleResource } from './offline/offlineBundle'
 import { routeBetweenLocations, routeFromPoint } from './offline/offlineRouter'
 
 // Previously plain fetch() with no timeout. LocationProvider.jsx's
@@ -68,25 +69,11 @@ async function getJSON(path) {
   return res.json()
 }
 
-export async function getLocations(category) {
-  const q = category ? `?category=${encodeURIComponent(category)}` : ''
-  try {
-    const data = await getJSON(`/api/locations${q}`)
-    // Only the unfiltered list is cached — every real caller in this app
-    // (Home.jsx) always calls getLocations() with no category and filters
-    // client-side, so caching a filtered subset under the same key would
-    // silently corrupt the offline cache for everyone else. Guarded here
-    // anyway rather than assumed, in case that ever changes.
-    if (!category) cacheBundleResource('locations', data)
-    return data
-  } catch (err) {
-    const cached = await getCachedBundleResource('locations')
-    if (!cached) throw err
-    return category
-      ? cached.filter(l => (l.category || '').toLowerCase() === category.toLowerCase())
-      : cached
-  }
+export function getLocations(category) {
+  // W2: baked /data/locations.json -> live API -> last-known-good (see data/dataClient.js)
+  return snap.getLocations(category)
 }
+
 
 export async function searchLocations(q) {
   if (!q) return []
@@ -113,40 +100,19 @@ export async function searchLocations(q) {
   }
 }
 
-export async function getLocation(id) {
-  try {
-    return await getJSON(`/api/locations/${id}`)
-  } catch (err) {
-    const cached = await getCachedBundleResource('locations')
-    const found = cached?.find(l => l.id === id)
-    if (found) return found
-    throw err
-  }
+export function getLocation(id) {
+  return snap.getLocation(id)
 }
 
-export async function getEvents(fest) {
-  const q = fest ? `?fest=${encodeURIComponent(fest)}` : ''
-  try {
-    const data = await getJSON(`/api/events${q}`)
-    if (!fest) cacheBundleResource('events', data)
-    return data
-  } catch (err) {
-    const cached = await getCachedBundleResource('events')
-    if (!cached) throw err
-    return fest ? cached.filter(e => (e.fest || '').toLowerCase() === fest.toLowerCase()) : cached
-  }
+
+export function getEvents(fest) {
+  return snap.getSchedule({ fest })
 }
 
-export async function getEvent(id) {
-  try {
-    return await getJSON(`/api/events/${id}`)
-  } catch (err) {
-    const cached = await getCachedBundleResource('events')
-    const found = cached?.find(e => e.id === id)
-    if (found) return found
-    throw err
-  }
+export function getEvent(id) {
+  return snap.getEvent(id)
 }
+
 
 // ── Routing ──────────────────────────────────────────────────────────────
 //
@@ -268,17 +234,10 @@ export function getRouteFromCoords(lat, lng, toId, accuracyM, preferNodeId, meta
  *  surface "passes through X road" entries in the route preview panel.
  *  Also one of the three inputs offline routing needs — see
  *  loadOfflineRouteInputs above. */
-export async function getRoadSegments() {
-  try {
-    const data = await getJSON('/api/road-segments')
-    cacheBundleResource('road-segments', data)
-    return data
-  } catch (err) {
-    const cached = await getCachedBundleResource('road-segments')
-    if (cached) return cached
-    throw err
-  }
+export function getRoadSegments() {
+  return snap.getClosures()
 }
+
 
 /** The raw walkway graph (nodes/edges/location_edges) — added for Task 1
  *  (offline support). Nothing in the UI reads this directly; it exists
@@ -286,23 +245,22 @@ export async function getRoadSegments() {
  *  the same way as everything else above, no fallback of its own to
  *  return since a failed fetch here just means loadOfflineRouteInputs
  *  won't find anything cached under 'graph' yet either. */
-export async function getGraph() {
-  const data = await getJSON('/api/graph')
-  cacheBundleResource('graph', data)
-  return data
+export function getGraph() {
+  return snap.getGraph()
 }
+
 
 /** Phase 4.2 — food court menu image for today (or a specific date). UI
  *  already treats a menu fetch failure as "no menu today" rather than a
  *  hard error. */
 export function getVenueMenu(venueId, date) {
-  const q = date ? `?date=${encodeURIComponent(date)}` : ''
-  return getJSON(`/api/locations/${encodeURIComponent(venueId)}/menu${q}`)
+  return snap.getVenueMenu(venueId, date)   // rejects with .status === 404 when no menu, as before
 }
 
 export function eventQrUrl(id) {
-  return `${API_BASE}/api/events/${id}/qr`
+  return snap.qrUrl(id)   // bucket copy when published, else the backend endpoint
 }
+
 
 /** Phase 4A.1 — used by the startup boot screen to detect when the
  *  backend (Render free-tier cold start can take 20-50s) and Supabase

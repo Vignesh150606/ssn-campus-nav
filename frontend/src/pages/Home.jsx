@@ -14,6 +14,7 @@
  * Phase 14: Auto-follow + Recenter button when user manually pans
  */
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { subscribe as subscribeSnapshot } from '../data/dataClient'
 import { useNavigate, useLocation as useRouterLocation } from 'react-router-dom'
 import MapView from '../components/MapView'
 import SearchBar from '../components/SearchBar'
@@ -564,7 +565,9 @@ export default function Home() {
   }, [locations, loadError])
 
   useEffect(() => {
+    const unsubscribe = subscribeSnapshot('closures', setRoadSegments)
     getRoadSegments().then(setRoadSegments).catch(() => {})
+    return unsubscribe
   }, [])
 
   useEffect(() => {

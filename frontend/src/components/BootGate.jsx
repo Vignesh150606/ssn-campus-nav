@@ -22,7 +22,7 @@
  */
 import { useEffect, useState } from 'react'
 import { checkHealth, getGraph, getRoadSegments, getLocations } from '../api'
-import { useOnlineStatus } from '../offline/useOnlineStatus'
+import { getSchedule, hasCachedBootData } from '../data/dataClient'
 
 const SLOW_MESSAGE_AFTER_MS = 22_000
 const GIVE_UP_AFTER_MS = 60_000
@@ -34,30 +34,14 @@ const ATTEMPT_TIMEOUT_MS = 8_000
 const EVENTS_CACHE_KEY = 'ssn_campus_events_v1'
 
 function seedEventsCache() {
-  const base = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'
-  fetch(`${base}/api/events`)
-    .then((r) => (r.ok ? r.json() : null))
+  // W2: schedule snapshot instead of a direct backend call
+  return getSchedule()
     .then((data) => {
-      if (!Array.isArray(data) || data.length === 0) return
+      if (!Array.isArray(data)) return
       try {
         localStorage.setItem(EVENTS_CACHE_KEY, JSON.stringify({ data, ts: Date.now() }))
       } catch { /* storage quota — silently ignore */ }
     })
-    .catch(() => { /* non-fatal — EventsList will fetch normally */ })
-}
-
-// Task 1 (offline support) — warms the on-device cache offline routing
-// needs (see offline/db.js, offline/offlineBundle.js, api.js) the moment
-// the backend is first confirmed reachable, rather than waiting on
-// Home.jsx's own mount to call getLocations()/getRoadSegments(). Each of
-// these already caches itself on success (see api.js) — this just makes
-// sure that happens even if the user's very first session lands on a
-// route other than Home (an EventPage deep link, say) or ends before
-// Home.jsx gets there itself.
-function seedOfflineCache() {
-  getGraph().catch(() => {})
-  getRoadSegments().catch(() => {})
-  getLocations().catch(() => {})
 }
 
 export default function BootGate({ children }) {
@@ -66,19 +50,27 @@ export default function BootGate({ children }) {
   // Task 1 (offline support) — reuses the same online/offline tracking
   // OfflineIndicator.jsx already relies on (see offline/offlineBundle.js),
   // rather than this component polling navigator.onLine itself.
-  const { online } = useOnlineStatus()
 
   useEffect(() => {
     let cancelled = false
     let attemptTimer = null
+
+    // The backend may be asleep while same-origin baked data, public snapshots
+    // or a previous device cache are already usable. Health keeps polling in
+    // the background; lack of backend health alone must not hide usable data.
+    hasCachedBootData().then((available) => {
+      if (available && !cancelled) setStatus('ready')
+    }).catch(() => {})
+    for (const load of [getGraph, getLocations, getRoadSegments, seedEventsCache]) {
+      load().then(() => { if (!cancelled) setStatus('ready') }).catch(() => {})
+    }
 
     async function attempt() {
       if (cancelled) return
       const ok = await checkHealth(ATTEMPT_TIMEOUT_MS)
       if (cancelled) return
       if (ok) {
-        seedEventsCache()
-        seedOfflineCache()
+        seedEventsCache().catch(() => {})
         setStatus('ready')
         return
       }
@@ -119,7 +111,7 @@ export default function BootGate({ children }) {
   // (not its own state, not set from inside the effect above) so it
   // reacts the instant `online` changes, from any status this gate is
   // currently in, with no extra state-lifecycle wiring of its own.
-  const effectiveStatus = online ? status : 'ready'
+  const effectiveStatus = status
 
   if (effectiveStatus === 'ready') return children
 

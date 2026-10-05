@@ -39,6 +39,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 
 import data_access
+import snapshots  # W2
+from starlette.concurrency import run_in_threadpool  # W2 (image re-encode runs off the event loop)
 from auth import (
     JWT_EXPIRES_HOURS,
     authenticate_admin,
@@ -189,6 +191,9 @@ def _on_startup():
     data_access.sync_road_segments_cache()
 
 
+snapshots.init(app)  # W2: startup/shutdown hooks + /api/admin/snapshots/{publish,status}
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -278,7 +283,7 @@ def list_events(fest: str | None = None, date: str | None = None):
     """List fest events, each enriched with its venue's coordinates.
     Optionally filter by fest name (e.g. 'Invente') or date (YYYY-MM-DD).
     Only verified events are returned — same as Phase 2."""
-    return data_access.list_public_events(fest=fest, date=date)
+    return [snapshots.public_event(event) for event in data_access.list_public_events(fest=fest, date=date)]
 
 
 @app.get("/api/events/{event_id}")
@@ -293,7 +298,7 @@ async def get_event(event_id: str):
     event = await data_access.get_event_async(event_id)
     if not event:
         raise HTTPException(status_code=404, detail=f"Event '{event_id}' not found")
-    return event
+    return snapshots.public_event(event)
 
 
 @app.get("/api/events/{event_id}/qr")
@@ -634,17 +639,21 @@ async def upload_event_image(
 
     content = await _read_upload_bounded(file)
     try:
+        # W2: always store WebP, <=1080 px wide, <=~150 KB, metadata stripped.
+        # CPU-bound, so it runs in the threadpool, not on the event loop.
+        content, content_type, filename, info = await run_in_threadpool(
+            snapshots.optimize_upload, content, file.content_type, file.filename
+        )
         public_url, storage_path = data_access.upload_event_image_file(
-            event_id,
-            file.filename or "image",
-            content,
-            file.content_type or "application/octet-stream",
+            event_id, filename, content, content_type
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-
     data_access.add_event_image(event_id, public_url, storage_path, is_poster)
-    return {"url": public_url, "is_poster": is_poster}
+    return {
+        "url": public_url, "is_poster": is_poster,
+        "bytes": info["bytes_out"], "width": info["width"], "height": info["height"],
+    }
 
 
 @app.get("/api/admin/events/{event_id}/images")
@@ -932,8 +941,13 @@ async def upload_venue_menu(
             raise HTTPException(status_code=404, detail=f"Venue '{venue_id}' not found")
         content = await _read_upload_bounded(file)
         try:
+            # W2 (optional but recommended): WebP, <=1600 px, <=300 KB
+            content, ctype, fname, _info = await run_in_threadpool(
+                snapshots.optimize_upload, content, file.content_type, file.filename or "menu",
+                1600, 300 * 1024,
+            )
             public_url, storage_path = data_access.upload_menu_image_file(
-                venue_id, file.filename or "menu", content, file.content_type or "image/jpeg"
+                venue_id, fname, content, ctype
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e

@@ -1,0 +1,321 @@
+/**
+ * frontend/src/data/dataClient.js  --  W2: snapshot-first data layer
+ *
+ * Read-mostly datasets come from static JSON instead of the FastAPI backend:
+ *   baked at build time (same-origin, served by Vercel):  /data/locations.json, /data/graph.json
+ *   live snapshots (public Supabase Storage bucket `snapshots`, base URL from
+ *   VITE_SNAPSHOT_BASE_URL):  schedule.json, menus.json, closures.json, posters.json
+ *
+ * Every function resolves to EXACTLY the shape the matching api.js function resolved to
+ * before (arrays of venues / events / road segments, the raw graph object, one menu row),
+ * so components don't change.
+ *
+ * Strategy per dataset (see DATASETS):
+ *   1. memory fresh (< ttl)           -> return it, no network
+ *   2. memory/IndexedDB copy < hardTtl -> return it NOW, revalidate in the background
+ *                                         (stale-while-revalidate; subscribers get the update)
+ *   3. otherwise                       -> wait for the network (short timeout); on failure
+ *                                         return the last-known-good copy if there is one
+ *   Network order: snapshot URL first, live API second. Only if both fail and nothing is cached
+ *   does the call reject (same error behaviour as the old api.js).
+ *
+ * Writes the same IndexedDB keys the existing offline code already reads
+ * ('locations', 'events', 'road-segments', 'graph' in offline/offlineBundle.js), so offline routing and
+ * the old fallbacks keep working. Admin screens do NOT use this file; they stay on the live API.
+ *
+ * Env: VITE_SNAPSHOT_BASE_URL   e.g. https://<ref>.supabase.co/storage/v1/object/public/snapshots
+ *      VITE_SNAPSHOT_BUCKET_SECONDS (optional)  if > 0, appends ?b=<time bucket> to live-snapshot URLs
+ *                                    to bound staleness when the CDN won't revalidate (see handoff).
+ */
+import { API_BASE } from '../apiBase'
+import { cacheBundleResource, getCachedBundleResource } from '../offline/offlineBundle'
+
+const SNAP_BASE = (import.meta.env.VITE_SNAPSHOT_BASE_URL || '').replace(/\/+$/, '')
+const BUCKET_S = Number(import.meta.env.VITE_SNAPSHOT_BUCKET_SECONDS) || 0
+
+const MIN = 60_000
+const DATASETS = {
+  // baked: same-origin raw JSON, no envelope
+  locations: { baked: true, file: '/data/locations.json', live: '/api/locations', idbKey: 'locations', ttl: 10 * MIN, hardTtl: 24 * 60 * MIN },
+  graph:     { baked: true, file: '/data/graph.json',     live: '/api/graph',     idbKey: 'graph',     ttl: 10 * MIN, hardTtl: 24 * 60 * MIN },
+  // live snapshots: envelope {schema, version, updated_at, meta, data}
+  schedule:  { file: '/schedule.json', live: '/api/events',        idbKey: 'events',          ttl: 30_000,  hardTtl: 5 * MIN },
+  closures:  { file: '/closures.json', live: '/api/road-segments', idbKey: 'road-segments',   ttl: 30_000,  hardTtl: 5 * MIN },
+  menus:     { file: '/menus.json',    live: null,                 idbKey: 'snapshot-menus',  ttl: 60_000,  hardTtl: 10 * MIN },
+  posters:   { file: '/posters.json',  live: 'derive-from-events',  idbKey: 'snapshot-posters', ttl: 2 * MIN, hardTtl: 30 * MIN },
+}
+
+const mem = {}          // name -> { data, version, fetchedAt, meta, source }
+const inflight = {}     // name -> Promise
+const listeners = {}    // name -> Set<fn>
+const refreshTimers = {} // Only actively displayed datasets are polled.
+
+const clone = (x) => (typeof structuredClone === 'function' ? structuredClone(x) : JSON.parse(JSON.stringify(x)))
+
+function httpError(message, status) {
+  const e = new Error(message)
+  e.status = status
+  return e
+}
+
+async function timedFetch(url, options = {}, timeoutMs = 8000) {
+  const ctl = new AbortController()
+  const timer = setTimeout(() => ctl.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...options, signal: ctl.signal })
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      const t = new Error('Request timed out — check your connection and try again.')
+      t.status = 0
+      t.timeout = true
+      throw t
+    }
+    throw e
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function liveJSON(path, timeoutMs = 8000) {
+  const res = await timedFetch(`${API_BASE}${path}`, {}, timeoutMs)
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}))
+    throw httpError(d.detail || `Request failed: ${res.status}`, res.status)
+  }
+  return res.json()
+}
+
+// ── validation: never let a malformed file replace good data ──────────────
+function validShape(name, data) {
+  if (name === 'graph') return data && typeof data === 'object' && Array.isArray(data.nodes) && Array.isArray(data.edges) && Array.isArray(data.location_edges)
+  if (name === 'menus') return data && typeof data === 'object' && !Array.isArray(data)
+  return Array.isArray(data)
+}
+
+// ── network sources ───────────────────────────────────────────────────────
+async function fetchSnapshot(name, timeoutMs) {
+  const def = DATASETS[name]
+  if (!def.baked && !SNAP_BASE) throw new Error('VITE_SNAPSHOT_BASE_URL not set')
+  let url = def.baked ? def.file : `${SNAP_BASE}${def.file}`
+  if (!def.baked && BUCKET_S > 0) url += `?b=${Math.floor(Date.now() / (BUCKET_S * 1000))}`
+  // Live snapshots: conditional request (cheap 304s) so the browser's own max-age can't add
+  // another minute of staleness on top of the CDN's. Baked files use normal HTTP/SW caching.
+  const res = await timedFetch(url, def.baked ? {} : { cache: 'no-cache' }, timeoutMs)
+  if (!res.ok) throw httpError(`snapshot ${name}: HTTP ${res.status}`, res.status)
+  const json = await res.json()
+  if (def.baked) {
+    if (!validShape(name, json)) throw new Error(`snapshot ${name}: bad data shape`)
+    return { data: json, version: 0, meta: {}, source: 'snapshot' }
+  }
+  if (!json || json.schema !== 1 || !('data' in json)) throw new Error(`snapshot ${name}: bad envelope`)
+  if (!validShape(name, json.data)) throw new Error(`snapshot ${name}: bad data shape`)
+  return { data: json.data, version: Number(json.version) || 0, meta: json.meta || {}, source: 'snapshot',
+    revalidated: res.headers.get('X-SSN-Snapshot-Source') !== 'sw-cache' }
+}
+
+async function fetchLive(name, timeoutMs) {
+  const def = DATASETS[name]
+  if (!def.live) throw new Error(`no live fallback for ${name}`)
+  if (def.live === 'derive-from-events') {
+    const events = await liveJSON('/api/events', timeoutMs)
+    const data = events
+      .filter((e) => e.poster_url || (e.photo_urls || []).length)
+      .map((e) => ({ event_id: e.id, poster_url: e.poster_url || '', photo_urls: e.photo_urls || [] }))
+    return { data, version: 0, meta: { live: true }, source: 'live' }
+  }
+  return { data: await liveJSON(def.live, timeoutMs), version: 0, meta: { live: true }, source: 'live' }
+}
+
+// ── state ─────────────────────────────────────────────────────────────────
+async function hydrate(name) {
+  const def = DATASETS[name]
+  const [data, meta] = await Promise.all([
+    getCachedBundleResource(def.idbKey),
+    getCachedBundleResource(`snapshot-meta:${name}`),
+  ])
+  if (!data || !validShape(name, data)) return undefined
+  // Raw data written by the pre-W2 api.js has no meta record: treat as old (fetchedAt 0) but usable.
+  return (mem[name] ||= { data, version: meta?.version ?? 0, fetchedAt: meta?.fetchedAt ?? 0, meta: meta?.meta ?? {}, source: 'cache' })
+}
+
+function commit(name, res) {
+  if (!validShape(name, res.data)) throw new Error(`${name}: unexpected data shape`)
+  const cur = mem[name]
+  const now = res.revalidated === false ? 0 : Date.now()
+  if (cur && res.revalidated === false) return cur
+  if (cur && res.version && cur.version && res.version < cur.version) {
+    // Older versions do not renew freshness.
+    return cur
+  }
+  if (cur && res.version && res.version === cur.version) {
+    cur.fetchedAt = now            // unchanged
+    return cur
+  }
+  const st = { data: res.data, version: res.version, fetchedAt: now, meta: res.meta, source: res.source }
+  mem[name] = st
+  const def = DATASETS[name]
+  cacheBundleResource(def.idbKey, st.data)
+  cacheBundleResource(`snapshot-meta:${name}`, { version: st.version, fetchedAt: st.fetchedAt, meta: st.meta })
+  listeners[name]?.forEach((fn) => { try { fn(clone(st.data)) } catch { /* listener bug must not break loading */ } })
+  return st
+}
+
+function revalidate(name, timeoutMs = 6000) {
+  if (inflight[name]) return inflight[name]
+  inflight[name] = (async () => {
+    try {
+      let res
+      try {
+        res = await fetchSnapshot(name, timeoutMs)
+      } catch {
+        res = await fetchLive(name, timeoutMs)   // snapshot unreachable -> the old live API path
+      }
+      return commit(name, res)
+    } finally {
+      delete inflight[name]
+    }
+  })()
+  return inflight[name]
+}
+
+async function load(name) {
+  const def = DATASETS[name]
+  const st = mem[name] || (await hydrate(name))
+  const age = st ? Date.now() - st.fetchedAt : Infinity
+  if (st && age < def.ttl) return st
+  if (st && age < def.hardTtl) {
+    if (name === 'closures') {
+      // A route request must use the refreshed road status, rather than returning
+      // a stale copy while its refresh runs after the route was calculated.
+      try { return await revalidate(name) } catch { return st }
+    }
+    revalidate(name).catch(() => {})             // stale-while-revalidate
+    return st
+  }
+  try {
+    return await revalidate(name, st ? 2500 : 8000)
+  } catch (err) {
+    if (st) return st                            // last-known-good (offline / both sources down)
+    throw err
+  }
+}
+
+// ── public API ────────────────────────────────────────────────────────────
+export async function getLocations(category) {
+  const list = clone((await load('locations')).data)
+  if (!category) return list
+  const c = category.toLowerCase()
+  return list.filter((l) => (l.category || '').toLowerCase() === c)
+}
+
+/** One venue by id (LocationDeepLink). Falls back to the live API only for an id the baked list lacks. */
+export async function getLocation(id) {
+  const found = (await load('locations')).data.find((l) => l.id === id)
+  if (found) return clone(found)
+  return liveJSON(`/api/locations/${encodeURIComponent(id)}`)   // rejects with .status === 404 if truly unknown
+}
+
+/** The raw walkway graph. Shared object (large): treat as read-only. */
+export async function getGraph() {
+  return (await load('graph')).data
+}
+
+/** Same array as GET /api/events (verified events, `location` = {id,name,lat,lng}). */
+export async function getSchedule({ fest, date } = {}) {
+  let list = clone((await load('schedule')).data)
+  if (fest) list = list.filter((e) => (e.fest || '').toLowerCase() === fest.toLowerCase())
+  if (date) list = list.filter((e) => e.date === date)
+  return list
+}
+
+/** Same object as GET /api/events/{id}: location is the full venue row. 404 error if unknown. */
+export async function getEvent(id) {
+  const ev = (await load('schedule')).data.find((e) => e.id === id)
+  if (!ev) return liveJSON(`/api/events/${encodeURIComponent(id)}`)  // brand-new event not in the snapshot yet
+  const out = clone(ev)
+  try {
+    const venue = (await load('locations')).data.find((l) => l.id === ev.location_id)
+    if (venue) out.location = clone(venue)
+  } catch { /* keep the minimal location */ }
+  return out
+}
+
+/** Same array as GET /api/road-segments. */
+export async function getClosures() {
+  return clone((await load('closures')).data)
+}
+
+/** { [venueId]: { [YYYY-MM-DD]: menuRow } } for yesterday..+14 days (UTC dates, like the backend). */
+export async function getMenus() {
+  return clone((await load('menus')).data)
+}
+
+const utcToday = () => new Date().toISOString().slice(0, 10)
+
+/** Same result/rejection as GET /api/locations/{id}/menu: a menu row, or an Error with .status 404. */
+export async function getVenueMenu(venueId, date) {
+  const d = date || utcToday()
+  let st
+  try { st = await load('menus') } catch { st = null }
+  const { date_from: from, date_to: to } = st?.meta || {}
+  if (st && from && to && d >= from && d <= to) {
+    const row = st.data?.[venueId]?.[d]
+    if (row) return clone(row)
+    throw httpError("Today's menu has not been uploaded.", 404)
+  }
+  return liveJSON(`/api/locations/${encodeURIComponent(venueId)}/menu?date=${encodeURIComponent(d)}`) // outside snapshot window / no snapshot
+}
+
+/** [{event_id, poster_url, photo_urls}] for verified events that have images. */
+export async function getPosters() {
+  return clone((await load('posters')).data)
+}
+
+/** QR image for an event: the bucket copy if the snapshot says it exists, else the backend endpoint. */
+export function qrUrl(eventId) {
+  const ids = mem.schedule?.meta?.qr_ids
+  if (SNAP_BASE && Array.isArray(ids) && ids.includes(eventId)) return `${SNAP_BASE}/qr/${encodeURIComponent(eventId)}.png`
+  return `${API_BASE}/api/events/${encodeURIComponent(eventId)}/qr`
+}
+
+/** Called with a fresh copy of the data whenever a background refresh actually changed it. */
+export function subscribe(name, fn) {
+  if (!DATASETS[name]) throw new Error(`unknown dataset ${name}`)
+  ;(listeners[name] ||= new Set()).add(fn)
+  if (!DATASETS[name].baked && !refreshTimers[name]) {
+    const refresh = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return
+      revalidate(name).catch(() => {})
+    }
+    const timer = setInterval(refresh, DATASETS[name].ttl)
+    timer.unref?.() // SSR verification must not be kept alive by a browser poll.
+    refreshTimers[name] = { timer, refresh }
+    if (typeof window !== 'undefined') window.addEventListener('online', refresh)
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', refresh)
+  }
+  return () => {
+    listeners[name].delete(fn)
+    if (!listeners[name].size && refreshTimers[name]) {
+      const { timer, refresh } = refreshTimers[name]
+      clearInterval(timer)
+      if (typeof window !== 'undefined') window.removeEventListener('online', refresh)
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', refresh)
+      delete refreshTimers[name]
+    }
+  }
+}
+
+/** An old cache is sufficient to show the app while health/network refreshes run. */
+export async function hasCachedBootData() {
+  const entries = await Promise.all(['locations', 'graph', 'closures', 'schedule'].map(name => mem[name] || hydrate(name)))
+  return entries.some(Boolean)
+}
+
+/** Warm everything the home screen needs; never rejects. */
+export function prefetchAll() {
+  return Promise.allSettled(['locations', 'graph', 'closures', 'schedule'].map(load))
+}
+
+/** Test/debug helper. */
+export function _state() { return mem }

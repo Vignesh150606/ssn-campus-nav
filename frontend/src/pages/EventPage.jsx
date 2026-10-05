@@ -10,6 +10,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getEvent, getEvents, getRoute, getRouteFromCoords, eventQrUrl } from '../api'
+import { subscribe } from '../data/dataClient'
 import { track } from '../analytics/analyticsClient'
 import { useLocationContext } from '../context/LocationContext'
 import { useVoiceGuidance } from '../hooks/useVoiceGuidance'
@@ -118,9 +119,10 @@ export default function EventPage() {
           }
         })
     }
+    const unsubscribe = subscribe('schedule', () => load(0))
     load(0)
 
-    return () => { cancelled = true; clearTimeout(retryTimer) }
+    return () => { cancelled = true; unsubscribe(); clearTimeout(retryTimer) }
   }, [eventId, retryAttempt])
 
   // Phase 2 — load same-day events within 300m of this venue
@@ -282,6 +284,8 @@ export default function EventPage() {
                   src={url}
                   alt={`Event photo ${i + 1}`}
                   className="event-photo-item"
+                  loading="lazy"
+                  decoding="async"
                   onClick={() => setLightboxIdx(i)}
                 />
               ))}
@@ -449,6 +453,8 @@ export default function EventPage() {
             src={eventQrUrl(event.id)}
             alt={`QR for ${event.name}`}
             className="event-qr-img"
+            loading="lazy"
+            decoding="async"
           />
         </div>
 

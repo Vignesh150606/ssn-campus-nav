@@ -634,6 +634,11 @@ def _slugify_event_id(name: str) -> str:
     return f"{slug}-{uuid.uuid4().hex[:6]}"
 
 
+def _mark_public_dirty(name: str) -> None:
+    import snapshots
+    snapshots.mark_dirty(name)  # Thread-safe; no network I/O on the write path.
+
+
 def create_event(payload: dict, created_by_admin_id: str | None = None) -> str:
     """payload matches the EventCreate pydantic model's .model_dump().
     Returns the new event's id. Raises ValueError if location_id is unknown
@@ -692,7 +697,10 @@ def create_event(payload: dict, created_by_admin_id: str | None = None) -> str:
 
         return event_id
 
-    return _wrap(_run)
+    result = _wrap(_run)
+    if result:
+        _mark_public_dirty("posters")
+    return result
 
 
 def verify_event(event_id: str, reviewer_id: str | None = None) -> bool:
@@ -714,6 +722,8 @@ def verify_event(event_id: str, reviewer_id: str | None = None) -> bool:
 
     result = _wrap(_run)
     _EVENT_CACHE.invalidate(event_id)  # status just changed to "verified" — don't serve the pending copy
+    if result:
+        _mark_public_dirty("posters")
     return result
 
 
@@ -742,6 +752,8 @@ def reject_event(event_id: str, reason: str = "", reviewer_id: str | None = None
 
     result = _wrap(_run)
     _EVENT_CACHE.invalidate(event_id)
+    if result:
+        _mark_public_dirty("posters")
     return result
 
 
@@ -770,6 +782,8 @@ def request_changes_event(event_id: str, notes: str, reviewer_id: str | None = N
 
     result = _wrap(_run)
     _EVENT_CACHE.invalidate(event_id)
+    if result:
+        _mark_public_dirty("posters")
     return result
 
 
@@ -828,6 +842,7 @@ def update_event(event_id: str, payload: dict, requesting_admin_id: str, request
     result = _wrap(_run)
     if result == "ok":
         _EVENT_CACHE.invalidate(event_id)
+        _mark_public_dirty("schedule")
     return result
 
 
@@ -840,6 +855,8 @@ def delete_event(event_id: str) -> bool:
 
     result = _wrap(_run)
     _EVENT_CACHE.invalidate(event_id)  # harmless no-op if nothing was actually deleted
+    if result:
+        _mark_public_dirty("posters")
     return result
 
 
@@ -882,6 +899,8 @@ def add_event_image(event_id: str, url: str, storage_path: str | None, is_poster
 
     result = _wrap(_run)
     _EVENT_CACHE.invalidate(event_id)  # poster_url/photo_urls are part of the cached serialized shape
+    if result:
+        _mark_public_dirty("posters")
     return result
 
 
@@ -896,7 +915,8 @@ def upload_event_image_file(event_id: str, filename: str, content: bytes, conten
         safe_name = "".join(c for c in filename if c.isalnum() or c in "._-") or "image"
         storage_path = f"{event_id}/{uuid.uuid4().hex}_{safe_name}"
         client.storage.from_(EVENT_IMAGES_BUCKET).upload(
-            storage_path, content, file_options={"content-type": content_type}
+            storage_path, content,
+            file_options={"content-type": content_type, "cache-control": "31536000"},  # W2: name is unique per upload
         )
         public = client.storage.from_(EVENT_IMAGES_BUCKET).get_public_url(storage_path)
         # supabase-py has returned either a plain string or a nested dict
@@ -1189,6 +1209,7 @@ def set_segment_closed(seg_id: str, closed: bool) -> dict | None:
 
     row = _wrap(_run)
     if row:
+        _mark_public_dirty("closures")
         sync_road_segments_cache()
         return _segment_row_to_legacy_shape(row)
     return None
@@ -1279,7 +1300,10 @@ def upsert_menu(venue_id: str, date: str, image_url: str,
             .execute()
         )
         return result.data[0] if result.data else {}
-    return _wrap(_run)
+    result = _wrap(_run)
+    if result:
+        _mark_public_dirty("menus")
+    return result
 
 
 def delete_menu(venue_id: str, date: str) -> bool:
@@ -1313,7 +1337,10 @@ def delete_menu(venue_id: str, date: str) -> bool:
             .execute()
         )
         return bool(result.data)
-    return _wrap(_run)
+    result = _wrap(_run)
+    if result:
+        _mark_public_dirty("menus")
+    return result
 
 
 def upload_menu_image_file(venue_id: str, filename: str,
@@ -1422,6 +1449,8 @@ def delete_event_image(image_id: str, event_id: str) -> bool:
         return bool(result.data)
     result = _wrap(_run)
     _EVENT_CACHE.invalidate(event_id)
+    if result:
+        _mark_public_dirty("posters")
     return result
 
 

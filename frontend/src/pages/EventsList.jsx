@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getEvents } from '../api'
+import { subscribe } from '../data/dataClient'
 import { FEST_META, displayLocationName } from '../constants'
 import { SkeletonScheduleList } from '../components/Skeleton'
 
@@ -104,6 +105,12 @@ export default function EventsList() {
     // own latest state. `cancelled` also guards against a fetch resolving
     // after this page has been navigated away from.
     let cancelled = false
+    const unsubscribe = subscribe('schedule', (data) => {
+      if (cancelled) return
+      setEvents(data)
+      setError(null)
+      saveEventsCache(data)
+    })
 
     function fetchEvents() {
       getEvents()
@@ -135,6 +142,7 @@ export default function EventsList() {
 
     return () => {
       cancelled = true
+      unsubscribe()
       clearInterval(interval)
       window.removeEventListener('campus:eventApproved', handleAdminApproval)
     }
