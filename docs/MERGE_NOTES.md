@@ -63,3 +63,6 @@ With snapshots working and client routing enabled, normal routes need zero Rende
 
 ### W2 verification
 PASS: frontend lint (0 errors, 16 warnings), dummy-URL production build in a scratch mirror excluding real .env files (17 precache entries, 723.50 KiB), verify_snapshots.mjs mocked contracts, baked-data --check, Python AST syntax. Backend runtime tests and actual Storage/SQL/security verification: UNTESTED.
+
+### W1 integration and verification
+Only the 14 patch-listed paths were considered; BootGate retains W2's requested data-availability gate. Initial routes await getRoadSegments/getClosures, closure subscriptions refresh every 30 s in the foreground, and synchronous GPS reroutes use that continually updated input while invoking the same getter. Missing road status is no longer assumed all-open. PASS: client/server verification (no route API calls in client mode; closure refresh and reopening tested), lint (0 errors, 16 warnings), production build (17 precache entries, 765.73 KiB). Full Python/JS parity is running; its final result will be recorded below. Backend integration tests: UNTESTED.

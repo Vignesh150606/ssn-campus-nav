@@ -9,7 +9,7 @@
  * first — see PRODUCTION_AUDIT_REPORT.md §10.1). That earlier removal was
  * the right call at the time: half-built, disconnected code is worse than
  * no code. This re-adds the same idea properly wired end to end: every
- * successful getLocations/getEvents/getRoadSegments/getGraph call in
+ * successful getLocations/getEvents/getRoadSegments call in
  * api.js now also writes its result here via cacheBundleResource, and
  * api.js reads it back via getCachedBundleResource whenever the real
  * network call fails — see api.js for the actual fallback logic; this
@@ -76,7 +76,7 @@ if (typeof window !== 'undefined') {
 // ── Offline data cache (Task 1) ─────────────────────────────────────────
 //
 // One row per resource name in STORE_BUNDLE_CACHE — 'locations', 'events',
-// 'road-segments', 'graph'. api.js is the only caller of either function
+// 'road-segments'. api.js is the only caller of either function
 // below; this module just owns the storage + the reactive `hasCache`/
 // `lastSyncedAt` status so OfflineIndicator.jsx doesn't need to know
 // anything changed.
@@ -104,7 +104,7 @@ export async function getCachedBundleResource(key) {
 // cached anything, so a device that opens this app OFFLINE from a cold
 // start still shows "Offline" (has cache) rather than "Offline — limited"
 // for data it actually already has. 'locations' is used as the presence
-// check since api.js always caches it first, before graph/road-segments.
+// check since api.js always caches it first, before road-segments.
 if (typeof indexedDB !== 'undefined') {
   getCachedBundleResource('locations').then((cached) => {
     if (cached) setStatus({ hasCache: true })

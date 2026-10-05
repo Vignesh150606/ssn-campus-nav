@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -55,7 +57,18 @@ export default defineConfig(({ command, mode }) => {
   }
 
   return {
+  resolve: { alias: { '@graph': fileURLToPath(new URL('../backend/data', import.meta.url)) } },
   plugins: [
+    {
+      name: 'baked-graph-consistency',
+      buildStart() {
+        const canonical = JSON.parse(readFileSync(new URL('../backend/data/walkway_graph.json', import.meta.url), 'utf8'))
+        const baked = JSON.parse(readFileSync(new URL('./public/data/graph.json', import.meta.url), 'utf8'))
+        if (JSON.stringify(canonical) !== JSON.stringify(baked)) {
+          this.error('Baked graph is stale. Run python scripts/bake_static_data.py from backend before building.')
+        }
+      },
+    },
     leafletGlobalFix(),
     react(),
     VitePWA({

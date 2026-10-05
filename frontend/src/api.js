@@ -11,22 +11,28 @@
 // logging lives, rather than scattered across every screen that calls
 // these functions. See ./analytics/analyticsClient.js.
 //
-// Task 1 (offline support) — getLocations/getEvents/getRoadSegments/
-// getGraph each cache their result via offline/offlineBundle.js the
-// moment a network call succeeds, and fall back to that same cache if a
-// later call fails. getRoute/getRouteFromCoords fall back to computing
-// the route on-device via offline/offlineRouter.js, using whatever of
-// that cached data is available. Every fallback below is genuinely
-// best-effort: if nothing has ever been cached yet (a device's very
-// first-ever launch, offline from the start), the original network error
-// is what gets thrown, same as before this was added — see each
-// function's own comment for specifics.
+// Task 1 (offline support) — getLocations/getEvents/getRoadSegments each
+// cache their result via offline/offlineBundle.js the moment a network call
+// succeeds, and fall back to that same cache if a later call fails. Every
+// fallback is genuinely best-effort: if nothing has ever been cached yet (a
+// device's very first-ever launch, offline from the start), the original
+// network error is what gets thrown.
+//
+// Routing (getRoute/getRouteFromCoords) runs on-device by default and makes
+// no request — see the Routing section below and routing/routingMode.js.
 
 import { API_BASE } from './apiBase'
 import { track } from './analytics/analyticsClient'
-import * as snap from './data/dataClient'  // W2: snapshot-first reads
+import * as snap from './data/dataClient'
 import { getCachedBundleResource } from './offline/offlineBundle'
-import { routeBetweenLocations, routeFromPoint } from './offline/offlineRouter'
+import { ROUTING_MODE } from './routing/routingMode'
+import {
+  routeToLocationSync, routeFromCoordsSync,
+  setRoadSegmentsSnapshot, setLocationsSnapshot,
+} from './routing/clientRouting'
+
+snap.subscribe('closures', setRoadSegmentsSnapshot)
+snap.subscribe('locations', setLocationsSnapshot)
 
 // Previously plain fetch() with no timeout. LocationProvider.jsx's
 // maybeRecalculate() sets recalculatingRef.current = true before calling
@@ -69,11 +75,11 @@ async function getJSON(path) {
   return res.json()
 }
 
-export function getLocations(category) {
-  // W2: baked /data/locations.json -> live API -> last-known-good (see data/dataClient.js)
-  return snap.getLocations(category)
+export async function getLocations(category) {
+  const data = await snap.getLocations(category)
+  if (!category) setLocationsSnapshot(data)
+  return data
 }
-
 
 export async function searchLocations(q) {
   if (!q) return []
@@ -104,7 +110,6 @@ export function getLocation(id) {
   return snap.getLocation(id)
 }
 
-
 export function getEvents(fest) {
   return snap.getSchedule({ fest })
 }
@@ -113,39 +118,26 @@ export function getEvent(id) {
   return snap.getEvent(id)
 }
 
-
 // ── Routing ──────────────────────────────────────────────────────────────
 //
-// Both getRoute and getRouteFromCoords hit the same /api/route endpoint and
-// get back the same response shape; `_routeQuery` below is the one place
-// that logs the route_requested / reroute analytics event. `meta.isReroute`
-// distinguishes an automatic on-route recalculation (LocationProvider.jsx,
-// the only caller that passes it) from every other, user-initiated route
-// request, so "most requested routes" and "most rerouted paths" can be
-// told apart in the analytics summary.
+// Default (VITE_ROUTING_MODE=client): every route and reroute is computed in
+// the browser by offline/offlineRouter.js — a port of backend/utils/router.py
+// — over the bundled walkway graph and the cached road closures. No request
+// is made. getRoute/getRouteFromCoords keep returning Promises so existing
+// callers are unchanged; getRouteSync/getRouteFromCoordsSync return the route
+// directly for the one caller that must apply it within the same tick
+// (LocationProvider's automatic reroute).
 //
-// Task 1 (offline support): if /api/route can't be reached at all,
-// `offlineFallback` computes the same shape of response on-device via
-// offline/offlineRouter.js, using whatever graph/locations/road-segments
-// were cached from a previous successful online session (see
-// loadOfflineRouteInputs below). If nothing has been cached yet, the
-// fallback itself throws, and that error (not the original network one)
-// is what the caller sees — its message says exactly that, since "no
-// internet, and nothing to fall back to either" is a genuinely different
-// situation from an ordinary network failure.
-async function _routeQuery(query, meta, offlineFallback) {
-  let r
-  let usedOffline = false
-  try {
-    r = await getJSON(`/api/route?${query}`)
-  } catch (networkErr) {
-    try {
-      r = await offlineFallback()
-      usedOffline = true
-    } catch {
-      throw networkErr
-    }
-  }
+// VITE_ROUTING_MODE=server (escape hatch): ask GET /api/route first, exactly
+// as before client routing, and compute on-device only if that request fails.
+// Client mode never falls back to the server — a client-side error (e.g. an
+// unknown destination) is surfaced as-is, never papered over by a request.
+//
+// `meta.isReroute` distinguishes an automatic on-route recalculation
+// (LocationProvider.jsx) from a user-initiated route request in the
+// analytics summary; the route_requested / reroute event is logged here, in
+// one place, for both modes.
+function _trackRoute(meta, r, usedServerFallback) {
   track(meta.isReroute ? 'reroute' : 'route_requested', {
     destination_id: meta.toId ?? null,
     from_id: meta.fromId ?? null,
@@ -155,36 +147,62 @@ async function _routeQuery(query, meta, offlineFallback) {
     accuracy_m: meta.accuracyM ?? null,
     snapped_to: r.snapped_to ?? null,
     warning: !!r.warning,
-    offline: usedOffline,
+    offline: usedServerFallback, // true only when server mode had to fall back to on-device routing
+    routing_mode: ROUTING_MODE,
   })
+}
+
+async function _serverFirst(query, meta, local) {
+  let r
+  let usedFallback = false
+  try {
+    r = await getJSON(`/api/route?${query}`)
+  } catch (networkErr) {
+    try {
+      await prepareClientRouting()
+      r = local()
+      usedFallback = true
+    } catch {
+      throw networkErr
+    }
+  }
+  _trackRoute(meta, r, usedFallback)
   return r
 }
 
-/** Loads the three inputs offline/offlineRouter.js needs, all previously
- *  cached by a successful getGraph/getRoadSegments/getLocations call.
- *  Throws (not returns null) when any of them is missing, since that's a
- *  genuinely different, more specific situation than "route request
- *  failed" — see _routeQuery above. */
-async function loadOfflineRouteInputs() {
-  const [graph, roadSegments, locations] = await Promise.all([
-    getCachedBundleResource('graph'),
-    getCachedBundleResource('road-segments'),
-    getCachedBundleResource('locations'),
-  ])
-  if (!graph || !roadSegments || !locations) {
-    throw new Error('No offline route data cached yet — connect to the internet at least once first.')
-  }
-  return { graph, roadSegments, locationsById: new Map(locations.map((l) => [l.id, l])) }
+function _clientRoute(meta, local) {
+  const r = local()
+  _trackRoute(meta, r, false)
+  return r
 }
 
-export function getRoute(fromId, toId, meta = {}) {
-  return _routeQuery(
-    `from_id=${encodeURIComponent(fromId)}&to_id=${encodeURIComponent(toId)}`,
-    { ...meta, fromId, toId },
-    async () => {
-      const { graph, roadSegments, locationsById } = await loadOfflineRouteInputs()
-      return routeBetweenLocations(graph, roadSegments, locationsById, fromId, toId)
-    }
+/** Synchronous, client-mode-only. Throws on failure. */
+export function getRouteSync(fromId, toId, meta = {}) {
+  getRoadSegments().catch(() => {})
+  return _clientRoute({ ...meta, fromId, toId }, () => routeToLocationSync(fromId, toId))
+}
+
+export async function getRoute(fromId, toId, meta = {}) {
+  const m = { ...meta, fromId, toId }
+  const local = () => routeToLocationSync(fromId, toId)
+  if (ROUTING_MODE === 'client') {
+    await prepareClientRouting()
+    return _clientRoute(m, local)
+  }
+  return _serverFirst(`from_id=${encodeURIComponent(fromId)}&to_id=${encodeURIComponent(toId)}`, m, local)
+}
+
+/** Synchronous, client-mode-only equivalent of getRouteFromCoords. Throws on
+ *  failure. Used by LocationProvider's reroute so the new route is applied in
+ *  the same tick it's computed — there is no in-flight request to go stale. */
+export function getRouteFromCoordsSync(lat, lng, toId, accuracyM, preferNodeId, meta = {}) {
+  // GPS reroutes apply within the same tick, using the latest subscribed road
+  // status. The TTL-aware getter also revalidates it rather than retaining a
+  // one-time startup copy. Initial async routes await this getter first.
+  getRoadSegments().catch(() => {})
+  return _clientRoute(
+    { ...meta, toId, fromLat: lat, fromLng: lng, fromGps: true, accuracyM },
+    () => routeFromCoordsSync(lat, lng, toId, accuracyM, preferNodeId)
   )
 }
 
@@ -192,75 +210,56 @@ export function getRoute(fromId, toId, meta = {}) {
  *  named location — used to recalculate a route once the user has drifted
  *  off the original path.
  *
- *  `accuracyM`, when available, is passed through so the backend's nearest-
- *  node snap can't trust a farther candidate any more than this specific
- *  fix's own measured uncertainty allows — see utils/router.py
- *  _nearest_node's docstring for why (root cause of the CSE-Annexure
- *  shortcut bug). Omit it and the backend falls back to its previous,
- *  unchanged default margin.
- *
- *  `preferNodeId`, when available, is the walkway node the in-progress
- *  route was last snapped to (this call's response also returns
- *  `snapped_to` — callers doing live rerouting should hold onto it and
- *  pass it back in here next time). This stops a route from flipping
- *  between two similarly-costed branches on a few metres of GPS noise
- *  alone — see the same docstring for the follow-up bug this fixes. Omit
- *  it for a fresh, one-off route request (nothing to stay consistent
- *  with yet).
+ *  `accuracyM` is the fix's own reported accuracy and `preferNodeId` the node
+ *  the in-progress route was last snapped to (this call's response returns
+ *  `snapped_to`; live reroutes hold onto it and pass it back next time).
+ *  Both are applied identically by the on-device router and by the backend
+ *  — see utils/router.py _nearest_node's docstring for what they guard
+ *  against (the CSE-Annexure shortcut bug and branch flip-flopping).
  *
  *  `meta.isReroute`, when true, tags this as an automatic on-route
- *  recalculation for analytics purposes only — see _routeQuery above.
- *  Omit it (the default) for a user-initiated route request.
- *
- *  Offline fallback note: offline/offlineRouter.js's snap-to-nearest-node
- *  is a simpler, single-candidate version of the backend's — it doesn't
- *  use accuracyM/preferNodeId (see that file's own docstring for why).
- *  Both are still accepted and forwarded to the real backend call above;
- *  they just have no effect on the one response that's computed offline. */
-export function getRouteFromCoords(lat, lng, toId, accuracyM, preferNodeId, meta = {}) {
+ *  recalculation for analytics only. */
+export async function getRouteFromCoords(lat, lng, toId, accuracyM, preferNodeId, meta = {}) {
+  const m = { ...meta, toId, fromLat: lat, fromLng: lng, fromGps: true, accuracyM }
+  const local = () => routeFromCoordsSync(lat, lng, toId, accuracyM, preferNodeId)
+  if (ROUTING_MODE === 'client') {
+    await prepareClientRouting()
+    return _clientRoute(m, local)
+  }
   const acc = accuracyM != null ? `&accuracy=${accuracyM}` : ''
   const prefer = preferNodeId ? `&prefer_node=${encodeURIComponent(preferNodeId)}` : ''
-  return _routeQuery(
-    `from_lat=${lat}&from_lng=${lng}&to_id=${encodeURIComponent(toId)}${acc}${prefer}`,
-    { ...meta, toId, fromLat: lat, fromLng: lng, fromGps: true, accuracyM },
-    async () => {
-      const { graph, roadSegments, locationsById } = await loadOfflineRouteInputs()
-      return routeFromPoint(graph, roadSegments, locationsById, lat, lng, toId)
-    }
-  )
+  return _serverFirst(`from_lat=${lat}&from_lng=${lng}&to_id=${encodeURIComponent(toId)}${acc}${prefer}`, m, local)
 }
 
-/** Road segments (with open/closed state) — reused on the frontend to
- *  surface "passes through X road" entries in the route preview panel.
- *  Also one of the three inputs offline routing needs — see
- *  loadOfflineRouteInputs above. */
-export function getRoadSegments() {
-  return snap.getClosures()
+/** Road segments (with open/closed state). Besides the route preview panel's
+ *  "passes through X road" entries, this is the closure input of the
+ *  on-device router: every result (fresh or cached) is handed to it, so a
+ *  closure fetched once at app start applies to every later route without
+ *  another request. Closures are as fresh as the last successful call. */
+export async function getRoadSegments() {
+  const data = await snap.getClosures()
+  setRoadSegmentsSnapshot(data)
+  return data
 }
 
-
-/** The raw walkway graph (nodes/edges/location_edges) — added for Task 1
- *  (offline support). Nothing in the UI reads this directly; it exists
- *  purely so offline routing has a graph to compute over at all. Cached
- *  the same way as everything else above, no fallback of its own to
- *  return since a failed fetch here just means loadOfflineRouteInputs
- *  won't find anything cached under 'graph' yet either. */
 export function getGraph() {
   return snap.getGraph()
 }
 
+async function prepareClientRouting() {
+  await Promise.all([getRoadSegments(), getLocations()])
+}
 
 /** Phase 4.2 — food court menu image for today (or a specific date). UI
  *  already treats a menu fetch failure as "no menu today" rather than a
  *  hard error. */
 export function getVenueMenu(venueId, date) {
-  return snap.getVenueMenu(venueId, date)   // rejects with .status === 404 when no menu, as before
+  return snap.getVenueMenu(venueId, date)
 }
 
 export function eventQrUrl(id) {
-  return snap.qrUrl(id)   // bucket copy when published, else the backend endpoint
+  return snap.qrUrl(id)
 }
-
 
 /** Phase 4A.1 — used by the startup boot screen to detect when the
  *  backend (Render free-tier cold start can take 20-50s) and Supabase

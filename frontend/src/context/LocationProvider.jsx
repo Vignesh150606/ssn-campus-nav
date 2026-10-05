@@ -27,7 +27,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LocationContext } from './LocationContext'
 import { pathLength, matchToPath, remainingPathFromMatch, destinationPoint, pointAtDistanceAlongPath } from '../utils/geo'
-import { getRouteFromCoords } from '../api'
+import { getRouteFromCoords, getRouteFromCoordsSync } from '../api'
+import { ROUTING_MODE } from '../routing/routingMode'
 // TEMPORARY — see utils/rerouteDebug.js. Remove once the live-navigation
 // "route through CSE Annexure" investigation concludes.
 import { logRerouteEvent } from '../utils/rerouteDebug'
@@ -288,7 +289,7 @@ export function LocationProvider({ children }) {
       gpsAccuracyM: accuracyM, gpsSpeedMS: speedMS, gpsHeadingDeg: courseDeg,
       currentRemainingM,
     }
-    if (!destRef.current?.id) { logRerouteEvent({ ...debugBase, skipped: 'no-destination' }); return }
+    if (!destRef.current?.id) { logRerouteEvent({ ...debugBase, skipped: 'no-destination' }); return null }
     if (recalculatingRef.current) { logRerouteEvent({ ...debugBase, skipped: 'already-in-flight' }); return }
     if (currentRemainingM != null && currentRemainingM < RECALC_MIN_REMAINING_M) {
       logRerouteEvent({ ...debugBase, skipped: 'below-min-remaining', minRemainingM: RECALC_MIN_REMAINING_M })
@@ -298,6 +299,72 @@ export function LocationProvider({ children }) {
     if (now - lastRecalcAtRef.current < RECALC_COOLDOWN_MS) {
       logRerouteEvent({ ...debugBase, skipped: 'cooldown', cooldownMsRemaining: RECALC_COOLDOWN_MS - (now - lastRecalcAtRef.current) })
       return // avoid recalculation loops
+    }
+
+    // Only carry the sticky preference forward if the current fix isn't a
+    // decisively better fix than whichever one originally set it — see
+    // STICKY_ACCURACY_IMPROVEMENT_TO_RESET_M above. If lastSnappedAccuracyRef
+    // is null (shouldn't happen alongside a non-null lastSnappedNodeRef in
+    // practice, but fail safe) the preference is trusted as before.
+    const stickyAccuracyM = lastSnappedAccuracyRef.current
+    const stickyIsStale = (
+      lastSnappedNodeRef.current != null &&
+      stickyAccuracyM != null && accuracyM != null &&
+      (stickyAccuracyM - accuracyM) >= STICKY_ACCURACY_IMPROVEMENT_TO_RESET_M
+    )
+    const preferNodeId = stickyIsStale ? null : lastSnappedNodeRef.current
+
+    // Installs a freshly computed route as the live route. Shared by the
+    // on-device path below and the server-mode response handler further down.
+    const applyReroute = (r) => {
+      routeRef.current  = r.path
+      lastSnappedNodeRef.current = r.snapped_to ?? null
+      lastSnappedAccuracyRef.current = r.snapped_to ? accuracyM : null
+      announced.current = new Set() // fresh route -> distance thresholds can fire again
+      lastMatchIndexRef.current = null // new path — old segment index is meaningless, re-search whole path next tick
+      offStreakRef.current = 0
+      onStreakRef.current  = 0
+      setRemainingPath(r.path)
+      setRemainingDist(Math.round(r.distance_m))
+      setLiveEta(r.eta_minutes)
+      setFullPath(r.path)
+      setFullDistance(r.distance_m)
+      setFullEta(r.eta_minutes)
+      setRecalcVersion((v) => v + 1)
+      offRouteRef.current = false
+      setOffRoute(false)
+      setGuidance('✅ Route recalculated')
+      setTimeout(() => setGuidance(null), 2500)
+    }
+
+    // On-device routing (default): the route is computed and applied right
+    // here, in this same tick. Nothing is ever in flight, so there is no
+    // in-flight flag to hold, no request generation to capture and no
+    // stale response to discard — that machinery below exists only for
+    // server mode's asynchronous request. Returns the new route's distance
+    // so processPosition can finish THIS tick against the new route rather
+    // than the one that was just replaced.
+    if (ROUTING_MODE === 'client') {
+      lastRecalcAtRef.current = now
+      try {
+        const r = getRouteFromCoordsSync(lat, lng, destRef.current.id, accuracyM, preferNodeId, { isReroute: true })
+        logRerouteEvent({
+          ...debugBase,
+          preferNodeSent: preferNodeId,
+          responseSource: r.source ?? null,
+          responseDistanceM: r.distance_m,
+          responseSnappedTo: r.snapped_to ?? null,
+          responsePathLength: Array.isArray(r.path) ? r.path.length : null,
+          responseWarning: r.warning ?? null,
+        })
+        applyReroute(r)
+        return r.distance_m
+      } catch (e) {
+        logRerouteEvent({ ...debugBase, preferNodeSent: preferNodeId, error: String(e?.message ?? e) })
+        // No route right now — leave the off-route state as is; the next
+        // GPS tick retries once the cooldown passes.
+        return null
+      }
     }
 
     recalculatingRef.current = true
@@ -313,21 +380,8 @@ export function LocationProvider({ children }) {
     const requestGeneration = recalcGenerationRef.current
     const requestedDestId   = destRef.current.id
 
-    // Only carry the sticky preference forward if the current fix isn't a
-    // decisively better fix than whichever one originally set it — see
-    // STICKY_ACCURACY_IMPROVEMENT_TO_RESET_M above. If lastSnappedAccuracyRef
-    // is null (shouldn't happen alongside a non-null lastSnappedNodeRef in
-    // practice, but fail safe) the preference is trusted as before.
-    const stickyAccuracyM = lastSnappedAccuracyRef.current
-    const stickyIsStale = (
-      lastSnappedNodeRef.current != null &&
-      stickyAccuracyM != null && accuracyM != null &&
-      (stickyAccuracyM - accuracyM) >= STICKY_ACCURACY_IMPROVEMENT_TO_RESET_M
-    )
-
     // TEMPORARY — mirrors getRouteFromCoords' own query-string construction
     // (api.js) purely for logging; does not affect the real request below.
-    const preferNodeId = stickyIsStale ? null : lastSnappedNodeRef.current
     const requestUrl = `/api/route?from_lat=${lat}&from_lng=${lng}&to_id=${encodeURIComponent(destRef.current.id)}`
       + (accuracyM != null ? `&accuracy=${accuracyM}` : '')
       + (preferNodeId ? `&prefer_node=${encodeURIComponent(preferNodeId)}` : '')
@@ -386,24 +440,7 @@ export function LocationProvider({ children }) {
           responsePathLength: Array.isArray(r.path) ? r.path.length : null,
           responseWarning: r.warning ?? null,
         })
-        routeRef.current  = r.path
-        lastSnappedNodeRef.current = r.snapped_to ?? null
-        lastSnappedAccuracyRef.current = r.snapped_to ? accuracyM : null
-        announced.current = new Set() // fresh route -> distance thresholds can fire again
-        lastMatchIndexRef.current = null // new path — old segment index is meaningless, re-search whole path next tick
-        offStreakRef.current = 0
-        onStreakRef.current  = 0
-        setRemainingPath(r.path)
-        setRemainingDist(Math.round(r.distance_m))
-        setLiveEta(r.eta_minutes)
-        setFullPath(r.path)
-        setFullDistance(r.distance_m)
-        setFullEta(r.eta_minutes)
-        setRecalcVersion((v) => v + 1)
-        offRouteRef.current = false
-        setOffRoute(false)
-        setGuidance('✅ Route recalculated')
-        setTimeout(() => setGuidance(null), 2500)
+        applyReroute(r)
       })
       .catch((e) => {
         // TEMPORARY — see utils/rerouteDebug.js. Reaching here means the
@@ -569,12 +606,17 @@ export function LocationProvider({ children }) {
     const remaining = remainingPathFromMatch(routeRef.current, match)
     setRemainingPath(remaining)
 
-    const remDist = pathLength(remaining)
+    let remDist = pathLength(remaining)
     setRemainingDist(Math.round(remDist))
     setLiveEta(Math.round((remDist / 1.4 / 60) * 10) / 10)
 
     if (isOffRoute) {
-      maybeRecalculate(lat, lng, remDist, accuracyM, speedMS, courseDeg)
+      // With on-device routing the reroute completes inside this call, so
+      // the arrival / distance-callout checks below must run against the
+      // NEW route's remaining distance, not the one it just replaced.
+      // (Server mode returns nothing here and applies its route later.)
+      const reroutedDistM = maybeRecalculate(lat, lng, remDist, accuracyM, speedMS, courseDeg)
+      if (reroutedDistM != null) remDist = reroutedDistM
     }
 
     // Phase 9 (Q7): dynamic arrival — uses max(15m, GPS accuracy)
