@@ -5,6 +5,7 @@ import { createServer } from 'vite'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const vite = await createServer({ root, configFile: false, envDir: false,
+  optimizeDeps: { noDiscovery: true, entries: [] },
   define: { 'import.meta.env.VITE_API_BASE': JSON.stringify('https://api.invalid'),
     'import.meta.env.VITE_SNAPSHOT_BASE_URL': JSON.stringify('https://storage.invalid/snapshots') },
   server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' })

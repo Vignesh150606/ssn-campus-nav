@@ -30,7 +30,7 @@ export default function App() {
       <header className="app-header">
         <NavLink to="/" className="brand">
           {/* Phase 4.2 — SSN branding: real logo in header */}
-          <img src="/ssn-logo.png" alt="SSN" className="brand-logo" />
+          <img src="/ssn-logo.webp" alt="SSN" className="brand-logo" />
           <span>Campus Navigator</span>
         </NavLink>
         <nav>

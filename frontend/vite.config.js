@@ -4,6 +4,8 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import snapshotCaching from './pwa/runtimeCaching.snapshots.js'
+import tilesCaching from './pwa/runtimeCaching.tiles.js'
+import shellCaching from './pwa/runtimeCaching.shell.js'
 
 // ── Fix for "Uncaught ReferenceError: L is not defined" ─────────────────────
 // leaflet-rotate ships a UMD/IIFE build (its package.json "browser" field)
@@ -85,7 +87,7 @@ export default defineConfig(({ command, mode }) => {
         'icons/icon-192.png',
         'icons/icon-512.png',
         'icons/apple-touch-icon.png',
-        'ssn-logo.png',
+        'ssn-logo.webp',
       ],
       manifest: {
         name: 'SSN Campus Navigator',
@@ -141,15 +143,9 @@ export default defineConfig(({ command, mode }) => {
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/(?:api|data|assets)\//],
         runtimeCaching: [
+          ...tilesCaching,
+          ...shellCaching,
           ...snapshotCaching,
-          {
-            urlPattern: ({ url }) => url.hostname.includes('tile.openstreetmap.org'),
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'map-tiles',
-              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 7 },
-            },
-          },
           {
             // Google Fonts' CSS file (index.html's <link> tag) — this is
             // the small stylesheet listing @font-face rules, not the font

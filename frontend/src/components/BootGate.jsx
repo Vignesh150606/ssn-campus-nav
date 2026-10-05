@@ -128,7 +128,7 @@ export default function BootGate({ children }) {
           identity, so alt="" consistently matches aria-hidden instead of
           fighting it. */}
       <img
-        src="/ssn-logo.png"
+        src="/ssn-logo.webp"
         alt=""
         className="boot-gate-logo"
         aria-hidden="true"

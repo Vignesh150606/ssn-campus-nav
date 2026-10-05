@@ -1,0 +1,7 @@
+{
+  "name": "ssn-nav-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Dev-only helper scripts (kept separate so frontend/package.json is untouched).",
+  "devDependencies": { "playwright": "^1.50.0" }
+}

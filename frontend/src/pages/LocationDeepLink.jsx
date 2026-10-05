@@ -39,7 +39,7 @@ export default function LocationDeepLink() {
       alignItems: 'center', justifyContent: 'center', gap: 20,
       background: 'var(--canvas)', color: 'var(--ink)'
     }}>
-      <img src="/ssn-logo.png" alt="SSN" style={{ width: 120, height: 'auto', objectFit: 'contain' }} />
+      <img src="/ssn-logo.webp" alt="SSN" style={{ width: 120, height: 'auto', objectFit: 'contain' }} />
       {error
         ? <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>Location not found — redirecting…</p>
         : <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>Opening destination…</p>
