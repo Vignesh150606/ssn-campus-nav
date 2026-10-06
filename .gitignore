@@ -46,3 +46,6 @@ backend/data/route_quality_report.json
 
 # Isolated builds/browser verification output (contains no source changes).
 /output/local-nav-check/
+
+# Supabase CLI generated linked-project/update metadata (not source).
+/supabase/.temp/

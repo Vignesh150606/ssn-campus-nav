@@ -5,8 +5,6 @@ import { subscribe } from '../data/dataClient'
 import { FEST_META, displayLocationName } from '../constants'
 import { SkeletonScheduleList } from '../components/Skeleton'
 
-const POLL_INTERVAL_MS = 20_000  // re-fetch every 20 s so new approved events appear
-
 // P1 — localStorage secondary cache.
 // Primary persistence is the backend API. The cache lets approved events
 // survive browser refresh / reopening the app while the network is briefly
@@ -134,7 +132,8 @@ export default function EventsList() {
     }
 
     fetchEvents()
-    const interval = setInterval(fetchEvents, POLL_INTERVAL_MS)
+    // The shared schedule subscription owns the 30-second foreground refresh.
+    // A second page timer would revalidate the same snapshot between those ticks.
 
     // P1 — instantly refresh when admin approves an event from the same browser tab
     const handleAdminApproval = () => fetchEvents()
@@ -143,7 +142,6 @@ export default function EventsList() {
     return () => {
       cancelled = true
       unsubscribe()
-      clearInterval(interval)
       window.removeEventListener('campus:eventApproved', handleAdminApproval)
     }
   }, [])

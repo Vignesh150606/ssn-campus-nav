@@ -11,13 +11,14 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { runTurn } from './copilotEngine'
-import { useOnlineStatus } from '../offline/useOnlineStatus'
 
 const STARTER_PROMPTS = [
   'Take me to Main Auditorium',
   "What's happening now?",
   'Nearest canteen',
   'ECE 302',
+  'Does this work offline?',
+  'How do I use this app?',
 ]
 
 function initials(name) { return (name || '?').slice(0, 1).toUpperCase() }
@@ -154,7 +155,6 @@ export default function ChatbotWidget({
   const [messages, setMessages]   = useState([])
   const [input, setInput]         = useState('')
   const [busy, setBusy]           = useState(false)
-  const { online } = useOnlineStatus()
   const stateRef      = useRef({})
   const listRef       = useRef(null)
   const inputRef      = useRef(null)
@@ -195,21 +195,6 @@ export default function ChatbotWidget({
     if (!trimmed || busy) return
     setMessages(m => [...m, { role: 'user', text: trimmed }])
     setInput('')
-    // Task 1 (offline support) — Campus Copilot's replies always require a
-    // round trip to the backend (see copilotEngine.js's runTurn ->
-    // copilotApi.js's copilotChat); there's no on-device fallback for this
-    // one, unlike locations/events/routing. Checking first and saying so
-    // plainly means offline feels like an expected, explained state
-    // instead of the generic "couldn't reach the campus service" failure
-    // below, which is meant for a genuine mid-session server hiccup, not
-    // "you have no connection at all right now."
-    if (online === false) {
-      setMessages(m => [...m, {
-        role: 'assistant',
-        text: "Campus Copilot can't reach the campus service right now. Directions still work with your last saved campus data.",
-      }])
-      return
-    }
     setBusy(true)
     try {
       const { replyText, cards, action, suggestions, newState } = await runTurn(
@@ -227,7 +212,7 @@ export default function ChatbotWidget({
         role: 'assistant',
         text: err?.name === 'CopilotError'
           ? err.message
-          : "Sorry, I couldn't reach the campus service. Please try again.",
+          : "I couldn't load that information. Directions and common questions work locally; connect to refresh missing events or menus, then try again.",
       }])
     } finally {
       setBusy(false)

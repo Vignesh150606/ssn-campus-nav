@@ -20,11 +20,18 @@ both produces an explicit connect/download/retry message. IndexedDB failure
 allows the current tab to work but warns that offline reopening is not saved.
 Browser storage eviction remains possible; installing a PWA is not a backup.
 
-Graph synchronization runs after local readiness, every five visible minutes
-and on reconnect/visibility recovery. It fetches the raw existing `/api/graph`
-with HTTP revalidation, computes its hash and validates before persistence.
-An invalid update retains the good graph. A current walking path is not
-discarded while synchronizing; the next local route/reroute uses new inputs.
+The graph is static deployment data. Normal visits never fetch `/api/graph`,
+including on reconnect or visibility recovery. A SHA-256 version embedded by
+Vite identifies the graph shipped with this app deployment. If IndexedDB has
+not seen that version, download precached `/data/graph.json` once in the
+background, validate its content and matching hash, then commit atomically.
+Unchanged versions need no download. Invalid updates or failed writes retain
+the good graph; failed deployment updates retry on the next app open.
+The explicit `syncGraph()` function remains for diagnostics, but no visitor
+flow calls it. It preserves the bundled version marker, so it cannot cause an
+unchanged deployment to overwrite a later explicitly synchronized graph.
+Future graph corrections require rebaking and deploying the frontend along
+with the backend. Current walking paths remain intact during a graph update.
 There is no service-worker cache for API responses.
 
 Road closures still use `getClosures()` / `getRoadSegments()` and subscriptions,
@@ -48,14 +55,28 @@ Retire `VITE_ROUTING_MODE=server`: navigation now always uses the client. Keep
 | --- | --- | --- |
 | Named/GPS routes, off-route reroutes, ETA, distances, turns, heading, GPS | Local | No backend request, health check or auth prerequisite |
 | Search and shared campus destination deep links | Local/cache | Cached venue labels, aliases, relevance and typo matching; unknown deep-link IDs may use online venue lookup |
-| `/api/graph` | Background sync | Hash/validation/atomic persistence; failure does not block local navigation |
+| `/api/graph` | Explicit diagnostics only | Visitors use deployed static graph and IndexedDB; no polling |
 | Locations and road segments/closures | Cached/sync | Local startup and subscribed background refresh; build-time fallback clearly labelled |
 | Schedule, event details, menus, posters | Cached/sync | Existing snapshots/IndexedDB and live API fallback; uncached/new records need internet |
-| Copilot chat | Online | Existing API and error handling retained; selecting known destinations routes locally |
+| Copilot chat | Local/cache | On-device rules, aliases and FAQ; existing cards/actions retained; events/menus use snapshot/cache/API fallback |
 | Feedback and analytics | Online/queued | Nonblocking analytics can queue offline; feedback submission needs internet |
 | Admin/login/account, uploads, closures writes, dev tools | Online | Privileged backend/auth unchanged; no service-role key in frontend |
 | QR image and uncached Storage images | Online/cache | Cached copies usable; missing assets need internet |
 | OSM tiles and Google fonts | Online/cache | Viewed tiles/fonts cache; system fonts remain a fallback |
+
+Analytics now batches for up to 60 seconds (formerly 8), with the existing
+40-event threshold, hide beacon and offline persistence/replay. Nothing is
+sampled or deliberately discarded. At sustained low event volume this reduces
+timer-driven requests by up to 86.7%; short visits and burst-triggered batches
+do not necessarily see that reduction.
+
+Copilot no longer calls `/api/copilot/chat`. Its browser classifier mirrors the
+Python vocabulary, fuzzy matching and intent order; parity tests use the actual
+stdlib Python classifier. Compact room codes such as ECE302 now work too.
+Common app questions answer locally; missing opening hours, registration fees,
+contacts and unverified step-free paths are explicitly described as unknown.
+Dynamic event/menu answers still read real datasets, with an offline saved-data
+notice. The backend chat endpoint is retained for compatibility.
 
 ## Maps and update safety
 
@@ -164,10 +185,13 @@ The final DNS-isolated full-app run passed all 100 pages in 48.96 seconds across
 shared desktop renderer resources. This measures test completion, not an
 individual phone's startup time or a production API capacity limit.
 
-Backend/FastAPI/Supabase integration tests, actual snapshot SQL/upload/security,
+Backend/FastAPI integration tests, Render admin-triggered snapshot publication,
 production CDN propagation, and physical Android GPS/compass/storage/battery
-remain **UNTESTED**. Dependencies were not installed and no deployment or
-production load test was performed. Current migration changes are uncommitted.
+remain **UNTESTED**. Supabase bucket creation, four snapshot uploads, anonymous
+public reads and anonymous Storage write rejection were subsequently verified;
+see MERGE_NOTES.md. Dependencies were not installed and no application deployment
+or production load test was performed in this pass. Current request-reduction
+changes are uncommitted.
 
 ## Changed files
 

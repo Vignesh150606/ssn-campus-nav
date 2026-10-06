@@ -86,8 +86,8 @@ export default function EventPage() {
   // Phase 4A.1 fix: a single failed getEvent() used to be permanent — the
   // only way to recover was to leave this page and come back (effectively
   // the same as a manual refresh), which is exactly the "event only shows
-  // up after a refresh" symptom. EventsList already self-heals via a 20s
-  // poll; this gives EventPage the equivalent — a couple of automatic
+  // up after a refresh" symptom. The shared schedule subscription refreshes
+  // both pages; this also supplies a couple of automatic
   // retries with backoff, plus a manual Retry button as a fallback below.
   // Phase X — Feature 2 (Analytics). Event pages are reached almost
   // exclusively by scanning the printed QR code for that event (see

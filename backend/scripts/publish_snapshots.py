@@ -15,6 +15,7 @@ Usage (PowerShell, from the backend folder):
     python scripts/publish_snapshots.py                  # all four, forced
     python scripts/publish_snapshots.py --only schedule menus
     python scripts/publish_snapshots.py --dry-run        # build to ./snapshot_preview/, upload nothing
+    python scripts/publish_snapshots.py --via-cli --project-ref <ref>  # native CLI login; no .env/dependencies
 Exit code 0 = everything uploaded, 1 = at least one failed.
 """
 import argparse
@@ -25,10 +26,6 @@ import sys
 BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BACKEND)
 
-from dotenv import load_dotenv  # noqa: E402
-
-load_dotenv(os.path.join(BACKEND, ".env"))
-
 import snapshots  # noqa: E402
 
 
@@ -36,8 +33,18 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", nargs="+", choices=snapshots.NAMES)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--via-cli", action="store_true", help="Bootstrap with the logged-in CLI; no .env or backend dependencies")
+    ap.add_argument("--project-ref", help="Verified Supabase project reference for --via-cli")
+    ap.add_argument("--api-base", help="Optional deployed public API URL for QR copies in --via-cli mode")
     a = ap.parse_args()
     names = a.only or list(snapshots.NAMES)
+
+    if a.via_cli:
+        from publish_snapshots_cli import publish_with_cli
+        return publish_with_cli(a.project_ref, names, a.dry_run, a.api_base)
+
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(BACKEND, ".env"))
 
     need = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]
     missing = [k for k in need if not os.environ.get(k)]

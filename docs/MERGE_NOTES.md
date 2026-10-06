@@ -197,3 +197,114 @@ IndexedDB graph and never requests Render routes or health on startup.
 No additional secret values or database migrations are required. Run the
 bake script before deploying; bootstrap road status is not current live status.
 Original MISSING items and backend UNTESTED limitations still apply.
+
+## Subsequent request reductions (2026-10-06)
+
+- Navigation/search/GPS/rerouting remain local. Copilot classification and common
+  questions now run locally too; no normal `/api/copilot/chat` traffic.
+- Analytics interval is 60 seconds, retaining every queued event, 40-event
+  batches, hide beacon and offline replay. No sampling or feature removal.
+- Removed periodic/startup/reconnect Render graph requests. Graph changes ship
+  as a validated, versioned frontend deployment asset; known-good IndexedDB
+  remains immediately usable. See LOCAL_NAVIGATION.md for update behavior.
+- Closure and schedule client TTLs/polling remain 30 seconds and snapshot
+  cache-control remains 60 seconds. No stale closure copy is introduced.
+
+### Snapshot setup completed; frontend activation still required
+
+CLI login verified `bsucvxhvshvrwouupbct` (Campus Nav Project, Mumbai,
+ACTIVE_HEALTHY). Ran `backend/supabase/snapshots_bucket.sql`: public-read bucket,
+2 MB limit, JSON/PNG only. Storage objects RLS is enabled; no existing object
+policies grant public writes. Rollback-only inserts as `anon` and `authenticated`
+both failed with RLS denial, and the probe row count remained zero.
+
+Published all four files on 2026-10-06 with `public, max-age=60`. Anonymous
+public GETs returned 200 and matched the staged database-derived payloads:
+schedule 115 B, closures 1,685 B, menus 151 B, posters 104 B. Current verified
+event count is zero and road-segment count is seven, matching the live Render
+API; no placeholder events were generated. No QR copies exist because there
+are no verified events. An actual anonymous-key Storage upload test was rejected
+with HTTP 400. No keys were printed or persisted by the bootstrap tool.
+
+Bootstrap used the logged-in CLI, without reading a real `.env` or installing
+backend dependencies. Windows CLI Storage calls reset on this network while
+.NET HTTP succeeds, so the Windows upload helper privately captures the CLI's
+project keys in process memory and uses verified .NET HTTPS. The regular Render
+publisher and all application endpoints are unchanged. To repeat the bootstrap:
+
+```powershell
+python backend/scripts/publish_snapshots.py --via-cli --project-ref bsucvxhvshvrwouupbct --api-base https://ssn-campus-nav.onrender.com
+```
+
+**Before deploy / set these in Render/Vercel:**
+
+- Set Vercel `VITE_SNAPSHOT_BASE_URL` to
+  `https://bsucvxhvshvrwouupbct.supabase.co/storage/v1/object/public/snapshots`
+  and rebuild. Inspected deployed entry bundles did not contain this URL;
+  dashboard environment configuration has not been changed or verified.
+- Keep Render `SNAPSHOT_ENABLED=true`, `SNAPSHOT_BUCKET=snapshots`,
+  `SNAPSHOT_CACHE_SECONDS=60`, `SNAPSHOT_INCLUDE_CONTACT_INFO=false` with its
+  existing backend-only credentials. Do not add credentials to Vercel.
+- After deployment, verify a real admin schedule/menu/closure edit publishes
+  the corresponding snapshot and reaches clients. This end-to-end write flow
+  is **UNTESTED**; no real event/closure was mutated for this check.
+- The earlier SQL/publish/anonymous-write checklist steps are now completed
+  for this project. Keep auditing any new Storage policies for public writes.
+
+Snapshots are saved to IndexedDB after loading, then reused on subsequent
+calls/reopens. Graph checks are not periodic: a new graph ships with a frontend
+deployment and is validated once. Only subscribed mutable snapshots refresh
+while visible/online; the duplicate EventsList 20-second timer was removed.
+Schedule/closure TTL remains 30 seconds, with a 60-second CDN cache target.
+Publication debounce/network/CDN behavior can add delay; 90 seconds is the
+cache-budget target, not a proven end-to-end propagation guarantee.
+
+Contact rows on snapshot-backed event pages remain hidden; setting Render
+`SNAPSHOT_INCLUDE_CONTACT_INFO=true` and republishing restores them after a
+privacy review. The CLI bootstrap deliberately always excludes contacts.
+
+To check all four datasets without secrets or dependencies:
+
+```powershell
+node frontend/scripts/check_public_snapshots.mjs https://<project>.supabase.co/storage/v1/object/public/snapshots
+```
+
+This command checks public reads/envelopes, sizes and reported cache-control;
+it does not prove write protection, CDN propagation or current database content.
+The live API fallback remains available when public snapshots are unavailable.
+Backend/FastAPI/Supabase runtime checks remain **UNTESTED** locally because
+dependencies are unavailable. There is no new database migration, dependency,
+paid service or claimed 1000-user production capacity from these changes.
+
+### Request-reduction validation
+
+- `node frontend/scripts/verify_local_copilot.mjs`: 1,051 intent/entity parity
+  cases against the existing stdlib Python classifier; compact room codes;
+  navigation follow-ups/cancel; 500 FAQ turns with zero network calls. Set
+  `PYTHON_FOR_TESTS` to an available Python executable if needed.
+- `node frontend/scripts/verify_analytics.mjs`: timer/size batches, accepted and
+  rejected hide beacons, offline persistence and replay.
+- `node frontend/scripts/verify_static_graph.mjs`: no unchanged-version
+  requests, one coalesced deployment download, bad graph/failed write retention,
+  mismatched first-boot asset rejection.
+- Existing snapshot, PWA, local-routing and backend Copilot API-contract
+  verification scripts passed. These use fixtures, not live backend runtime.
+- Chrome against the production build: real IndexedDB/SW offline reopen, FAQ
+  and library cards, local GPS routes/reroutes/arrival/exit, deployment graph
+  refresh, blocked storage upgrade and deferred SW/chunk reloads passed. Zero
+  backend graph/chat/route/health calls in the tested flows.
+- Snapshots persisted in real IndexedDB: closing/reopening within the client
+  TTL made no additional snapshot request; an offline reopen retained events
+  after clearing the legacy localStorage event cache.
+- `python backend/scripts/verify_snapshot_cli.py`: dependency-free fixtures
+  for bootstrap dry-run, privacy filtering, non-empty event/image/menu
+  serialization, closure shape, selected upload manifest and project validation.
+  These tooling tests do not substitute for backend runtime integration tests.
+- Frontend lint passed with 15 existing warnings; build passed with the
+  existing >500 KB main-chunk warning. No typecheck command exists. Only the
+  main JS asset exceeds 150 KB; it is about 533 KB raw / 163 KB gzip.
+
+These are local verification results, not a new production load-test result.
+Actual Android GPS/compass/battery behavior and Render admin-triggered publishing
+remain **UNTESTED**. The bucket/files were set up, but no application commit,
+push or deployment was made in this pass.

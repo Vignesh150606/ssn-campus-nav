@@ -7,6 +7,8 @@ const root = new URL('../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, 
 const read = name => JSON.parse(readFileSync(new URL(`../public/data/${name}.json`, import.meta.url), 'utf8'))
 const graph = read('graph'), locations = read('locations'), closures = read('closures')
 const rows = new Map()
+const realInterval = globalThis.setInterval, intervals = new Set()
+globalThis.setInterval = (...args) => { const timer = realInterval(...args); intervals.add(timer); return timer }
 let abortWrites = false, backendGraph = graph, liveClosures = closures, calls = []
 // Transaction-aware storage double. Real IndexedDB and SW are tested in Chrome.
 globalThis.indexedDB = { open() {
@@ -130,4 +132,8 @@ try {
     assert.equal(connectivity.getOfflineStatus().online, true, 'a fresh public snapshot establishes actual reachability')
   } finally { Date.now = realNow }
   console.log('PASS: bootstrap, integrity (11 malformed updates including snap-ID renumbering), atomic abort, versions, Render-down routing, 100 users, local search and closure refresh')
-} finally { await vite.close() }
+} finally {
+  intervals.forEach(clearInterval)
+  globalThis.setInterval = realInterval
+  await vite.close()
+}

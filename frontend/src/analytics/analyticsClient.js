@@ -23,7 +23,7 @@ import { idbAdd, idbGetAllEntries, idbDeleteKeys, STORE_ANALYTICS_QUEUE } from '
 import { API_BASE } from '../apiBase'
 
 const SESSION_KEY = 'ssn_analytics_session_v1'
-const FLUSH_INTERVAL_MS = 8000
+const FLUSH_INTERVAL_MS = 60_000
 const MAX_BATCH = 40
 
 function sessionId() {
@@ -75,6 +75,8 @@ async function sendBatch(events) {
 /** Flush the in-memory queue. On failure, persist to IndexedDB rather than
  *  drop the events — flushQueuedOffline() resends them on reconnect. */
 export async function flush() {
+  clearTimeout(flushTimer)
+  flushTimer = null
   if (!queue.length) return
   const batch = queue
   queue = []

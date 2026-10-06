@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -58,6 +59,12 @@ export default defineConfig(({ command, mode }) => {
   }
 
   return {
+  // A deployment identifier, not a periodic backend graph request.
+  define: {
+    'import.meta.env.CAMPUS_GRAPH_VERSION': JSON.stringify(createHash('sha256')
+      .update(JSON.stringify(JSON.parse(readFileSync(new URL('./public/data/graph.json', import.meta.url), 'utf8'))))
+      .digest('hex')),
+  },
   plugins: [
     {
       name: 'baked-graph-consistency',

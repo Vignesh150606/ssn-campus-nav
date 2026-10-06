@@ -1,0 +1,539 @@
+{
+  "LOCATION_ALIASES": {
+    "eee-block": [
+      "eee",
+      "electrical",
+      "electrical engineering",
+      "electrical and electronics",
+      "electronics and electrical",
+      "eee dept",
+      "eee department",
+      "eee block"
+    ],
+    "cse-block": [
+      "cse",
+      "computer science",
+      "computer science engineering",
+      "cs",
+      "comp sci",
+      "cse dept",
+      "cse department"
+    ],
+    "ece-block": [
+      "ece",
+      "electronics and communication",
+      "electronics communication",
+      "ece dept",
+      "ece department"
+    ],
+    "it-block": [
+      "information technology",
+      "it dept",
+      "it department"
+    ],
+    "mech-block": [
+      "mech",
+      "mechanical",
+      "mechanical engineering",
+      "mech dept",
+      "mech department"
+    ],
+    "civil-block": [
+      "civil",
+      "civil engineering",
+      "civil dept",
+      "civil department"
+    ],
+    "biomed-block": [
+      "biomed",
+      "bme",
+      "biomedical",
+      "biomedical engineering",
+      "biomedical and chemical",
+      "chemical",
+      "chemical engineering",
+      "biomed dept",
+      "biomed department"
+    ],
+    "admin-block": [
+      "admin",
+      "administration",
+      "admin office",
+      "administration office",
+      "admin dept"
+    ],
+    "cdc-block": [
+      "cdc",
+      "placement",
+      "placement cell",
+      "placement office",
+      "career development",
+      "career development cell",
+      "career cell"
+    ],
+    "central-library": [
+      "library",
+      "lib",
+      "central library"
+    ],
+    "tcs-auditorium": [
+      "tcs auditorium",
+      "auditorium",
+      "tcs",
+      "main auditorium"
+    ],
+    "mini-hall-1": [
+      "mini hall",
+      "mini hall 1",
+      "minihall"
+    ],
+    "open-air-theatre": [
+      "oat",
+      "open air theatre",
+      "open air theater"
+    ],
+    "main-gate": [
+      "main gate",
+      "gate",
+      "entrance",
+      "entry"
+    ],
+    "parking": [
+      "parking",
+      "parking lot",
+      "car park",
+      "bike parking"
+    ],
+    "medical-center": [
+      "medical center",
+      "medical centre",
+      "hospital",
+      "clinic",
+      "infirmary",
+      "sick bay"
+    ],
+    "boys-hostel-gate": [
+      "boys hostel",
+      "boys hostel gate",
+      "men's hostel"
+    ],
+    "boys-hostel-office": [
+      "boys hostel office"
+    ],
+    "girls-hostel": [
+      "girls hostel",
+      "women's hostel",
+      "ladies hostel"
+    ],
+    "sports-complex": [
+      "sports complex",
+      "gym",
+      "stadium",
+      "sports"
+    ],
+    "sports-complex-main": [
+      "sports ground",
+      "main sports complex"
+    ],
+    "ssn-cricket-ground": [
+      "cricket ground",
+      "cricket field"
+    ],
+    "ssn-football-ground": [
+      "football ground",
+      "football field"
+    ],
+    "clock-tower": [
+      "clock tower",
+      "clocktower"
+    ],
+    "ssn-fountain": [
+      "fountain",
+      "ssn fountain"
+    ],
+    "main-canteen": [
+      "main canteen",
+      "canteen",
+      "main mess",
+      "main cafeteria"
+    ],
+    "food-rishabhs": [
+      "rishabh's",
+      "rishabhs",
+      "rishabh's food court",
+      "rishabh food court"
+    ],
+    "food-snowcube": [
+      "snow cube",
+      "snowcube",
+      "snow cube cafe"
+    ],
+    "food-metro": [
+      "metro cafe",
+      "metro",
+      "metro coffee"
+    ],
+    "food-pr": [
+      "pr food court",
+      "pr",
+      "pr canteen"
+    ],
+    "food-aswins": [
+      "ashwin's",
+      "aswins",
+      "ashwin's food court",
+      "ashwin food court"
+    ]
+  },
+  "CLASSROOM_DEPT_CODES": {
+    "eee": "eee-block",
+    "cse": "cse-block",
+    "ece": "ece-block",
+    "it": "it-block",
+    "mech": "mech-block",
+    "me": "mech-block",
+    "civil": "civil-block",
+    "ce": "civil-block",
+    "biomed": "biomed-block",
+    "bme": "biomed-block",
+    "admin": "admin-block",
+    "cdc": "cdc-block"
+  },
+  "NEED_ALIASES": {
+    "dining": [
+      "hungry",
+      "food",
+      "eat",
+      "something to eat",
+      "snack",
+      "snacks",
+      "canteen",
+      "mess",
+      "restaurant",
+      "cafe",
+      "coffee",
+      "tea",
+      "lunch",
+      "dinner",
+      "breakfast",
+      "hungry now"
+    ],
+    "water_station": [
+      "water",
+      "thirsty",
+      "drinking water",
+      "water station",
+      "water fountain",
+      "need water"
+    ],
+    "restroom": [
+      "restroom",
+      "washroom",
+      "toilet",
+      "bathroom",
+      "loo",
+      "lavatory",
+      "rest room"
+    ],
+    "parking": [
+      "parking",
+      "park my vehicle",
+      "park my car",
+      "park my bike",
+      "car park",
+      "where to park"
+    ],
+    "medical": [
+      "sick",
+      "unwell",
+      "injured",
+      "first aid",
+      "medical help",
+      "not feeling well",
+      "hurt"
+    ],
+    "accessibility": [
+      "wheelchair",
+      "wheelchair accessible",
+      "wheelchair access",
+      "wheelchair friendly",
+      "accessible",
+      "accessibility",
+      "disability",
+      "disabled access",
+      "handicap accessible",
+      "ramp access",
+      "ramp",
+      "step free",
+      "step-free"
+    ]
+  },
+  "NEED_DIRECT_LOCATION": {
+    "placement": "cdc-block"
+  },
+  "NEED_ALIASES_DIRECT": {
+    "placement": [
+      "placement cell",
+      "placement office",
+      "placement",
+      "career development cell",
+      "career cell",
+      "i need the placement cell",
+      "job cell"
+    ]
+  },
+  "GREETING_PHRASES": [
+    "hi",
+    "hello",
+    "hey",
+    "good morning",
+    "good afternoon",
+    "good evening",
+    "yo",
+    "sup",
+    "hai"
+  ],
+  "MENU_PHRASES": [
+    "what's today's menu",
+    "today's menu",
+    "todays menu",
+    "show menu",
+    "what's on the menu",
+    "what is on the menu",
+    "menu today",
+    "menu",
+    "what's available",
+    "what is available",
+    "what can i eat",
+    "what food is available",
+    "show canteen menu",
+    "show food court menu",
+    "show main canteen menu",
+    "what's for lunch",
+    "what's for dinner",
+    "what's for breakfast"
+  ],
+  "EVENT_NOW_PHRASES": [
+    "happening now",
+    "going on now",
+    "right now",
+    "currently on",
+    "live now",
+    "now?",
+    "what is happening"
+  ],
+  "EVENT_TODAY_PHRASES": [
+    "today's events",
+    "today events",
+    "events today",
+    "what is today",
+    "show today's events",
+    "show today events"
+  ],
+  "EVENT_UPCOMING_PHRASES": [
+    "upcoming",
+    "coming up",
+    "next event",
+    "future events",
+    "what is next"
+  ],
+  "EVENT_GENERIC_PHRASES": [
+    "events",
+    "event",
+    "fest schedule",
+    "schedule",
+    "whats on",
+    "what's on"
+  ],
+  "EVENT_NEAR_ME_PHRASES": [
+    "events near me",
+    "events nearby",
+    "nearby events",
+    "what events are near me",
+    "events close to me",
+    "events around me",
+    "events around here"
+  ],
+  "EVENT_SOON_PHRASES": [
+    "next 30 minutes",
+    "starting soon",
+    "starts in 30",
+    "beginning soon",
+    "about to start",
+    "in 30 min",
+    "in half an hour",
+    "what starts in",
+    "starts soon",
+    "starting in",
+    "beginning in"
+  ],
+  "NEARBY_SEARCH_PHRASES": [
+    "what's near me",
+    "what is near me",
+    "what's nearby",
+    "what's around me",
+    "what's close to me",
+    "near me",
+    "nearby places",
+    "what's around",
+    "show me nearby",
+    "what is around me",
+    "show nearby"
+  ],
+  "CANCEL_NAV_PHRASES": [
+    "cancel navigation",
+    "stop navigation",
+    "exit navigation",
+    "cancel route",
+    "stop route",
+    "end navigation",
+    "stop directions"
+  ],
+  "INFO_QUERY_PREFIXES": [
+    "tell me about",
+    "info about",
+    "information about",
+    "describe",
+    "what can you tell me about"
+  ],
+  "FOLLOWUP_NAVIGATE_PHRASES": [
+    "take me there",
+    "navigate",
+    "navigate there",
+    "start navigation",
+    "go there",
+    "lets go",
+    "let's go",
+    "start",
+    "go now",
+    "directions"
+  ],
+  "FOLLOWUP_PREVIEW_PHRASES": [
+    "preview",
+    "preview route",
+    "show route",
+    "show the route",
+    "preview the route"
+  ],
+  "FOLLOWUP_ETA_PHRASES": [
+    "how long",
+    "how far",
+    "eta",
+    "how much time",
+    "how many minutes",
+    "when will i reach",
+    "how much distance",
+    "duration"
+  ],
+  "FOLLOWUP_DETAILS_PHRASES": [
+    "show details",
+    "details",
+    "more info",
+    "tell me more",
+    "more information",
+    "view details"
+  ],
+  "FOLLOWUP_CLOSEST_PHRASES": [
+    "closest",
+    "nearest",
+    "which one is closest",
+    "which is nearest",
+    "which is closer"
+  ],
+  "FOLLOWUP_DIETARY_PHRASES": [
+    "vegetarian",
+    "veg",
+    "non veg",
+    "non-veg",
+    "vegan"
+  ],
+  "CURRENT_LOCATION_PHRASES": [
+    "where am i",
+    "what's my location",
+    "my location",
+    "current location",
+    "my position"
+  ],
+  "DEPARTMENT_KEYWORDS": [
+    "department",
+    "dept"
+  ],
+  "AMBIGUOUS_BARE_TOKENS": [
+    "it"
+  ],
+  "CAMPUS_KEYWORDS": [
+    "block",
+    "building",
+    "department",
+    "dept",
+    "room",
+    "floor",
+    "wing",
+    "event",
+    "fest",
+    "navigate",
+    "direction",
+    "directions",
+    "route",
+    "canteen",
+    "food",
+    "water",
+    "restroom",
+    "washroom",
+    "toilet",
+    "parking",
+    "hostel",
+    "library",
+    "auditorium",
+    "gate",
+    "college",
+    "campus",
+    "class",
+    "classroom",
+    "lab",
+    "faculty",
+    "professor",
+    "admin",
+    "placement",
+    "cdc",
+    "ground",
+    "sports",
+    "medical",
+    "clinic",
+    "hospital",
+    "tower",
+    "fountain",
+    "theatre",
+    "theater",
+    "hall",
+    "cafe",
+    "mess",
+    "menu",
+    "lunch",
+    "dinner",
+    "breakfast"
+  ],
+  "_COMMAND_PREFIXES": [
+    "take me to",
+    "navigate me to",
+    "navigate to",
+    "directions to",
+    "how do i get to",
+    "how do i reach",
+    "where is",
+    "where's",
+    "where is the",
+    "show me",
+    "find",
+    "go to",
+    "i want to go to",
+    "i need to go to",
+    "i need",
+    "i want",
+    "tell me about",
+    "info about",
+    "information about",
+    "describe",
+    "what can you tell me about"
+  ]
+}

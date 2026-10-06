@@ -8,12 +8,13 @@
 //  • info_mode flag  — "tell me about X" → shows description before nav card
 //  • suggestions[]   — 2-4 contextual follow-up chips appended to every response
 //  • follow_up_cancel_nav — cancel active navigation from chat
-import { copilotChat } from './copilotApi'
+import { classifyLocal } from './localClassifier'
 import { haversine } from '../utils/geo'
 import { nearestWithFacility } from '../utils/facilities'
 import { isSafeUrl } from '../utils/url'
 import { getEvents, getRoute, getRouteFromCoords, getVenueMenu } from '../api'
 import { displayLocationName } from '../constants'
+import { getOfflineStatus } from '../offline/offlineBundle'
 
 const NEED_LABELS = {
   dining: 'somewhere to eat',
@@ -505,11 +506,11 @@ export async function runTurn(message, state, deps) {
   const { locations, position } = deps
   const locationsById = Object.fromEntries(locations.map(l => [l.id, l]))
 
-  const result = await copilotChat(message, { hasPending: !!(state.lastCandidates?.length) })
+  const result = classifyLocal(message, locations)
   const intent = result.intent
 
   const isFollowUp = intent.startsWith('follow_up_')
-  const baseState  = isFollowUp ? state : {}
+  const baseState  = isFollowUp || intent === 'faq' ? state : {}
 
   let outcome
 
@@ -665,6 +666,7 @@ export async function runTurn(message, state, deps) {
       break
     }
 
+    case 'faq':
     case 'greeting':
     case 'out_of_scope':
     case 'unknown':
@@ -677,7 +679,8 @@ export async function runTurn(message, state, deps) {
   }
 
   return {
-    replyText: outcome.replyText,
+    replyText: (outcome.replyText || '') + ((intent.startsWith('event_') || intent === 'venue_menu') && getOfflineStatus().online === false
+      ? '\nUsing saved data; events, menus and road status may have changed.' : ''),
     cards:       outcome.cards       || [],
     action:      outcome.action      || null,
     suggestions: outcome.suggestions || [],

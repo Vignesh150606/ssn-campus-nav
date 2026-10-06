@@ -1,6 +1,6 @@
 /**
  * Show the app as soon as cached, baked or snapshot/live data is usable.
- * Graph synchronization runs in the background after local navigation is ready.
+ * New deployed graph versions load from the app shell after navigation is ready.
  * With no usable data, retain the checking/failed bootstrap screen.
  */
 import { useEffect, useState } from 'react'

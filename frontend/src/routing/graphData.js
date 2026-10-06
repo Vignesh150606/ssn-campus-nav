@@ -4,8 +4,9 @@ import { idbGet, idbPut, STORE_BUNDLE_CACHE } from '../offline/db'
 import { reportBackendReachability, setNavigationStatus } from '../offline/offlineBundle'
 import { validateGraph, graphHash } from './validateGraph'
 
-let record = null, loading = null, syncing = null
+let record = null, loading = null, syncing = null, bootstrapSyncing = null
 let destinations = []
+const bundledVersion = import.meta.env.CAMPUS_GRAPH_VERSION
 
 export function currentGraph() {
   if (!record) throw new Error('Campus map is not downloaded. Connect once to prepare offline navigation.')
@@ -27,15 +28,15 @@ async function readJSON(url) {
   } finally { clearTimeout(timer) }
 }
 
-async function accept(data, source, checkedAt = 0) {
+async function accept(data, source, checkedAt = 0, bootstrapVersion = record?.bootstrapVersion) {
   const graph = validateGraph(data, destinations, record?.data.nodes.map(n => n.id) || [])
   const hash = await graphHash(graph)
   if (record?.hash === hash) {
-    record = { ...record, checkedAt: checkedAt || record.checkedAt }
+    record = { ...record, bootstrapVersion, checkedAt: checkedAt || record.checkedAt }
     await idbPut(STORE_BUNDLE_CACHE, 'graph', record).catch(() => {})
     return record.data
   }
-  const next = { data: graph, hash, version: hash, cachedAt: Date.now(), checkedAt, source, schema: 1 }
+  const next = { data: graph, hash, version: hash, bootstrapVersion, cachedAt: Date.now(), checkedAt, source, schema: 1 }
   const previous = record
   setNavigationStatus({ updateAvailable: !!previous })
   try {
@@ -72,7 +73,11 @@ export function loadGraph(locations = []) {
         return graph
       }
     } catch { /* Keep invalid cache until a validated replacement exists. */ }
-    try { return await accept(await readJSON('/data/graph.json'), 'bootstrap') }
+    try {
+      const data = await readJSON('/data/graph.json')
+      if (bundledVersion && await graphHash(data) !== bundledVersion) throw new Error('Campus map does not match this app deployment')
+      return await accept(data, 'bootstrap', 0, bundledVersion)
+    }
     catch { throw new Error('No valid campus map is stored on this device. Connect to download campus data, then retry.') }
   })().finally(() => { loading = null })
   return loading
@@ -94,16 +99,17 @@ export function syncGraph() {
 }
 
 export function startGraphSync() {
-  const refresh = () => {
-    if (document.visibilityState !== 'hidden') syncGraph()
+  // Static graph updates ship with the app. A cached graph renders immediately;
+  // only a new bundled graph version needs a same-origin download/validation.
+  // Explicit syncGraph() remains available, but normal visits never poll Render.
+  if (bundledVersion && record?.bootstrapVersion !== bundledVersion && !bootstrapSyncing) {
+    // Shared repository work, independent of any mounted screen. Strict Mode
+    // remounts reuse the download rather than starting another request.
+    bootstrapSyncing = readJSON('/data/graph.json').then(async data => {
+      if (await graphHash(data) !== bundledVersion) return
+      await accept(data, 'bootstrap', 0, bundledVersion)
+    }).catch(() => { /* Keep the known-good graph; retry on the next app open. */ })
+      .finally(() => { bootstrapSyncing = null })
   }
-  refresh()
-  const timer = setInterval(refresh, 5 * 60_000)
-  window.addEventListener('online', refresh)
-  document.addEventListener('visibilitychange', refresh)
-  return () => {
-    clearInterval(timer)
-    window.removeEventListener('online', refresh)
-    document.removeEventListener('visibilitychange', refresh)
-  }
+  return () => {} // no timers or event listeners to remove
 }
