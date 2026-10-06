@@ -1,16 +1,12 @@
 /**
  * Show the app as soon as cached, baked or snapshot/live data is usable.
- * Render health checks continue in the background until the backend wakes.
- * With no usable data, retain the checking/slow/failed startup screen.
+ * Graph synchronization runs in the background after local navigation is ready.
+ * With no usable data, retain the checking/failed bootstrap screen.
  */
 import { useEffect, useState } from 'react'
-import { checkHealth, getGraph, getRoadSegments, getLocations } from '../api'
-import { getSchedule, hasCachedBootData } from '../data/dataClient'
-
-const SLOW_MESSAGE_AFTER_MS = 22_000
-const GIVE_UP_AFTER_MS = 60_000
-const RETRY_INTERVAL_MS = 2_500
-const ATTEMPT_TIMEOUT_MS = 8_000
+import { prepareClientRouting } from '../routing/clientRouting'
+import { startGraphSync } from '../routing/graphData'
+import { getSchedule } from '../data/dataClient'
 
 // Mirrors EventsList's cache key/writer so the cache can be warmed here
 // without importing that page directly (keeps bundles/cleanly separated).
@@ -28,55 +24,19 @@ function seedEventsCache() {
 }
 
 export default function BootGate({ children }) {
-  const [status, setStatus] = useState('checking') // checking | slow | ready | failed
+  const [status, setStatus] = useState('checking') // checking | ready | failed
   const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
-    let attemptTimer = null
-
-    // The backend may be asleep while same-origin baked data, public snapshots
-    // or a previous device cache are already usable. Health keeps polling in
-    // the background; lack of backend health alone must not hide usable data.
-    hasCachedBootData().then((available) => {
-      if (available && !cancelled) setStatus('ready')
-    }).catch(() => {})
-    function warmData() {
-      for (const load of [getGraph, getLocations, getRoadSegments, seedEventsCache]) {
-        load().then(() => { if (!cancelled) setStatus('ready') }).catch(() => {})
-      }
-    }
-    warmData()
-
-    async function attempt() {
+    let stopSync = null
+    prepareClientRouting().then(() => {
       if (cancelled) return
-      const ok = await checkHealth(ATTEMPT_TIMEOUT_MS)
-      if (cancelled) return
-      if (ok) {
-        // Health alone is not data. Retry initial reads now that the server
-        // is awake, and release the gate only when a dataset resolves.
-        warmData()
-        return
-      }
-      attemptTimer = setTimeout(attempt, RETRY_INTERVAL_MS)
-    }
-
-    const slowTimer = setTimeout(() => {
-      if (!cancelled) setStatus((s) => (s === 'ready' ? s : 'slow'))
-    }, SLOW_MESSAGE_AFTER_MS)
-
-    const giveUpTimer = setTimeout(() => {
-      if (!cancelled) setStatus((s) => (s === 'ready' ? s : 'failed'))
-    }, GIVE_UP_AFTER_MS)
-
-    attempt()
-
-    return () => {
-      cancelled = true
-      clearTimeout(attemptTimer)
-      clearTimeout(slowTimer)
-      clearTimeout(giveUpTimer)
-    }
+      setStatus('ready')
+      stopSync = startGraphSync()
+      seedEventsCache().catch(() => {}) // optional schedule never gates navigation
+    }).catch(() => { if (!cancelled) setStatus('failed') })
+    return () => { cancelled = true; stopSync?.() }
   }, [retryKey])
 
   const effectiveStatus = status
@@ -84,7 +44,6 @@ export default function BootGate({ children }) {
   if (effectiveStatus === 'ready') return children
 
   const failed = effectiveStatus === 'failed'
-  const slow = effectiveStatus === 'slow'
 
   return (
     <div className="boot-gate" role="status" aria-live="polite">
@@ -107,9 +66,7 @@ export default function BootGate({ children }) {
         <>
           <div className="boot-gate-spinner" aria-hidden="true" />
           <div className="boot-gate-message">
-            {slow
-              ? 'Still waking the server… Almost there.'
-              : 'Waking up the server. This usually takes a few seconds.'}
+            Preparing campus data for local navigation…
           </div>
         </>
       )}
@@ -117,7 +74,7 @@ export default function BootGate({ children }) {
       {failed && (
         <>
           <div className="boot-gate-message boot-gate-message-error">
-            Couldn't reach the server. Please check your connection and try again.
+            No valid campus data is stored yet. Connect once to download the map, then retry.
           </div>
           <button
             type="button"

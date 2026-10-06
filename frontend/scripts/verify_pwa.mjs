@@ -38,3 +38,23 @@ context.sessionStorage.getItem = () => { throw new Error('storage blocked') }
 handlers['vite:preloadError']({ preventDefault: () => prevented++ })
 assert.equal(reloads, 1); assert.equal(prevented, 1)
 console.log('PASS: self-contained serialized tile matcher (726 cases), snapshot fallback provenance/TTL, guarded preload recovery')
+
+const navigationHandlers = {}, workerHandlers = {}
+let updateReloads = 0
+vm.runInNewContext(readFileSync(new URL('../src/pwa/updateGuards.js', import.meta.url), 'utf8'), { window: { addEventListener: (name, callback) => { navigationHandlers[name] = callback },
+  location: { reload: () => updateReloads++ } }, navigator: { serviceWorker: { controller: null,
+  addEventListener: (name, callback) => { workerHandlers[name] = callback } } },
+  document: { addEventListener() {} }, Date,
+  sessionStorage: { getItem: () => null, setItem() {} } })
+workerHandlers.controllerchange()
+assert.equal(updateReloads, 0, 'initial installation must not reload')
+navigationHandlers['campus:navigation-state']({ detail: { active: true } })
+workerHandlers.controllerchange()
+assert.equal(updateReloads, 0, 'worker upgrade must preserve active navigation')
+navigationHandlers['vite:preloadError']({ preventDefault() {} })
+assert.equal(updateReloads, 0, 'missing lazy chunk must also preserve active navigation')
+navigationHandlers['campus:navigation-state']({ detail: { active: false } })
+assert.equal(updateReloads, 1, 'worker upgrade reloads once after navigation ends')
+workerHandlers.controllerchange()
+assert.equal(updateReloads, 1)
+console.log('PASS: worker first-install; worker and missing-chunk reloads defer until navigation ends, once')

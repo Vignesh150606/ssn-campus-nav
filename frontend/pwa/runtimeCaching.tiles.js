@@ -1,7 +1,7 @@
 // Workbox runtimeCaching entries for OpenStreetMap raster tiles (W3 lane).
 // Default export is an ARRAY; the merge step concatenates it into the
-// workbox.runtimeCaching list in vite.config.js (do not import this from
-// application code).
+// workbox.runtimeCaching list in vite.config.js. The application reuses only
+// isCampusTile() to cache the already displayed viewport after first install.
 //
 // What it does: caches ONLY tiles that fall inside the campus bounding box
 // AND inside the zoom range the map actually allows (MapView.jsx sets
@@ -62,11 +62,9 @@ export default [
     handler: 'CacheFirst',
     options: {
       cacheName: 'map-tiles-campus-v1',
-      // Leaflet loads tiles via <img> (no-cors) → responses are OPAQUE
-      // (status 0). Workbox's CacheFirst drops opaque responses unless 0 is
-      // listed here — the previous rule in vite.config.js had no
-      // cacheableResponse, so it most likely never stored a tile (verify:
-      // DevTools → Application → Cache Storage → map-tiles).
+      // New tiles use anonymous CORS (200), avoiding opaque quota padding.
+      // Keep 0 for legacy cached requests during upgrade; viewing only,
+      // never a background whole-campus/offline download.
       cacheableResponse: { statuses: [0, 200] },
       expiration: {
         maxEntries: 260,

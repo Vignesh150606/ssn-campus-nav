@@ -2,23 +2,29 @@
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
+import { readFileSync } from 'node:fs'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const vite = await createServer({ root, configFile: false, envDir: false,
   optimizeDeps: { noDiscovery: true, entries: [] },
   define: { 'import.meta.env.VITE_API_BASE': JSON.stringify('https://api.invalid'),
     'import.meta.env.VITE_SNAPSHOT_BASE_URL': JSON.stringify('https://storage.invalid/snapshots') },
-  server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' })
+  server: { middlewareMode: true, hmr: false }, appType: 'custom', logLevel: 'error' })
 const realFetch = globalThis.fetch
 const realNow = Date.now
 let now = realNow(), mode = 'absent', eventName = 'Fest', version = 1, calls = [], fallback = false
 Date.now = () => now
-const locations = [{ id: 'main-gate', name: 'Main Gate', lat: 12.75, lng: 80.19 }]
+const locations = JSON.parse(readFileSync(new URL('../public/data/locations.json', import.meta.url), 'utf8'))
 const events = () => [{ id: 'e1', name: eventName, location_id: 'main-gate', location: { id: 'main-gate' }, fest: 'Invente' }]
-const graph = { nodes: [], edges: [], location_edges: [] }
-const closures = [{ id: 'road', closed: true }]
-globalThis.fetch = async (url) => {
+const graph = JSON.parse(readFileSync(new URL('../public/data/graph.json', import.meta.url), 'utf8'))
+const closures = JSON.parse(readFileSync(new URL('../public/data/closures.json', import.meta.url), 'utf8'))
+globalThis.fetch = async (url, options = {}) => {
   calls.push(String(url))
+  if (mode === 'body-stall' && String(url).includes('/api/locations/unknown')) {
+    return { ok: true, json: () => new Promise((resolve, reject) => {
+      options.signal.addEventListener('abort', () => reject(new DOMException('Body aborted', 'AbortError')), { once: true })
+    }) }
+  }
   if (mode === 'offline') throw new TypeError('offline')
   if (url === '/data/locations.json') return Response.json(locations)
   if (url === '/data/graph.json') return Response.json(graph)
@@ -41,7 +47,7 @@ try {
   assert.deepEqual(await data.getSchedule(), events())
   assert.deepEqual(await data.getClosures(), closures)
   assert(calls.some(x => x.endsWith('/api/events')), 'missing bucket must fall back to API')
-  assert.equal((await data.getEvent('e1')).location.name, 'Main Gate')
+  assert.equal((await data.getEvent('e1')).location.name, locations.find(l => l.id === 'main-gate').name)
   assert.equal(data.qrUrl('e1'), 'https://api.invalid/api/events/e1/qr')
   assert.equal(await data.hasCachedBootData(), true)
   calls = []
@@ -72,7 +78,9 @@ try {
   await assert.rejects(data.getVenueMenu('main-gate'), /offline/)
   mode = 'absent'
   await assert.rejects(data.getVenueMenu('main-gate'), e => e.status === 404)
-  console.log('PASS: baked data, missing/malformed snapshots, live fallback, TTL, subscriptions, QR, venue enrichment, offline data, menu errors')
+  mode = 'body-stall'
+  await assert.rejects(data.getLocation('unknown'), e => e.timeout === true)
+  console.log('PASS: baked data, missing/malformed snapshots, live fallback, TTL, subscriptions, QR, venue enrichment, offline data, menu errors, stalled-body deadline')
 } finally {
   globalThis.fetch = realFetch; Date.now = realNow
   await vite.close()

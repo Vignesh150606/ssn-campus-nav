@@ -34,7 +34,10 @@ export default function App() {
           <span>Campus Navigator</span>
         </NavLink>
         <nav>
-          <NavLink to="/events">Fest Schedule</NavLink>
+          <NavLink to="/events" aria-label="Fest Schedule">
+            <span className="schedule-label">Fest Schedule</span>
+            <span className="schedule-label-compact" aria-hidden="true">Schedule</span>
+          </NavLink>
           <NavLink to="/admin" className="admin-link">Admin</NavLink>
           {/* Task 1 (offline support) — built earlier (Phase X) but never
               actually rendered anywhere; renders nothing at all while

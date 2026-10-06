@@ -9,8 +9,8 @@
 // friendly message instead of the generic "couldn't reach the campus service".
 import { API_BASE } from '../apiBase'
 
-// Render's free instance can take a while to wake; BootGate normally covers
-// that, so this only guards against a request hanging mid-session.
+// Copilot remains online; local navigation startup never waits for Render.
+// Bound a cold-start or interrupted chat request independently.
 const REQUEST_TIMEOUT_MS = 20000
 
 export class CopilotError extends Error {

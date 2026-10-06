@@ -5,7 +5,7 @@ const root = fileURLToPath(new URL('../', import.meta.url))
 const vite = await createServer({ root, configFile: false, envDir: false,
   optimizeDeps: { noDiscovery: true, entries: [] },
   define: { 'import.meta.env.VITE_API_BASE': JSON.stringify('https://api.invalid') },
-  server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' })
+  server: { middlewareMode: true, hmr: false }, appType: 'custom', logLevel: 'error' })
 const original = globalThis.fetch
 try {
   const { copilotChat } = await vite.ssrLoadModule('/src/copilot/copilotApi.js')

@@ -3,8 +3,10 @@ backend/scripts/bake_static_data.py -- bake the build-time datasets for Vercel.
 
 Writes   frontend/public/data/graph.json       <- backend/data/walkway_graph.json
          frontend/public/data/locations.json   <- backend/data/locations.json (or Supabase `venues`)
+         frontend/public/data/closures.json    <- backend/data/road_segments.json (bootstrap only)
 Vercel serves frontend/public/ at the site root, so these appear at /data/graph.json
-and /data/locations.json.
+and /data/locations.json. The road-status copy is only an offline bootstrap;
+live closures still synchronize independently from snapshots/the API.
 
 Shapes are NOT changed: the files are the same JSON the backend returns from
 GET /api/graph (raw walkway_graph.json: nodes / edges / location_edges) and
@@ -74,7 +76,10 @@ def main() -> None:
     ap.add_argument("--check", action="store_true", help="don't write; exit 1 if outputs differ")
     a = ap.parse_args()
 
-    outputs = {"graph.json": dumps(load_graph()), "locations.json": dumps(load_locations(a.source))}
+    with open(os.path.join(BACKEND, "data", "road_segments.json"), encoding="utf-8") as f:
+        closures = json.load(f)
+    outputs = {"graph.json": dumps(load_graph()), "locations.json": dumps(load_locations(a.source)),
+               "closures.json": dumps(closures)}
     stale = False
     for name, text in outputs.items():
         path = os.path.join(a.out, name)

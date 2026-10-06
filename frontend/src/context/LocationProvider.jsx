@@ -27,8 +27,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LocationContext } from './LocationContext'
 import { pathLength, matchToPath, remainingPathFromMatch, destinationPoint, pointAtDistanceAlongPath } from '../utils/geo'
-import { getRouteFromCoords, getRouteFromCoordsSync } from '../api'
-import { ROUTING_MODE } from '../routing/routingMode'
+import { getRouteFromCoordsSync } from '../api'
 // TEMPORARY — see utils/rerouteDebug.js. Remove once the live-navigation
 // "route through CSE Annexure" investigation concludes.
 import { logRerouteEvent } from '../utils/rerouteDebug'
@@ -163,6 +162,12 @@ export function LocationProvider({ children }) {
   const [remainingDist, setRemainingDist]  = useState(null)
   const [liveEta, setLiveEta]              = useState(null)
   const [guidance, setGuidance]            = useState(null)
+  const guidanceTimer = useRef(null)
+  const showGuidance = useCallback((message, duration) => {
+    clearTimeout(guidanceTimer.current)
+    setGuidance(message)
+    guidanceTimer.current = duration ? setTimeout(() => setGuidance(null), duration) : null
+  }, [])
   const [offRoute, setOffRoute]            = useState(false)
   const [hasRoute, setHasRoute]            = useState(false)
 
@@ -193,19 +198,7 @@ export function LocationProvider({ children }) {
   const autoWalkTimer    = useRef(null)
   const walkedMetersRef  = useRef(0)
   const simPositionRef   = useRef(null)  // mirrors simPosition for sync reads
-  const recalculatingRef = useRef(false) // guards against overlapping reroute requests
   const lastRecalcAtRef  = useRef(0)     // Date.now() of the last reroute attempt (cooldown)
-  // Bug fix — stale reroute race condition (previously undetected: a
-  // reroute fetch in flight for the current destination, still pending
-  // when the user exits nav / picks a different destination, would land
-  // afterwards and unconditionally overwrite routeRef/remainingPath/
-  // fullPath/liveEta with data for a destination that's no longer
-  // current — silently showing directions for the wrong route). Bumped
-  // once per reroute attempt and once on every destination change
-  // (setDestination/clearDestination below); the response handler in
-  // maybeRecalculate discards anything that doesn't match the value it
-  // captured when the request was sent.
-  const recalcGenerationRef = useRef(0)
   // The walkway node the most recent reroute snapped to (see main.py's
   // route response `snapped_to`) — fed back into the next reroute request
   // as `prefer_node` so it doesn't flip to a different, similarly-costed
@@ -290,7 +283,6 @@ export function LocationProvider({ children }) {
       currentRemainingM,
     }
     if (!destRef.current?.id) { logRerouteEvent({ ...debugBase, skipped: 'no-destination' }); return null }
-    if (recalculatingRef.current) { logRerouteEvent({ ...debugBase, skipped: 'already-in-flight' }); return }
     if (currentRemainingM != null && currentRemainingM < RECALC_MIN_REMAINING_M) {
       logRerouteEvent({ ...debugBase, skipped: 'below-min-remaining', minRemainingM: RECALC_MIN_REMAINING_M })
       return
@@ -315,7 +307,7 @@ export function LocationProvider({ children }) {
     const preferNodeId = stickyIsStale ? null : lastSnappedNodeRef.current
 
     // Installs a freshly computed route as the live route. Shared by the
-    // on-device path below and the server-mode response handler further down.
+    // local GPS reroute below.
     const applyReroute = (r) => {
       routeRef.current  = r.path
       lastSnappedNodeRef.current = r.snapped_to ?? null
@@ -333,18 +325,16 @@ export function LocationProvider({ children }) {
       setRecalcVersion((v) => v + 1)
       offRouteRef.current = false
       setOffRoute(false)
-      setGuidance('✅ Route recalculated')
-      setTimeout(() => setGuidance(null), 2500)
+      showGuidance('✅ Route recalculated', 2500)
     }
 
     // On-device routing (default): the route is computed and applied right
     // here, in this same tick. Nothing is ever in flight, so there is no
     // in-flight flag to hold, no request generation to capture and no
-    // stale response to discard — that machinery below exists only for
-    // server mode's asynchronous request. Returns the new route's distance
+    // stale response to discard. Returns the new route's distance
     // so processPosition can finish THIS tick against the new route rather
     // than the one that was just replaced.
-    if (ROUTING_MODE === 'client') {
+    {
       lastRecalcAtRef.current = now
       try {
         const r = getRouteFromCoordsSync(lat, lng, destRef.current.id, accuracyM, preferNodeId, { isReroute: true })
@@ -367,94 +357,7 @@ export function LocationProvider({ children }) {
       }
     }
 
-    recalculatingRef.current = true
-    lastRecalcAtRef.current  = now
-    setRecalculating(true)
-
-    // Captured now, checked again when the response lands (below) — this
-    // is the actual fix for the stale-reroute race: recalculatingRef only
-    // ever prevented a SECOND automatic reroute from being *sent* while
-    // one was in flight, it never stopped an old one's response from
-    // being *applied* after the user had already moved on to a different
-    // destination (or exited navigation) in the meantime.
-    const requestGeneration = recalcGenerationRef.current
-    const requestedDestId   = destRef.current.id
-
-    // TEMPORARY — mirrors getRouteFromCoords' own query-string construction
-    // (api.js) purely for logging; does not affect the real request below.
-    const requestUrl = `/api/route?from_lat=${lat}&from_lng=${lng}&to_id=${encodeURIComponent(destRef.current.id)}`
-      + (accuracyM != null ? `&accuracy=${accuracyM}` : '')
-      + (preferNodeId ? `&prefer_node=${encodeURIComponent(preferNodeId)}` : '')
-
-    // Root cause of the CSE-Annexure shortcut bug (proven against the real
-    // graph — see utils/router.py _nearest_node docstring): a reroute fired
-    // from a single noisy-but-accepted fix near IT Block/CSE Annexure could
-    // snap onto the destination's own connector node and return an
-    // artificially short "shortcut" whose snap segment actually cut through
-    // the building gap between them. accuracyM is this exact fix's own
-    // measured uncertainty — passing it through lets the backend bound its
-    // snap tie-break by it instead of always using its wider flat default.
-    //
-    // Follow-up bug, same area: even with the fix above, two *comparably*
-    // costed branches (e.g. one via n_126, the other via n_47) could still
-    // flip which one wins on a few metres of GPS noise, because neither is
-    // an implausible long-jump candidate — they're both perfectly
-    // reasonable, just on either side of a walkway with no single obvious
-    // closest entry point. lastSnappedNodeRef is this route's own previous
-    // snapped_to; passing it as prefer_node lets the backend hold onto it
-    // unless the alternative wins by a clear margin, instead of re-deciding
-    // that close call from scratch on every single reroute.
-    // Phase X — meta.isReroute tags this specific call (the only automatic,
-    // on-route recalculation in the app) for analytics purposes only; it
-    // has no effect on the request itself or on any routing behaviour.
-    getRouteFromCoords(lat, lng, destRef.current.id, accuracyM, preferNodeId, { isReroute: true })
-      .then((r) => {
-        // Bug fix — discard this response if it's stale: a newer reroute
-        // was sent (recalcGenerationRef bumped again since we started) or
-        // the destination changed/cleared entirely (setRoute/clearRoute/
-        // stop all bump the same counter). Without this, a slow response
-        // for a destination the user already left would silently
-        // overwrite the current route with directions for the wrong
-        // place. recalculatingRef/setRecalculating are still cleared
-        // unconditionally in .finally() below — the request genuinely
-        // completed, it's only the resulting state application that's
-        // being skipped.
-        if (requestGeneration !== recalcGenerationRef.current || destRef.current?.id !== requestedDestId) {
-          logRerouteEvent({
-            ...debugBase, requestUrl, preferNodeSent: preferNodeId,
-            skipped: 'stale-response-discarded',
-            requestedDestId, currentDestId: destRef.current?.id ?? null,
-          })
-          return
-        }
-        // TEMPORARY — see utils/rerouteDebug.js. `source` is the field that
-        // matters most: it should always be 'local' (genuinely came from
-        // /api/route just now).
-        logRerouteEvent({
-          ...debugBase,
-          requestUrl,
-          preferNodeSent: preferNodeId,
-          responseSource: r.source ?? null,
-          responseDistanceM: r.distance_m,
-          responseSnappedTo: r.snapped_to ?? null,
-          responsePathLength: Array.isArray(r.path) ? r.path.length : null,
-          responseWarning: r.warning ?? null,
-        })
-        applyReroute(r)
-      })
-      .catch((e) => {
-        // TEMPORARY — see utils/rerouteDebug.js. Reaching here means the
-        // live request failed — genuinely no route available right now,
-        // not the bug under investigation.
-        logRerouteEvent({ ...debugBase, requestUrl, preferNodeSent: preferNodeId, error: String(e?.message ?? e) })
-        // Couldn't reach the routing API — leave the off-route state as is;
-        // the next GPS tick will retry automatically once the cooldown passes.
-      })
-      .finally(() => {
-        recalculatingRef.current = false
-        setRecalculating(false)
-      })
-  }, [])
+  }, [showGuidance])
 
   // ---------------------------------------------------------------------
   // Shared processing pipeline — both real and simulated positions land
@@ -598,7 +501,7 @@ export function LocationProvider({ children }) {
       // banner text doesn't get re-set (and voice guidance re-triggered
       // downstream) on every tick for the whole time the user stays
       // off-route — just once, when they first leave the route.
-      if (!wasOffRoute) setGuidance('⚠️ Off route detected — recalculating route…')
+      if (!wasOffRoute) showGuidance('⚠️ Off route detected — recalculating route…')
     } else {
       setOffRoute(false)
     }
@@ -614,7 +517,6 @@ export function LocationProvider({ children }) {
       // With on-device routing the reroute completes inside this call, so
       // the arrival / distance-callout checks below must run against the
       // NEW route's remaining distance, not the one it just replaced.
-      // (Server mode returns nothing here and applies its route later.)
       const reroutedDistM = maybeRecalculate(lat, lng, remDist, accuracyM, speedMS, courseDeg)
       if (reroutedDistM != null) remDist = reroutedDistM
     }
@@ -648,22 +550,20 @@ export function LocationProvider({ children }) {
       // Don't let a stale "Xm from destination" callout fire after arrival
       // has already been announced (e.g. on a later, jitter-widened tick).
       DISTANCE_CALLOUT_THRESHOLDS_M.forEach((t) => announced.current.add(t))
-      setGuidance('🎯 You have arrived!')
-      setTimeout(() => setGuidance(null), 4000)
+      showGuidance('🎯 You have arrived!', 4000)
       setArrivalRadius(arrivalM)  // expose for Home.jsx
     } else {
       for (const threshold of DISTANCE_CALLOUT_THRESHOLDS_M) {
         if (remDist <= threshold) {
           if (!announced.current.has(threshold)) {
             announced.current.add(threshold)
-            setGuidance(`📍 ${threshold}m from destination`)
-            setTimeout(() => setGuidance(null), 4000)
+            showGuidance(`📍 ${threshold}m from destination`, 4000)
           }
           break
         }
       }
     }
-  }, [maybeRecalculate])
+  }, [maybeRecalculate, showGuidance])
 
   /** Set the simulated position AND run it through the shared pipeline,
    *  in one synchronous call — not via a watching effect, so there's no
@@ -763,6 +663,7 @@ export function LocationProvider({ children }) {
   }, [])
 
   const stop = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('campus:navigation-state', { detail: { active: false } }))
     stopRealWatch()
     stopAutoWalkInternal()
     setTracking(false)
@@ -776,12 +677,11 @@ export function LocationProvider({ children }) {
     acquireDeadlineRef.current = null                      // Priority 2 (Phase 4.7)
     routeRef.current = null
     destRef.current = null
-    recalcGenerationRef.current += 1
     announced.current = new Set()
     setRemainingPath(null)
     setRemainingDist(null)
     setLiveEta(null)
-    setGuidance(null)
+    showGuidance(null)
     offRouteRef.current = false
     setOffRoute(false)
     setHasRoute(false)
@@ -789,13 +689,14 @@ export function LocationProvider({ children }) {
     setFullDistance(null)
     setFullEta(null)
     setRecalculating(false)
-  }, [stopRealWatch, stopAutoWalkInternal])
+  }, [stopRealWatch, stopAutoWalkInternal, showGuidance])
 
   const setRoute = useCallback((path, destLat, destLng, destId) => {
+    // Protect the route synchronously, before React effects/GPS permission.
+    window.dispatchEvent(new CustomEvent('campus:navigation-state', { detail: { active: true } }))
     stopAutoWalkInternal()
     routeRef.current  = path
     destRef.current   = { lat: destLat, lng: destLng, id: destId ?? null }
-    recalcGenerationRef.current += 1
     lastSnappedNodeRef.current = null
     lastSnappedAccuracyRef.current = null
     lastMatchIndexRef.current = null
@@ -813,15 +714,14 @@ export function LocationProvider({ children }) {
     offRouteRef.current = false
     setOffRoute(false)
     setHasRoute(true)
-    setGuidance('Navigation started. Follow the orange path.')
-    setTimeout(() => setGuidance(null), 3000)
-  }, [stopAutoWalkInternal])
+    showGuidance('Navigation started. Follow the orange path.', 3000)
+  }, [stopAutoWalkInternal, showGuidance])
 
   const clearRoute = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('campus:navigation-state', { detail: { active: false } }))
     stopAutoWalkInternal()
     routeRef.current = null
     destRef.current  = null
-    recalcGenerationRef.current += 1
     lastSnappedAccuracyRef.current = null
     lastMatchIndexRef.current = null
     offStreakRef.current = 0
@@ -832,7 +732,7 @@ export function LocationProvider({ children }) {
     setRemainingPath(null)
     setRemainingDist(null)
     setLiveEta(null)
-    setGuidance(null)
+    showGuidance(null)
     offRouteRef.current = false
     setOffRoute(false)
     setHasRoute(false)
@@ -840,7 +740,7 @@ export function LocationProvider({ children }) {
     setFullDistance(null)
     setFullEta(null)
     setRecalculating(false)
-  }, [stopAutoWalkInternal])
+  }, [stopAutoWalkInternal, showGuidance])
 
   // ---------------------------------------------------------------------
   // Dev-mode simulation controls
@@ -938,7 +838,9 @@ export function LocationProvider({ children }) {
   // Clean up any running interval/watch on unmount.
   useEffect(() => {
     return () => {
+      window.dispatchEvent(new CustomEvent('campus:navigation-state', { detail: { active: false } }))
       stopRealWatch()
+      clearTimeout(guidanceTimer.current)
       if (autoWalkTimer.current !== null) clearInterval(autoWalkTimer.current)
     }
   }, [stopRealWatch])

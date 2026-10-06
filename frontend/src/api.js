@@ -18,32 +18,19 @@
 // device's very first-ever launch, offline from the start), the original
 // network error is what gets thrown.
 //
-// Routing (getRoute/getRouteFromCoords) runs on-device by default and makes
-// no request — see the Routing section below and routing/routingMode.js.
+// Routing and search always run on-device. Background data synchronization
+// is separate — see routing/clientRouting.js and data/dataClient.js.
 
 import { API_BASE } from './apiBase'
 import { track } from './analytics/analyticsClient'
 import * as snap from './data/dataClient'
-import { getCachedBundleResource } from './offline/offlineBundle'
-import { ROUTING_MODE } from './routing/routingMode'
+import { searchCampusLocations } from './routing/searchLocations'
 import {
   routeToLocationSync, routeFromCoordsSync,
-  setRoadSegmentsSnapshot, setLocationsSnapshot,
+  setRoadSegmentsSnapshot, setLocationsSnapshot, prepareClientRouting,
 } from './routing/clientRouting'
 
-snap.subscribe('closures', setRoadSegmentsSnapshot)
-snap.subscribe('locations', setLocationsSnapshot)
-
-// Previously plain fetch() with no timeout. LocationProvider.jsx's
-// maybeRecalculate() sets recalculatingRef.current = true before calling
-// getRouteFromCoords() (-> getJSON here) and only ever resets it to false
-// in that promise's .finally() — so one request that never settles (bad
-// signal, backend hung, cold-start stall) left recalculatingRef stuck
-// true for the rest of the tab's life, and every future off-route tick
-// silently no-ops on the "already-in-flight" guard forever, permanently
-// killing auto-reroute. Same pattern already used correctly by
-// checkHealth() below; applied here to every JSON call so nothing else
-// downstream (route requests, feedback submission) can wedge the same way.
+// Bound legitimate online operations (feedback/admin consumers), never routing.
 const DEFAULT_TIMEOUT_MS = 15000
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
@@ -64,17 +51,6 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_M
   }
 }
 
-async function getJSON(path) {
-  const res = await fetchWithTimeout(`${API_BASE}${path}`)
-  if (!res.ok) {
-    const detail = await res.json().catch(() => ({}))
-    const err = new Error(detail.detail || `Request failed: ${res.status}`)
-    err.status = res.status
-    throw err
-  }
-  return res.json()
-}
-
 export async function getLocations(category) {
   const data = await snap.getLocations(category)
   if (!category) setLocationsSnapshot(data)
@@ -82,28 +58,9 @@ export async function getLocations(category) {
 }
 
 export async function searchLocations(q) {
-  if (!q) return []
-  try {
-    const results = await getJSON(`/api/locations/search?q=${encodeURIComponent(q)}`)
-    track('search', { query: q, result_count: results.length })
-    return results
-  } catch (err) {
-    const cached = await getCachedBundleResource('locations')
-    if (!cached) throw err
-    // Offline degradation only — a plain substring match over name/
-    // department/category, not a port of the backend's fuzzy/alias/
-    // relevance-ranked search (data_access.py's search_locations). Good
-    // enough that search isn't completely dead with no connection; not
-    // meant to match backend results exactly.
-    const ql = q.trim().toLowerCase()
-    const results = cached.filter(l =>
-      (l.name || '').toLowerCase().includes(ql) ||
-      (l.department || '').toLowerCase().includes(ql) ||
-      (l.category || '').toLowerCase().includes(ql)
-    )
-    track('search', { query: q, result_count: results.length, offline: true })
-    return results
-  }
+  const results = searchCampusLocations(await getLocations(), q)
+  track('search', { query: q, result_count: results.length })
+  return results
 }
 
 export function getLocation(id) {
@@ -120,24 +77,9 @@ export function getEvent(id) {
 
 // ── Routing ──────────────────────────────────────────────────────────────
 //
-// Default (VITE_ROUTING_MODE=client): every route and reroute is computed in
-// the browser by offline/offlineRouter.js — a port of backend/utils/router.py
-// — over the bundled walkway graph and the cached road closures. No request
-// is made. getRoute/getRouteFromCoords keep returning Promises so existing
-// callers are unchanged; getRouteSync/getRouteFromCoordsSync return the route
-// directly for the one caller that must apply it within the same tick
-// (LocationProvider's automatic reroute).
-//
-// VITE_ROUTING_MODE=server (escape hatch): ask GET /api/route first, exactly
-// as before client routing, and compute on-device only if that request fails.
-// Client mode never falls back to the server — a client-side error (e.g. an
-// unknown destination) is surfaced as-is, never papered over by a request.
-//
-// `meta.isReroute` distinguishes an automatic on-route recalculation
-// (LocationProvider.jsx) from a user-initiated route request in the
-// analytics summary; the route_requested / reroute event is logged here, in
-// one place, for both modes.
-function _trackRoute(meta, r, usedServerFallback) {
+// Routes and reroutes use the validated local graph. Background synchronization
+// updates inputs without adding requests or waits to route/GPS ticks.
+function _trackRoute(meta, r) {
   track(meta.isReroute ? 'reroute' : 'route_requested', {
     destination_id: meta.toId ?? null,
     from_id: meta.fromId ?? null,
@@ -147,49 +89,27 @@ function _trackRoute(meta, r, usedServerFallback) {
     accuracy_m: meta.accuracyM ?? null,
     snapped_to: r.snapped_to ?? null,
     warning: !!r.warning,
-    offline: usedServerFallback, // true only when server mode had to fall back to on-device routing
-    routing_mode: ROUTING_MODE,
+    offline: typeof navigator !== 'undefined' && navigator.onLine === false,
+    routing_mode: 'client',
   })
-}
-
-async function _serverFirst(query, meta, local) {
-  let r
-  let usedFallback = false
-  try {
-    r = await getJSON(`/api/route?${query}`)
-  } catch (networkErr) {
-    try {
-      await prepareClientRouting()
-      r = local()
-      usedFallback = true
-    } catch {
-      throw networkErr
-    }
-  }
-  _trackRoute(meta, r, usedFallback)
-  return r
 }
 
 function _clientRoute(meta, local) {
   const r = local()
-  _trackRoute(meta, r, false)
+  _trackRoute(meta, r)
   return r
 }
 
 /** Synchronous, client-mode-only. Throws on failure. */
 export function getRouteSync(fromId, toId, meta = {}) {
-  getRoadSegments().catch(() => {})
   return _clientRoute({ ...meta, fromId, toId }, () => routeToLocationSync(fromId, toId))
 }
 
 export async function getRoute(fromId, toId, meta = {}) {
   const m = { ...meta, fromId, toId }
   const local = () => routeToLocationSync(fromId, toId)
-  if (ROUTING_MODE === 'client') {
-    await prepareClientRouting()
-    return _clientRoute(m, local)
-  }
-  return _serverFirst(`from_id=${encodeURIComponent(fromId)}&to_id=${encodeURIComponent(toId)}`, m, local)
+  await prepareClientRouting()
+  return _clientRoute(m, local)
 }
 
 /** Synchronous, client-mode-only equivalent of getRouteFromCoords. Throws on
@@ -197,9 +117,7 @@ export async function getRoute(fromId, toId, meta = {}) {
  *  the same tick it's computed — there is no in-flight request to go stale. */
 export function getRouteFromCoordsSync(lat, lng, toId, accuracyM, preferNodeId, meta = {}) {
   // GPS reroutes apply within the same tick, using the latest subscribed road
-  // status. The TTL-aware getter also revalidates it rather than retaining a
-  // one-time startup copy. Initial async routes await this getter first.
-  getRoadSegments().catch(() => {})
+  // status. Background subscriptions refresh it independently of GPS ticks.
   return _clientRoute(
     { ...meta, toId, fromLat: lat, fromLng: lng, fromGps: true, accuracyM },
     () => routeFromCoordsSync(lat, lng, toId, accuracyM, preferNodeId)
@@ -222,13 +140,8 @@ export function getRouteFromCoordsSync(lat, lng, toId, accuracyM, preferNodeId, 
 export async function getRouteFromCoords(lat, lng, toId, accuracyM, preferNodeId, meta = {}) {
   const m = { ...meta, toId, fromLat: lat, fromLng: lng, fromGps: true, accuracyM }
   const local = () => routeFromCoordsSync(lat, lng, toId, accuracyM, preferNodeId)
-  if (ROUTING_MODE === 'client') {
-    await prepareClientRouting()
-    return _clientRoute(m, local)
-  }
-  const acc = accuracyM != null ? `&accuracy=${accuracyM}` : ''
-  const prefer = preferNodeId ? `&prefer_node=${encodeURIComponent(preferNodeId)}` : ''
-  return _serverFirst(`from_lat=${lat}&from_lng=${lng}&to_id=${encodeURIComponent(toId)}${acc}${prefer}`, m, local)
+  await prepareClientRouting()
+  return _clientRoute(m, local)
 }
 
 /** Road segments (with open/closed state). Besides the route preview panel's
@@ -246,10 +159,6 @@ export function getGraph() {
   return snap.getGraph()
 }
 
-async function prepareClientRouting() {
-  await Promise.all([getRoadSegments(), getLocations()])
-}
-
 /** Phase 4.2 — food court menu image for today (or a specific date). UI
  *  already treats a menu fetch failure as "no menu today" rather than a
  *  hard error. */
@@ -259,25 +168,6 @@ export function getVenueMenu(venueId, date) {
 
 export function eventQrUrl(id) {
   return snap.qrUrl(id)
-}
-
-/** Phase 4A.1 — used by the startup boot screen to detect when the
- *  backend (Render free-tier cold start can take 20-50s) and Supabase
- *  are both reachable. Deliberately never throws — a failed/timed-out
- *  check just means "not ready yet", which the caller polls again for.
- *  `timeoutMs` bounds a single attempt so one slow request can't hang
- *  the whole retry loop. */
-export async function checkHealth(timeoutMs = 8000) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const res = await fetch(`${API_BASE}/api/health`, { signal: controller.signal })
-    return res.ok
-  } catch {
-    return false
-  } finally {
-    clearTimeout(timer)
-  }
 }
 
 // ── Route feedback (Feature 3) ──────────────────────────────────────────

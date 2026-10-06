@@ -9,6 +9,18 @@
 //    at most once per hour (one tiny request to /sw.js).
 
 const RELOAD_KEY = 'ssn-preload-reload-at'
+let navigationActive = false, pendingReload = false, refreshing = false
+
+function reloadWhenIdle() {
+  if (!pendingReload || navigationActive || refreshing) return
+  refreshing = true
+  window.location.reload()
+}
+
+window.addEventListener('campus:navigation-state', (event) => {
+  navigationActive = event.detail.active
+  reloadWhenIdle()
+})
 
 window.addEventListener('vite:preloadError', (event) => {
   try {
@@ -17,10 +29,19 @@ window.addEventListener('vite:preloadError', (event) => {
     sessionStorage.setItem(RELOAD_KEY, String(Date.now()))
   } catch { return /* Cannot persist a safe reload guard. */ }
   event.preventDefault()
-  window.location.reload()
+  pendingReload = true
+  reloadWhenIdle()
 })
 
 if ('serviceWorker' in navigator) {
+  let hadController = !!navigator.serviceWorker.controller
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    // The first installed worker already matches this page. Subsequent worker
+    // and missing-chunk updates share one guard, preserving an active route.
+    if (!hadController) { hadController = true; return }
+    pendingReload = true
+    reloadWhenIdle()
+  })
   let lastCheck = Date.now()
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return

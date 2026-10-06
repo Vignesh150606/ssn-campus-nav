@@ -1,41 +1,38 @@
-/**
- * clientRouting.js — the on-device routing service: the bundled graph + the
- * two live inputs the router needs (road closures, location names) held in
- * memory so a route can be computed synchronously, with no await and no
- * request.
- *
- * Inputs:
- *   graph          bundled at build time (./graphData.js) — never fetched.
- *   road closures  the one input that changes at runtime. Today they come
- *                  from the existing GET /api/road-segments, fetched by the
- *                  normal app-start calls to api.js getRoadSegments() (which
- *                  hands each result to setRoadSegmentsSnapshot below) and
- *                  mirrored to IndexedDB, so a cold start with no network
- *                  still has the last-known closures. This is the single
- *                  seam to change when closures move to a static snapshot.
- *                  Initial routes await the snapshot/live/cache getter in
- *                  api.js; foreground subscriptions keep reroutes current.
- *                  Missing road status is never assumed to mean all-open.
- *   locations      only used to fill the from/to names in the response
- *                  (same shape as GET /api/route); routing itself doesn't
- *                  need them, and a missing one degrades to the id.
- */
-import { WALKWAY_GRAPH } from './graphData'
+/** Local routing over the validated IndexedDB graph; closures are refreshed
+ * by the shared data subscriptions, independently of route requests. */
+import { currentGraph, loadGraph } from './graphData'
 import { routeBetweenLocations, routeFromPoint } from '../offline/offlineRouter'
-import { getCachedBundleResource } from '../offline/offlineBundle'
+import { getCachedBundleResource, setNavigationStatus } from '../offline/offlineBundle'
+import { getLocations, getClosures, subscribe } from '../data/dataClient'
 
 let roadSegments = []
 let roadSegmentsReady = false
-let roadSegmentsSetAt = 0 // 0 = nothing received this session yet
 let locationsById = new Map()
-let locationsSetAt = 0
+let ready = null
+
+subscribe('closures', setRoadSegmentsSnapshot)
+subscribe('locations', setLocationsSnapshot)
+
+/** Only startup/bootstrap awaits input loading. Subsequent routes use memory;
+ * graph and closure synchronization never belongs to a GPS/request tick. */
+export function prepareClientRouting() {
+  if (ready) return ready
+  ready = (async () => {
+    const [locs, segs] = await Promise.all([getLocations(), getClosures()])
+    setLocationsSnapshot(locs)
+    setRoadSegmentsSnapshot(segs)
+    await loadGraph(locs)
+    const [graph, cachedLocs, cachedSegs] = await Promise.all(['graph', 'locations', 'road-segments'].map(getCachedBundleResource))
+    setNavigationStatus({ hasCache: !!(graph && cachedLocs && cachedSegs) })
+  })().catch(error => { ready = null; throw error })
+  return ready
+}
 
 /** Latest road open/closed state (GET /api/road-segments shape). */
 export function setRoadSegmentsSnapshot(data) {
   if (!Array.isArray(data)) return
   roadSegments = data
   roadSegmentsReady = true
-  roadSegmentsSetAt = Date.now()
 }
 
 export function getRoadSegmentsSnapshot() {
@@ -46,23 +43,7 @@ export function getRoadSegmentsSnapshot() {
 export function setLocationsSnapshot(list) {
   if (!Array.isArray(list)) return
   locationsById = new Map(list.map((l) => [l.id, l]))
-  locationsSetAt = Date.now()
 }
-
-// Cold start: load whatever a previous session cached in IndexedDB. A
-// fresher in-memory snapshot (set while this is still in flight) always wins.
-async function hydrateFromCache() {
-  const [segs, locs] = await Promise.all([
-    getCachedBundleResource('road-segments'),
-    getCachedBundleResource('locations'),
-  ])
-  if (!roadSegmentsSetAt && Array.isArray(segs)) {
-    roadSegments = segs
-    roadSegmentsReady = true
-  }
-  if (!locationsSetAt && Array.isArray(locs)) locationsById = new Map(locs.map((l) => [l.id, l]))
-}
-if (typeof indexedDB !== 'undefined') hydrateFromCache().catch(() => {})
 
 function requireRoadStatus() {
   if (!roadSegmentsReady) throw new Error('Road status is still loading. Please retry shortly.')
@@ -71,7 +52,7 @@ function requireRoadStatus() {
 /** Equivalent of GET /api/route?from_id=…&to_id=…, computed synchronously. */
 export function routeToLocationSync(fromId, toId) {
   requireRoadStatus()
-  return routeBetweenLocations(WALKWAY_GRAPH, roadSegments, locationsById, fromId, toId)
+  return routeBetweenLocations(currentGraph(), roadSegments, locationsById, fromId, toId)
 }
 
 /** Equivalent of GET /api/route?from_lat=…&from_lng=…&to_id=…&accuracy=…&prefer_node=…,
@@ -79,7 +60,7 @@ export function routeToLocationSync(fromId, toId) {
 export function routeFromCoordsSync(lat, lng, toId, accuracyM, preferNodeId) {
   requireRoadStatus()
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new Error('Invalid coordinates')
-  return routeFromPoint(WALKWAY_GRAPH, roadSegments, locationsById, lat, lng, toId, {
+  return routeFromPoint(currentGraph(), roadSegments, locationsById, lat, lng, toId, {
     accuracyM: accuracyM ?? null,
     preferNodeId: preferNodeId ?? null,
   })

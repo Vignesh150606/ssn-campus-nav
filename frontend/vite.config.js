@@ -1,4 +1,3 @@
-import { fileURLToPath } from 'node:url'
 import { readFileSync } from 'node:fs'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -59,7 +58,6 @@ export default defineConfig(({ command, mode }) => {
   }
 
   return {
-  resolve: { alias: { '@graph': fileURLToPath(new URL('../backend/data', import.meta.url)) } },
   plugins: [
     {
       name: 'baked-graph-consistency',
@@ -88,6 +86,9 @@ export default defineConfig(({ command, mode }) => {
         'icons/icon-512.png',
         'icons/apple-touch-icon.png',
         'ssn-logo.webp',
+        'data/graph.json',
+        'data/locations.json',
+        'data/closures.json',
       ],
       manifest: {
         name: 'SSN Campus Navigator',

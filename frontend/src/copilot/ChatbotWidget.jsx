@@ -203,10 +203,10 @@ export default function ChatbotWidget({
     // instead of the generic "couldn't reach the campus service" failure
     // below, which is meant for a genuine mid-session server hiccup, not
     // "you have no connection at all right now."
-    if (!online) {
+    if (online === false) {
       setMessages(m => [...m, {
         role: 'assistant',
-        text: "Campus Copilot needs an internet connection to answer — you're offline right now. Directions and the map still work with your last saved campus data.",
+        text: "Campus Copilot can't reach the campus service right now. Directions still work with your last saved campus data.",
       }])
       return
     }

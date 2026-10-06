@@ -24,6 +24,28 @@ import { MapContainer, TileLayer, Marker, Polyline, useMap, Circle } from 'react
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { CATEGORY_META } from '../constants'
+import { isCampusTile } from '../../pwa/runtimeCaching.tiles'
+
+function CacheVisibleTilesAfterInstall() {
+  const map = useMap()
+  useEffect(() => {
+    const worker = navigator.serviceWorker
+    if (!worker) return
+    const cacheViewed = () => {
+      if (!worker.controller || navigator.onLine === false) return
+      // First-visit images may have loaded BEFORE the worker took control.
+      // Reuse the browser HTTP cache for only the already displayed tiles;
+      // Workbox then saves them. No redraw, bulk prefetch or forced reload.
+      const urls = new Set(Array.from(map.getContainer().querySelectorAll('img.leaflet-tile'), img => img.src))
+      for (const src of urls) {
+        if (isCampusTile(new URL(src))) fetch(src, { mode: 'cors' }).catch(() => {})
+      }
+    }
+    worker.addEventListener('controllerchange', cacheViewed)
+    return () => worker.removeEventListener('controllerchange', cacheViewed)
+  }, [map])
+  return null
+}
 
 // Root-cause hardening (post-4A crash fix): leaflet-rotate's own patches to
 // L.Marker, L.GridLayer, L.Popup, L.Tooltip and L.SVG/L.Canvas (Renderer)
@@ -903,9 +925,11 @@ export default function MapView({
           L.Control.Rotate override above — so this buffer is now a safety
           margin rather than the only line of defence. updateWhenZooming=
           false avoids extra tile churn mid-gesture. */}
+      <CacheVisibleTilesAfterInstall />
       <TileLayer
+        crossOrigin="anonymous"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         keepBuffer={8}
         updateWhenZooming={false}
       />

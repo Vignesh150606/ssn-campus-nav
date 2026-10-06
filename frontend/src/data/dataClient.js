@@ -28,7 +28,9 @@
  *                                    to bound staleness when the CDN won't revalidate (see handoff).
  */
 import { API_BASE } from '../apiBase'
-import { cacheBundleResource, getCachedBundleResource } from '../offline/offlineBundle'
+import { cacheBundleResource, getCachedBundleResource, setNavigationStatus,
+  reportBackendReachability, reportPublicReachability, reportSynchronizationFailure } from '../offline/offlineBundle'
+import { loadGraph } from '../routing/graphData'
 
 const SNAP_BASE = (import.meta.env.VITE_SNAPSHOT_BASE_URL || '').replace(/\/+$/, '')
 const BUCKET_S = Number(import.meta.env.VITE_SNAPSHOT_BUCKET_SECONDS) || 0
@@ -37,7 +39,6 @@ const MIN = 60_000
 const DATASETS = {
   // baked: same-origin raw JSON, no envelope
   locations: { baked: true, file: '/data/locations.json', live: '/api/locations', idbKey: 'locations', ttl: 10 * MIN, hardTtl: 24 * 60 * MIN },
-  graph:     { baked: true, file: '/data/graph.json',     live: '/api/graph',     idbKey: 'graph',     ttl: 10 * MIN, hardTtl: 24 * 60 * MIN },
   // live snapshots: envelope {schema, version, updated_at, meta, data}
   schedule:  { file: '/schedule.json', live: '/api/events',        idbKey: 'events',          ttl: 30_000,  hardTtl: 5 * MIN },
   closures:  { file: '/closures.json', live: '/api/road-segments', idbKey: 'road-segments',   ttl: 30_000,  hardTtl: 5 * MIN },
@@ -58,11 +59,11 @@ function httpError(message, status) {
   return e
 }
 
-async function timedFetch(url, options = {}, timeoutMs = 8000) {
+async function timedFetch(url, options = {}, timeoutMs = 8000, read = res => res) {
   const ctl = new AbortController()
   const timer = setTimeout(() => ctl.abort(), timeoutMs)
   try {
-    return await fetch(url, { ...options, signal: ctl.signal })
+    return await read(await fetch(url, { ...options, signal: ctl.signal }))
   } catch (e) {
     if (e.name === 'AbortError') {
       const t = new Error('Request timed out — check your connection and try again.')
@@ -76,18 +77,32 @@ async function timedFetch(url, options = {}, timeoutMs = 8000) {
   }
 }
 
+function timedJSON(url, options = {}, timeoutMs = 8000) {
+  // Keep the abort deadline active while receiving/parsing the body too.
+  return timedFetch(url, options, timeoutMs, async res => {
+    let json
+    try { json = await res.json() }
+    catch (error) {
+      if (res.ok || error.name === 'AbortError') throw error
+      json = {}
+    }
+    return { res, json }
+  })
+}
+
 async function liveJSON(path, timeoutMs = 8000) {
-  const res = await timedFetch(`${API_BASE}${path}`, {}, timeoutMs)
+  const { res, json } = await timedJSON(`${API_BASE}${path}`, {}, timeoutMs)
   if (!res.ok) {
-    const d = await res.json().catch(() => ({}))
-    throw httpError(d.detail || `Request failed: ${res.status}`, res.status)
+    throw httpError(json?.detail || `Request failed: ${res.status}`, res.status)
   }
-  return res.json()
+  reportBackendReachability(true)
+  return json
 }
 
 // ── validation: never let a malformed file replace good data ──────────────
 function validShape(name, data) {
-  if (name === 'graph') return data && typeof data === 'object' && Array.isArray(data.nodes) && Array.isArray(data.edges) && Array.isArray(data.location_edges)
+  if (name === 'locations') return Array.isArray(data) && data.length > 0 && new Set(data.map(l => l?.id)).size === data.length && data.every(l => l && typeof l.id === 'string' && l.id && Number.isFinite(l.lat) && Math.abs(l.lat) <= 90 && Number.isFinite(l.lng) && Math.abs(l.lng) <= 180)
+  if (name === 'closures') return Array.isArray(data) && data.length > 0 && new Set(data.map(s => s?.id)).size === data.length && data.every(s => s && typeof s.id === 'string' && typeof s.closed === 'boolean' && s.bbox && ['lat_min', 'lat_max', 'lng_min', 'lng_max'].every(k => Number.isFinite(s.bbox[k])) && s.bbox.lat_min <= s.bbox.lat_max && s.bbox.lng_min <= s.bbox.lng_max)
   if (name === 'menus') return data && typeof data === 'object' && !Array.isArray(data)
   return Array.isArray(data)
 }
@@ -100,15 +115,15 @@ async function fetchSnapshot(name, timeoutMs) {
   if (!def.baked && BUCKET_S > 0) url += `?b=${Math.floor(Date.now() / (BUCKET_S * 1000))}`
   // Live snapshots: conditional request (cheap 304s) so the browser's own max-age can't add
   // another minute of staleness on top of the CDN's. Baked files use normal HTTP/SW caching.
-  const res = await timedFetch(url, def.baked ? {} : { cache: 'no-cache' }, timeoutMs)
+  const { res, json } = await timedJSON(url, def.baked ? {} : { cache: 'no-cache' }, timeoutMs)
   if (!res.ok) throw httpError(`snapshot ${name}: HTTP ${res.status}`, res.status)
-  const json = await res.json()
   if (def.baked) {
     if (!validShape(name, json)) throw new Error(`snapshot ${name}: bad data shape`)
     return { data: json, version: 0, meta: {}, source: 'snapshot' }
   }
   if (!json || json.schema !== 1 || !('data' in json)) throw new Error(`snapshot ${name}: bad envelope`)
   if (!validShape(name, json.data)) throw new Error(`snapshot ${name}: bad data shape`)
+  if (res.headers.get('X-SSN-Snapshot-Source') !== 'sw-cache') reportPublicReachability()
   return { data: json.data, version: Number(json.version) || 0, meta: json.meta || {}, source: 'snapshot',
     revalidated: res.headers.get('X-SSN-Snapshot-Source') !== 'sw-cache' }
 }
@@ -149,10 +164,13 @@ function commit(name, res) {
   }
   if (cur && res.version && res.version === cur.version) {
     cur.fetchedAt = now            // unchanged
+    if (name === 'closures') setNavigationStatus({ closuresSyncedAt: now })
+    cacheBundleResource(`snapshot-meta:${name}`, { version: cur.version, fetchedAt: now, meta: cur.meta })
     return cur
   }
   const st = { data: res.data, version: res.version, fetchedAt: now, meta: res.meta, source: res.source }
   mem[name] = st
+  if (name === 'closures') setNavigationStatus({ closuresSyncedAt: st.fetchedAt })
   const def = DATASETS[name]
   cacheBundleResource(def.idbKey, st.data)
   cacheBundleResource(`snapshot-meta:${name}`, { version: st.version, fetchedAt: st.fetchedAt, meta: st.meta })
@@ -171,6 +189,9 @@ function revalidate(name, timeoutMs = 6000) {
         res = await fetchLive(name, timeoutMs)   // snapshot unreachable -> the old live API path
       }
       return commit(name, res)
+    } catch (error) {
+      reportSynchronizationFailure()
+      throw error
     } finally {
       delete inflight[name]
     }
@@ -183,14 +204,20 @@ async function load(name) {
   const st = mem[name] || (await hydrate(name))
   const age = st ? Date.now() - st.fetchedAt : Infinity
   if (st && age < def.ttl) return st
-  if (st && age < def.hardTtl) {
-    if (name === 'closures') {
-      // A route request must use the refreshed road status, rather than returning
-      // a stale copy while its refresh runs after the route was calculated.
-      try { return await revalidate(name) } catch { return st }
-    }
-    revalidate(name).catch(() => {})             // stale-while-revalidate
+  if (st && (age < def.hardTtl || name === 'closures' || name === 'locations')) {
+    // Navigation uses last-known-good data immediately. Polling/subscriptions
+    // update closures independently; GPS and routes never await the network.
+    if (typeof navigator === 'undefined' || navigator.onLine !== false) revalidate(name).catch(() => {})
     return st
+  }
+  if (name === 'closures') {
+    try {
+      const { res, json } = await timedJSON('/data/closures.json')
+      if (!res.ok) throw new Error('No bootstrap road status')
+      const initial = commit(name, { data: json, version: 0, meta: { bootstrap: true }, source: 'bootstrap', revalidated: false })
+      revalidate(name).catch(() => {})
+      return initial
+    } catch { /* No build-time status: bootstrap from the live snapshot/API. */ }
   }
   try {
     return await revalidate(name, st ? 2500 : 8000)
@@ -217,7 +244,7 @@ export async function getLocation(id) {
 
 /** The raw walkway graph. Shared object (large): treat as read-only. */
 export async function getGraph() {
-  return (await load('graph')).data
+  return loadGraph(await getLocations())
 }
 
 /** Same array as GET /api/events (verified events, `location` = {id,name,lat,lng}). */
@@ -242,7 +269,9 @@ export async function getEvent(id) {
 
 /** Same array as GET /api/road-segments. */
 export async function getClosures() {
-  return clone((await load('closures')).data)
+  const st = await load('closures')
+  setNavigationStatus({ closuresSyncedAt: st.fetchedAt })
+  return clone(st.data)
 }
 
 /** { [venueId]: { [YYYY-MM-DD]: menuRow } } for yesterday..+14 days (UTC dates, like the backend). */
@@ -308,13 +337,13 @@ export function subscribe(name, fn) {
 
 /** An old cache is sufficient to show the app while health/network refreshes run. */
 export async function hasCachedBootData() {
-  const entries = await Promise.all(['locations', 'graph', 'closures', 'schedule'].map(name => mem[name] || hydrate(name)))
+  const entries = await Promise.all(['locations', 'closures', 'schedule'].map(name => mem[name] || hydrate(name)))
   return entries.some(Boolean)
 }
 
 /** Warm everything the home screen needs; never rejects. */
 export function prefetchAll() {
-  return Promise.allSettled(['locations', 'graph', 'closures', 'schedule'].map(load))
+  return Promise.allSettled([getGraph(), ...['locations', 'closures', 'schedule'].map(load)])
 }
 
 /** Test/debug helper. */

@@ -40,6 +40,13 @@ function openDB() {
   }
   dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION)
+    let blocked = false
+    req.onblocked = () => {
+      blocked = true
+      const error = new Error('Offline storage upgrade is blocked. Close older app tabs and retry.')
+      error.storageBlocked = true
+      reject(error)
+    }
     req.onupgradeneeded = () => {
       const db = req.result
       // The old store this same name/version once held had a different
@@ -59,7 +66,11 @@ function openDB() {
         db.createObjectStore(STORE_BUNDLE_CACHE)
       }
     }
-    req.onsuccess = () => resolve(req.result)
+    req.onsuccess = () => {
+      if (blocked) { req.result.close(); dbPromise = null; return }
+      req.result.onversionchange = () => { req.result.close(); dbPromise = null }
+      resolve(req.result)
+    }
     req.onerror = () => reject(req.error)
   }).catch((err) => {
     // Item 19 — previously a failed open cached this rejected promise in
@@ -69,7 +80,10 @@ function openDB() {
     // mid-session, etc). Clearing dbPromise back to null lets the NEXT
     // call retry a fresh indexedDB.open() instead of being stuck replaying
     // one failure for the rest of the page's life.
-    dbPromise = null
+    // An open request cannot be cancelled. Keep its rejected promise while
+    // blocked, rather than queueing more opens behind it indefinitely. Once
+    // the old tab closes, onsuccess releases the connection and permits retry.
+    if (!err.storageBlocked) dbPromise = null
     throw err
   })
   return dbPromise
@@ -123,7 +137,11 @@ export async function idbPut(storeName, key, value) {
   const store = await tx(storeName, 'readwrite')
   return new Promise((resolve, reject) => {
     const req = store.put(value, key)
-    req.onsuccess = () => resolve(true)
+    // A successful request can still belong to an aborted transaction (quota,
+    // shutdown). Never promote a graph until its entire row is durable.
+    store.transaction.oncomplete = () => resolve(true)
+    store.transaction.onabort = () => reject(store.transaction.error || new Error('Storage transaction aborted'))
+    store.transaction.onerror = () => reject(store.transaction.error)
     req.onerror = () => reject(req.error)
   })
 }

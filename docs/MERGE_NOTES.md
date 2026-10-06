@@ -188,3 +188,12 @@ A new visit may cost roughly 30-40 same-origin requests once HTML/app assets, 23
 Animated-image pass-through retains original bytes/metadata and may exceed image-size targets; runtime image optimization is UNTESTED without Pillow/backend dependencies.
 
 Final startup boundary PASS: a new isolated browser with health 200 but no snapshots, no baked fetches and no cached/live data retained the blocking screen. Final frontend build/lint were rerun after this correction and animation preservation.
+
+## Subsequent local-navigation migration
+
+The runtime routing/boot behavior recorded above is superseded by
+[LOCAL_NAVIGATION.md](LOCAL_NAVIGATION.md). Navigation now reads a validated
+IndexedDB graph and never requests Render routes or health on startup.
+No additional secret values or database migrations are required. Run the
+bake script before deploying; bootstrap road status is not current live status.
+Original MISSING items and backend UNTESTED limitations still apply.

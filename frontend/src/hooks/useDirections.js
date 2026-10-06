@@ -1,5 +1,5 @@
 /**
- * Fetches walking route from our own FastAPI backend (no Google API needed).
+ * Computes a walking route on-device using the validated local campus graph.
  * Returns path, distance, eta and triggers live tracking updates.
  */
 import { useState, useCallback } from 'react'

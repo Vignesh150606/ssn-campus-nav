@@ -29,7 +29,7 @@
  *
  * Python is run unmodified (py_router_runner.py). The graph is loaded from
  * the single canonical file backend/data/walkway_graph.json, which is the
- * same file Python reads and the frontend bundles.
+ * same file Python reads and the frontend bakes for validated IDB bootstrap.
  */
 import fs from 'node:fs'
 import os from 'node:os'
@@ -67,7 +67,7 @@ const failures = [] // pre-check failures (not per-case mismatches)
 // ── 1. one graph data source ──────────────────────────────────────────────
 function findGraphCopies(dir, out = []) {
   for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (ent.name === 'node_modules' || ent.name === '.git' || ent.name === 'dist') continue
+    if (ent.name === 'node_modules' || ent.name === '.git' || ent.name === 'dist' || ent.name === 'output') continue
     const p = path.join(dir, ent.name)
     if (ent.isDirectory()) findGraphCopies(p, out)
     else if (ent.name === 'walkway_graph.json') out.push(path.relative(ROOT, p))
@@ -78,11 +78,14 @@ const copies = findGraphCopies(ROOT)
 if (copies.length !== 1 || copies[0] !== path.join('backend', 'data', 'walkway_graph.json')) {
   failures.push(`expected exactly one walkway_graph.json (backend/data/), found: ${copies.join(', ') || 'none'}`)
 }
-// The frontend imports it through the '@graph' alias in vite.config.js.
+// Build bootstrap must match the canonical graph. Runtime updates live in
+// validated IndexedDB rows, not a second hand-maintained routing source.
 const viteCfg = fs.readFileSync(path.join(ROOT, 'frontend', 'vite.config.js'), 'utf8')
-if (!/'@graph'/.test(viteCfg) || !/\.\.\/backend\/data/.test(viteCfg)) {
-  failures.push("frontend/vite.config.js does not alias '@graph' to ../backend/data")
+if (!/baked-graph-consistency/.test(viteCfg)) {
+  failures.push('frontend build is missing its canonical/bootstrap graph consistency check')
 }
+const baked = JSON.parse(fs.readFileSync(path.join(ROOT, 'frontend', 'public', 'data', 'graph.json'), 'utf8'))
+if (JSON.stringify(baked) !== JSON.stringify(JSON.parse(fs.readFileSync(GRAPH_FILE, 'utf8')))) failures.push('baked bootstrap graph differs from canonical graph')
 
 const graph = JSON.parse(fs.readFileSync(GRAPH_FILE, 'utf8'))
 const baseSegs = JSON.parse(fs.readFileSync(SEGS_FILE, 'utf8'))

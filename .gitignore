@@ -43,3 +43,6 @@ CLAUDE.md
 ## no source data, safe to regenerate locally whenever needed.
 backend/data/validation_report.json
 backend/data/route_quality_report.json
+
+# Isolated builds/browser verification output (contains no source changes).
+/output/local-nav-check/
