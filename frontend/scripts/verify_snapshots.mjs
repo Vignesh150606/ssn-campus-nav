@@ -20,12 +20,8 @@ const graph = JSON.parse(readFileSync(new URL('../public/data/graph.json', impor
 const closures = JSON.parse(readFileSync(new URL('../public/data/closures.json', import.meta.url), 'utf8'))
 globalThis.fetch = async (url, options = {}) => {
   calls.push(String(url))
-  if (mode === 'body-stall' && String(url).includes('/api/locations/unknown')) {
-    return { ok: true, json: () => new Promise((resolve, reject) => {
-      options.signal.addEventListener('abort', () => reject(new DOMException('Body aborted', 'AbortError')), { once: true })
-    }) }
-  }
   if (mode === 'offline') throw new TypeError('offline')
+  if (String(url).includes('/api/admin/')) return Response.json({ message: 'Updated' })
   if (url === '/data/locations.json') return Response.json(locations)
   if (url === '/data/graph.json') return Response.json(graph)
   if (String(url).startsWith('https://storage.invalid')) {
@@ -48,16 +44,16 @@ try {
   assert.deepEqual(await data.getClosures(), closures)
   assert(calls.some(x => x.endsWith('/api/events')), 'missing bucket must fall back to API')
   assert.equal((await data.getEvent('e1')).location.name, locations.find(l => l.id === 'main-gate').name)
-  assert.equal(data.qrUrl('e1'), 'https://api.invalid/api/events/e1/qr')
+  assert.equal(data.qrUrl('e1'), 'https://storage.invalid/snapshots/qr/e1.png')
   assert.equal(await data.hasCachedBootData(), true)
   calls = []
   await data.getSchedule(); await data.getClosures()
   assert.equal(calls.length, 0, 'fresh client data avoids requests')
-  now += 31_000; mode = 'malformed'
+  now += 31_000; mode = 'malformed'; calls = []
   const off = data.subscribe('schedule', () => {})
   await data.getSchedule()
   await new Promise(resolve => setTimeout(resolve, 50))
-  assert(calls.some(x => x.endsWith('/api/events')), 'invalid JSON shape must fall back')
+  assert(!calls.some(x => x.startsWith('https://api.invalid')), 'cached visitor must not fall back to Render on malformed snapshot')
   off()
   now += 31_000; mode = 'snapshot'; eventName = 'Updated'
   let notification
@@ -67,20 +63,31 @@ try {
   assert.equal(notification[0].name, 'Updated')
   assert.equal(data.qrUrl('e1'), 'https://storage.invalid/snapshots/qr/e1.png')
   stop()
+  calls = []
+  await assert.rejects(data.getEvent('removed'), e => e.status === 404)
+  await assert.rejects(data.getLocation('unknown'), e => e.status === 404)
+  assert.equal(calls.length, 0, 'missing IDs in usable public data do not wake Render')
+  const currentVersion = data._state().schedule.version
+  const admin = await vite.ssrLoadModule('/src/pages/admin/adminShared.js')
+  await admin.adminFetch('/api/admin/events/e1', 'PATCH', { name: 'Edited' }, 'dummy-test-token')
+  await Promise.resolve()
+  assert.equal(data._state().schedule.fetchedAt, 0)
+  assert.equal(data._state().schedule.version, currentVersion, 'invalidation retains the known-good version and data')
+  assert.equal(data._state().schedule.data[0].name, 'Updated')
   const before = data._state().schedule.fetchedAt
   now += 31_000; fallback = true
   await data.getSchedule()
   await new Promise(resolve => setTimeout(resolve, 50))
   assert.equal(data._state().schedule.fetchedAt, before, 'SW fallback must not renew freshness')
-  mode = 'offline'; now += 600_000
+  mode = 'offline'; now += 600_000; calls = []
   assert.equal((await data.getSchedule())[0].name, 'Updated')
   assert.deepEqual(await data.getClosures(), closures)
+  await new Promise(resolve => setTimeout(resolve, 50))
+  assert(!calls.some(x => x.startsWith('https://api.invalid')), 'even very old caches must never wake Render in a refresh')
   await assert.rejects(data.getVenueMenu('main-gate'), /offline/)
   mode = 'absent'
   await assert.rejects(data.getVenueMenu('main-gate'), e => e.status === 404)
-  mode = 'body-stall'
-  await assert.rejects(data.getLocation('unknown'), e => e.timeout === true)
-  console.log('PASS: baked data, missing/malformed snapshots, live fallback, TTL, subscriptions, QR, venue enrichment, offline data, menu errors, stalled-body deadline')
+  console.log('PASS: baked data, cold live fallback, no cached Render fallback, TTL/subscriptions, admin invalidation, Storage QR, missing IDs, venue enrichment, offline data and menu errors')
 } finally {
   globalThis.fetch = realFetch; Date.now = realNow
   await vite.close()

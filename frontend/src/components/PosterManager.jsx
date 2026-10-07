@@ -22,6 +22,7 @@
  *   - every image is lazy-loaded + async-decoded.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { noteAdminMutation } from '../data/dataClient'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'
 
@@ -63,7 +64,9 @@ async function apiFetch(path, options = {}, token) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail || `Request failed: ${res.status}`)
   }
-  return res.json()
+  const data = await res.json()
+  noteAdminMutation(path, options.method)
+  return data
 }
 
 async function listImages(eventId, token) {

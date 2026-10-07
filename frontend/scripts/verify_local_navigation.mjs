@@ -9,7 +9,7 @@ const graph = read('graph'), locations = read('locations'), closures = read('clo
 const rows = new Map()
 const realInterval = globalThis.setInterval, intervals = new Set()
 globalThis.setInterval = (...args) => { const timer = realInterval(...args); intervals.add(timer); return timer }
-let abortWrites = false, backendGraph = graph, liveClosures = closures, calls = []
+let abortWrites = false, backendGraph = graph, liveClosures = closures, closureVersion = 0, calls = []
 // Transaction-aware storage double. Real IndexedDB and SW are tested in Chrome.
 globalThis.indexedDB = { open() {
   const request = {}
@@ -34,12 +34,14 @@ globalThis.fetch = async url => {
   if (url === '/data/graph.json') return Response.json(graph)
   if (url === '/data/locations.json') return Response.json(locations)
   if (url === '/data/closures.json') return Response.json(closures)
+  if (String(url).endsWith('/snapshots/closures.json')) return Response.json({ schema: 1, version: ++closureVersion, data: liveClosures, meta: {} })
   if (String(url).endsWith('/api/graph')) return Response.json(backendGraph)
   if (String(url).endsWith('/api/road-segments')) return Response.json(liveClosures)
   throw new TypeError('Render completely unavailable')
 }
 const vite = await createServer({ root, configFile: false, envDir: false, optimizeDeps: { noDiscovery: true, entries: [] },
-  define: { 'import.meta.env.VITE_API_BASE': JSON.stringify('https://api.invalid') },
+  define: { 'import.meta.env.VITE_API_BASE': JSON.stringify('https://api.invalid'),
+    'import.meta.env.VITE_SNAPSHOT_BASE_URL': JSON.stringify('https://storage.invalid/snapshots') },
   server: { middlewareMode: true, hmr: false }, appType: 'custom', logLevel: 'error' })
 try {
   const validation = await vite.ssrLoadModule('/src/routing/validateGraph.js')
@@ -85,7 +87,7 @@ try {
   data._state().closures.fetchedAt = 0
   await data.getClosures()
   await new Promise(resolve => setTimeout(resolve, 10))
-  assert.match(api.getRouteSync('main-gate', 'cse-block').warning, /Test Road/, 'live closure refresh reaches the router subscription')
+  assert.match(api.getRouteSync('main-gate', 'cse-block').warning, /Test Road/, 'public closure snapshot reaches the router subscription without Render')
   liveClosures = closures; data._state().closures.fetchedAt = 0
   await data.getClosures(); await new Promise(resolve => setTimeout(resolve, 10))
   assert.equal(api.getRouteSync('main-gate', 'cse-block').warning, baseline.warning)

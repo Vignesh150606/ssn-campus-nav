@@ -928,7 +928,7 @@ export default function MapView({
       <CacheVisibleTilesAfterInstall />
       <TileLayer
         crossOrigin="anonymous"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         keepBuffer={8}
         updateWhenZooming={false}

@@ -12,11 +12,11 @@
  *
  * Strategy per dataset (see DATASETS):
  *   1. memory fresh (< ttl)           -> return it, no network
- *   2. memory/IndexedDB copy < hardTtl -> return it NOW, revalidate in the background
+ *   2. older memory/IndexedDB copy    -> return it NOW, revalidate in the background
  *                                         (stale-while-revalidate; subscribers get the update)
- *   3. otherwise                       -> wait for the network (short timeout); on failure
- *                                         return the last-known-good copy if there is one
- *   Network order: snapshot URL first, live API second. Only if both fail and nothing is cached
+ *   3. no usable copy                  -> wait for snapshot, then the live API (short timeout)
+ *   Network order: snapshot URL first; live API only when no usable data is cached.
+ *   Only if both fail and nothing is cached
  *   does the call reject (same error behaviour as the old api.js).
  *
  * Writes the same IndexedDB keys the existing offline code already reads
@@ -38,12 +38,12 @@ const BUCKET_S = Number(import.meta.env.VITE_SNAPSHOT_BUCKET_SECONDS) || 0
 const MIN = 60_000
 const DATASETS = {
   // baked: same-origin raw JSON, no envelope
-  locations: { baked: true, file: '/data/locations.json', live: '/api/locations', idbKey: 'locations', ttl: 10 * MIN, hardTtl: 24 * 60 * MIN },
+  locations: { baked: true, file: '/data/locations.json', live: '/api/locations', idbKey: 'locations', ttl: 10 * MIN },
   // live snapshots: envelope {schema, version, updated_at, meta, data}
-  schedule:  { file: '/schedule.json', live: '/api/events',        idbKey: 'events',          ttl: 30_000,  hardTtl: 5 * MIN },
-  closures:  { file: '/closures.json', live: '/api/road-segments', idbKey: 'road-segments',   ttl: 30_000,  hardTtl: 5 * MIN },
-  menus:     { file: '/menus.json',    live: null,                 idbKey: 'snapshot-menus',  ttl: 60_000,  hardTtl: 10 * MIN },
-  posters:   { file: '/posters.json',  live: 'derive-from-events',  idbKey: 'snapshot-posters', ttl: 2 * MIN, hardTtl: 30 * MIN },
+  schedule:  { file: '/schedule.json', live: '/api/events',        idbKey: 'events',          ttl: 30_000 },
+  closures:  { file: '/closures.json', live: '/api/road-segments', idbKey: 'road-segments',   ttl: 30_000 },
+  menus:     { file: '/menus.json',    live: null,                 idbKey: 'snapshot-menus',  ttl: 60_000 },
+  posters:   { file: '/posters.json',  live: 'derive-from-events',  idbKey: 'snapshot-posters', ttl: 2 * MIN },
 }
 
 const mem = {}          // name -> { data, version, fetchedAt, meta, source }
@@ -132,11 +132,12 @@ async function fetchLive(name, timeoutMs) {
   const def = DATASETS[name]
   if (!def.live) throw new Error(`no live fallback for ${name}`)
   if (def.live === 'derive-from-events') {
-    const events = await liveJSON('/api/events', timeoutMs)
+    const cachedSchedule = mem.schedule || await hydrate('schedule')
+    const events = cachedSchedule ? cachedSchedule.data : await liveJSON('/api/events', timeoutMs)
     const data = events
       .filter((e) => e.poster_url || (e.photo_urls || []).length)
       .map((e) => ({ event_id: e.id, poster_url: e.poster_url || '', photo_urls: e.photo_urls || [] }))
-    return { data, version: 0, meta: { live: true }, source: 'live' }
+    return { data, version: 0, meta: { live: !cachedSchedule }, source: cachedSchedule ? 'cache' : 'live', revalidated: !cachedSchedule }
   }
   return { data: await liveJSON(def.live, timeoutMs), version: 0, meta: { live: true }, source: 'live' }
 }
@@ -185,8 +186,13 @@ function revalidate(name, timeoutMs = 6000) {
       let res
       try {
         res = await fetchSnapshot(name, timeoutMs)
-      } catch {
-        res = await fetchLive(name, timeoutMs)   // snapshot unreachable -> the old live API path
+      } catch (error) {
+        // A snapshot outage must not turn every cached visitor's 30-second
+        // refresh into a request to Render. Empty schedules are valid caches.
+        // Hydrate here too: a subscriber can refresh before the first getter.
+        const cached = mem[name] || await hydrate(name)
+        if (cached) throw error
+        res = await fetchLive(name, timeoutMs)
       }
       return commit(name, res)
     } catch (error) {
@@ -204,9 +210,10 @@ async function load(name) {
   const st = mem[name] || (await hydrate(name))
   const age = st ? Date.now() - st.fetchedAt : Infinity
   if (st && age < def.ttl) return st
-  if (st && (age < def.hardTtl || name === 'closures' || name === 'locations')) {
-    // Navigation uses last-known-good data immediately. Polling/subscriptions
-    // update closures independently; GPS and routes never await the network.
+  if (st) {
+    // All public pages use known-good data immediately. Snapshot subscriptions
+    // refresh it independently; a cold Render is never part of that refresh
+    // when this dataset is already available, however old the cache is.
     if (typeof navigator === 'undefined' || navigator.onLine !== false) revalidate(name).catch(() => {})
     return st
   }
@@ -219,11 +226,26 @@ async function load(name) {
       return initial
     } catch { /* No build-time status: bootstrap from the live snapshot/API. */ }
   }
-  try {
-    return await revalidate(name, st ? 2500 : 8000)
-  } catch (err) {
-    if (st) return st                            // last-known-good (offline / both sources down)
-    throw err
+  return revalidate(name, 8000)
+}
+
+/** Successful admin writes expire, but never discard, public copies. This
+ *  invalidates this browser's IndexedDB too; publication still owns truth and
+ *  the existing 30-second subscriptions pick up the new Storage version. */
+export function noteAdminMutation(path, method) {
+  if (!['POST', 'PATCH', 'PUT', 'DELETE'].includes(method?.toUpperCase())) return
+  const pathname = path.split('?')[0]
+  const names = pathname.startsWith('/api/admin/events') ? ['schedule', 'posters']
+    : pathname.startsWith('/api/admin/road-segments') ? ['closures']
+    : /^\/api\/admin\/locations\/[^/]+\/menu$/.test(pathname) ? ['menus'] : []
+  for (const name of names) {
+    // Non-blocking storage invalidation, never a new live API call on a write.
+    ;(async () => {
+      const st = mem[name] || await hydrate(name)
+      if (!st) return
+      st.fetchedAt = 0
+      await cacheBundleResource(`snapshot-meta:${name}`, { version: st.version, fetchedAt: 0, meta: st.meta })
+    })().catch(() => {})
   }
 }
 
@@ -235,11 +257,11 @@ export async function getLocations(category) {
   return list.filter((l) => (l.category || '').toLowerCase() === c)
 }
 
-/** One venue by id (LocationDeepLink). Falls back to the live API only for an id the baked list lacks. */
+/** One venue by id. The validated destination list is authoritative. */
 export async function getLocation(id) {
   const found = (await load('locations')).data.find((l) => l.id === id)
   if (found) return clone(found)
-  return liveJSON(`/api/locations/${encodeURIComponent(id)}`)   // rejects with .status === 404 if truly unknown
+  throw httpError('Campus destination not found.', 404)
 }
 
 /** The raw walkway graph. Shared object (large): treat as read-only. */
@@ -256,9 +278,14 @@ export async function getSchedule({ fest, date } = {}) {
 }
 
 /** Same object as GET /api/events/{id}: location is the full venue row. 404 error if unknown. */
-export async function getEvent(id) {
+export async function getEvent(id, { refresh = false } = {}) {
+  // An explicit Retry bypasses the memory TTL, but still obeys the cached-data
+  // protection in revalidate(). Subscription callbacks never force a refresh.
+  if (refresh) await revalidate('schedule').catch(() => {})
   const ev = (await load('schedule')).data.find((e) => e.id === id)
-  if (!ev) return liveJSON(`/api/events/${encodeURIComponent(id)}`)  // brand-new event not in the snapshot yet
+  // An absent id is not a reason to wake Render. Newly published events arrive
+  // through the schedule subscription, including recovery on the QR page.
+  if (!ev) throw httpError('This event is not in the published schedule. It may be awaiting approval or have been removed.', 404)
   const out = clone(ev)
   try {
     const venue = (await load('locations')).data.find((l) => l.id === ev.location_id)
@@ -300,10 +327,11 @@ export async function getPosters() {
   return clone((await load('posters')).data)
 }
 
-/** QR image for an event: the bucket copy if the snapshot says it exists, else the backend endpoint. */
+/** QR image: use Storage when snapshots are configured, never an automatic
+ *  Render image request because a cached envelope lacks qr_ids. The admin QR
+ *  download still uses the authenticated dashboard's live endpoint. */
 export function qrUrl(eventId) {
-  const ids = mem.schedule?.meta?.qr_ids
-  if (SNAP_BASE && Array.isArray(ids) && ids.includes(eventId)) return `${SNAP_BASE}/qr/${encodeURIComponent(eventId)}.png`
+  if (SNAP_BASE) return `${SNAP_BASE}/qr/${encodeURIComponent(eventId)}.png`
   return `${API_BASE}/api/events/${encodeURIComponent(eventId)}/qr`
 }
 

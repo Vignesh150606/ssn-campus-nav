@@ -4,6 +4,7 @@
 // instead of drifting between the Super Admin and Fest Admin dashboards.
 import { API_BASE } from '../../apiBase'
 import { LOCATION_NAME_OVERRIDES } from '../../constants'
+import { noteAdminMutation } from '../../data/dataClient'
 
 // Phase 3 — JWT bearer auth (replaces the old shared `?secret=` query param).
 export async function adminFetch(path, method = 'GET', body = null, token) {
@@ -31,7 +32,9 @@ export async function adminFetch(path, method = 'GET', body = null, token) {
     err.status = res.status
     throw err
   }
-  return res.json()
+  const data = await res.json()
+  noteAdminMutation(path, method)
+  return data
 }
 
 export const TOKEN_STORAGE_KEY = 'ssn_admin_token_v1'

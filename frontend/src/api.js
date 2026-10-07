@@ -71,8 +71,8 @@ export function getEvents(fest) {
   return snap.getSchedule({ fest })
 }
 
-export function getEvent(id) {
-  return snap.getEvent(id)
+export function getEvent(id, options) {
+  return snap.getEvent(id, options)
 }
 
 // ── Routing ──────────────────────────────────────────────────────────────

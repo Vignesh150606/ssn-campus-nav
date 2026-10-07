@@ -25,6 +25,9 @@ import { API_BASE } from '../apiBase'
 const SESSION_KEY = 'ssn_analytics_session_v1'
 const FLUSH_INTERVAL_MS = 60_000
 const MAX_BATCH = 40
+// Visitor telemetry is optional. A disabled build must not wake Render, even
+// when an older build left an offline backlog or the browser sends a beacon.
+const ENABLED = import.meta.env.VITE_ANALYTICS_ENABLED === 'true'
 
 function sessionId() {
   try {
@@ -52,6 +55,7 @@ function scheduleFlush() {
 
 /** Record one anonymized event. */
 export function track(eventType, payload = {}) {
+  if (!ENABLED) return
   queue.push({ event_type: eventType, payload })
   if (queue.length >= MAX_BATCH) flush()
   else scheduleFlush()
@@ -75,6 +79,7 @@ async function sendBatch(events) {
 /** Flush the in-memory queue. On failure, persist to IndexedDB rather than
  *  drop the events — flushQueuedOffline() resends them on reconnect. */
 export async function flush() {
+  if (!ENABLED) return
   clearTimeout(flushTimer)
   flushTimer = null
   if (!queue.length) return
@@ -90,6 +95,7 @@ export async function flush() {
  *  anything queued to IndexedDB while offline, in small batches so one
  *  large backlog can't become one huge request. */
 export async function flushQueuedOffline() {
+  if (!ENABLED) return
   let entries
   try {
     entries = await idbGetAllEntries(STORE_ANALYTICS_QUEUE)
@@ -108,7 +114,7 @@ export async function flushQueuedOffline() {
 
 // Best-effort last flush when the tab is hidden/closed — sendBeacon
 // doesn't need the page to stay alive, unlike a normal fetch.
-if (typeof document !== 'undefined') {
+if (ENABLED && typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'hidden' || !queue.length) return
     // Item 20 (part 1) — previously cleared `queue` unconditionally

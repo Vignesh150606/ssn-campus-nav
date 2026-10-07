@@ -17,7 +17,8 @@ const vite = await createServer({ root, configFile: false, envDir: false,
       export async function idbGetAllEntries() { return { keys: globalThis.__analyticsTest.persisted.map((_,i)=>i), values: [...globalThis.__analyticsTest.persisted] } }
       export async function idbDeleteKeys(_store,keys) { keys.reverse().forEach(i=>globalThis.__analyticsTest.persisted.splice(i,1)) }` },
   }], optimizeDeps: { noDiscovery: true, entries: [] },
-  define: { 'import.meta.env.VITE_API_BASE': JSON.stringify('https://api.invalid') },
+  define: { 'import.meta.env.VITE_API_BASE': JSON.stringify('https://api.invalid'),
+    'import.meta.env.VITE_ANALYTICS_ENABLED': JSON.stringify('true') },
   server: { middlewareMode: true, hmr: false }, appType: 'custom', logLevel: 'error' })
 try {
   const client = await vite.ssrLoadModule('/src/analytics/analyticsClient.js')
@@ -57,4 +58,31 @@ try {
   if (originals.navigator) Object.defineProperty(globalThis, 'navigator', originals.navigator); else delete globalThis.navigator
   delete globalThis.__analyticsTest
   await vite.close()
+}
+
+// A second module graph uses the production default: no flag, no telemetry.
+const disabled = await createServer({ root, configFile: false, envDir: false,
+  optimizeDeps: { noDiscovery: true, entries: [] },
+  define: { 'import.meta.env.VITE_API_BASE': JSON.stringify('https://api.invalid') },
+  server: { middlewareMode: true, hmr: false }, appType: 'custom', logLevel: 'error' })
+let requests = 0, writes = 0, timersCreated = 0, hideListeners = 0
+const beforeDisabled = { fetch, setTimeout, document: globalThis.document }
+globalThis.fetch = async () => { requests++; throw new Error('Render must not be contacted') }
+globalThis.setTimeout = () => { timersCreated++; return 1 }
+globalThis.document = { addEventListener() { hideListeners++ } }
+try {
+  const client = await disabled.ssrLoadModule('/src/analytics/analyticsClient.js')
+  timersCreated = 0 // Ignore Vite's own transform timers; measure visitor calls.
+  // Any IndexedDB access would record a write; no disabled backlog is created.
+  globalThis.indexedDB = { open() { writes++; throw new Error('Disabled analytics touched storage') } }
+  for (let i = 0; i < 500; i++) client.track('route_requested')
+  await client.flush(); await client.flushQueuedOffline()
+  assert.equal(requests, 0); assert.equal(writes, 0)
+  assert.equal(timersCreated, 0); assert.equal(hideListeners, 0)
+  console.log('PASS: default-disabled analytics makes no fetch/beacon, timer, IndexedDB write or backlog replay.')
+} finally {
+  globalThis.fetch = beforeDisabled.fetch; globalThis.setTimeout = beforeDisabled.setTimeout
+  if (beforeDisabled.document === undefined) delete globalThis.document; else globalThis.document = beforeDisabled.document
+  delete globalThis.indexedDB
+  await disabled.close()
 }

@@ -308,3 +308,29 @@ These are local verification results, not a new production load-test result.
 Actual Android GPS/compass/battery behavior and Render admin-triggered publishing
 remain **UNTESTED**. The bucket/files were set up, but no application commit,
 push or deployment was made in this pass.
+
+### Event-day visitor request protection (2026-10-07)
+
+This later pass adds default-off `VITE_ANALYTICS_ENABLED`, including queued
+replay/beacons; cached snapshot failures no longer wake Render. Live fallback
+remains only for datasets with no usable copy. Public event/venue misses are
+resolved locally, visitor QRs use Storage, and successful admin writes expire
+public cache metadata without deleting good data. EventPage now clears a prior
+load error on successful subscription refresh and discards superseded loads.
+Manual Retry refreshes the public schedule without an automatic retry loop.
+Schedule/closure refresh budgets, graph data and both routing algorithms remain
+unchanged. These changes are local and have not been committed or deployed.
+
+The live IEEE publication was verified read-only in Storage. Rendered browser
+fixtures cover event approval/edit/delete/retry, closure/reopening, cached
+Storage outage/reload and tile-server failure with zero unexpected Render
+requests. Existing real IndexedDB/service-worker/offline navigation checks also
+passed. This is not a new production load-test result or a proof of every live
+backend mutation. Backend/FastAPI integration remains UNTESTED locally.
+
+A private content recovery export was created and hash-verified under ignored
+`backups/`. It deliberately excludes admin credentials and is not a full DB or
+Storage-object backup. A schema-only CLI dump was attempted and failed because
+Docker is unavailable; full dump/restore and off-device backup remain pending.
+See [FEST_READINESS.md](FEST_READINESS.md) for the read-only public content checks,
+request policy, map limitations, recovery commands and precise backup scope.

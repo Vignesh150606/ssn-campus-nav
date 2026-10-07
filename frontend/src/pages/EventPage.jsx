@@ -73,6 +73,7 @@ export default function EventPage() {
   const [previewOpen,   setPreviewOpen]   = useState(false)
   const [lightboxIdx,   setLightboxIdx]   = useState(null)
   const [nearbyEvents,  setNearbyEvents]  = useState([])
+  const [qrFailedUrl,   setQrFailedUrl]   = useState(null)
 
   const {
     setRoute, start: startTracking, tracking, position,
@@ -87,8 +88,8 @@ export default function EventPage() {
   // only way to recover was to leave this page and come back (effectively
   // the same as a manual refresh), which is exactly the "event only shows
   // up after a refresh" symptom. The shared schedule subscription refreshes
-  // both pages; this also supplies a couple of automatic
-  // retries with backoff, plus a manual Retry button as a fallback below.
+  // both pages, with a manual Retry button as a fallback below. No repeated
+  // live-API attempts: the shared snapshot subscription owns recovery.
   // Phase X — Feature 2 (Analytics). Event pages are reached almost
   // exclusively by scanning the printed QR code for that event (see
   // utils/qr_generator.py) — there's no separate "QR scan" browser event
@@ -102,27 +103,30 @@ export default function EventPage() {
   const [retryAttempt, setRetryAttempt] = useState(0)
   useEffect(() => {
     let cancelled = false
-    let retryTimer = null
+    let generation = 0
     setEvent(null); setLoadError(null)
     setRoutePreview(null); setPreviewOpen(false)
     setNearbyEvents([])
 
-    function load(attempt) {
-      getEvent(eventId)
-        .then((data) => { if (!cancelled) setEvent(data) })
+    function load(refresh = false) {
+      const current = ++generation
+      getEvent(eventId, { refresh })
+        .then((data) => {
+          if (cancelled || current !== generation) return
+          setEvent(data)
+          setLoadError(null)
+          setQrFailedUrl(null)
+        })
         .catch((e) => {
-          if (cancelled) return
-          if (attempt < 2) {
-            retryTimer = setTimeout(() => load(attempt + 1), 1500 * (attempt + 1))
-          } else {
-            setLoadError(e.message)
-          }
+          if (cancelled || current !== generation) return
+          if (e.status === 404) setEvent(null)
+          setLoadError(e.message)
         })
     }
-    const unsubscribe = subscribe('schedule', () => load(0))
-    load(0)
+    const unsubscribe = subscribe('schedule', () => load())
+    load(retryAttempt > 0)
 
-    return () => { cancelled = true; unsubscribe(); clearTimeout(retryTimer) }
+    return () => { cancelled = true; unsubscribe() }
   }, [eventId, retryAttempt])
 
   // Phase 2 — load same-day events within 300m of this venue
@@ -449,13 +453,16 @@ export default function EventPage() {
               ↗ Share Event Link
             </button>
           </div>
-          <img
+          {qrFailedUrl === eventQrUrl(event.id) ? (
+            <span className="state-message">QR unavailable. Use Share Event Link.</span>
+          ) : <img
             src={eventQrUrl(event.id)}
             alt={`QR for ${event.name}`}
             className="event-qr-img"
             loading="lazy"
             decoding="async"
-          />
+            onError={() => setQrFailedUrl(eventQrUrl(event.id))}
+          />}
         </div>
 
         {/* Phase 2 — Nearby events (same-day, within 300m) */}

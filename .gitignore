@@ -49,3 +49,6 @@ backend/data/route_quality_report.json
 
 # Supabase CLI generated linked-project/update metadata (not source).
 /supabase/.temp/
+
+# Private event-day recovery exports (may contain unpublished events/contacts).
+/backups/
