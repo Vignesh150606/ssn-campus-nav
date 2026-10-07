@@ -34,6 +34,35 @@ requested dataset has no usable cached copy. This is not a claim of measured
 
 ## Admin publication acceptance
 
+### Separate admin entry
+
+Open `/admin` directly on the same Vercel deployment (bookmark this URL).
+It builds from `frontend/admin/index.html`, with its own Admin Console header,
+and is absent from visitor navigation. Existing Super Admin/Fest Admin login,
+tokens, backend authorization, tabs and mutations are retained. Hiding the
+link and search-engine indexing is not an access control; backend RBAC remains
+the protection.
+
+The admin entry does not mount visitor BootGate, GPS/navigation providers,
+install prompts or snapshot subscriptions, and does not register the visitor
+service worker. Visitor precaching excludes admin-only HTML/chunks, while
+shared assets remain cached. The visitor worker bypasses `/admin` navigation
+so it cannot serve the visitor shell in place of the console. Admin operations
+still require the live Render backend, and an uncached admin page requires
+network access.
+
+Deploy the two HTML outputs together using the existing frontend build.
+`frontend/vercel.json` rewrites `/admin` and `/admin/*` to the dedicated HTML;
+there are no new environment variables, separate hosting projects or backend
+changes. Vite dev/preview implements the same rewrite. After deploying, verify
+direct `/admin` opening and reload both in a fresh browser and a browser with
+the visitor PWA installed. An old worker needs its normal update before it
+knows the new admin navigation exclusion.
+
+Local check: run `node scripts/verify_admin_entry.cjs` from `frontend`, pointing
+`NAV_TEST_URL` at the built preview and `NAV_TEST_DIST` at its output directory.
+It uses fake API responses and test tokens, never live admin credentials.
+
 Creating an event submits it for review; only approved/verified events belong
 in the public schedule. Successful event, road-state and menu/image writes
 expire this browser's public cache metadata without discarding its good data.

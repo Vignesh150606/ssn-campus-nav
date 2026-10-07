@@ -1,26 +1,8 @@
 import { Outlet, NavLink } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useTheme } from './hooks/useTheme'
 import DevLocationPanel from './components/DevLocationPanel'
 import InstallPrompt from './components/InstallPrompt'
 import OfflineIndicator from './components/OfflineIndicator'
-
-// Dark mode hook — persists to localStorage, respects system preference
-function useTheme() {
-  const [theme, setTheme] = useState(() => {
-    if (typeof window === 'undefined') return 'light'
-    const stored = localStorage.getItem('ssn-theme')
-    if (stored === 'light' || stored === 'dark') return stored
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  })
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('ssn-theme', theme)
-    const metas = document.querySelectorAll('meta[name="theme-color"]')
-    const color = theme === 'dark' ? '#0d4ba0' : '#0d4ba0'
-    metas.forEach((m) => m.setAttribute('content', color))
-  }, [theme])
-  return [theme, () => setTheme(t => (t === 'dark' ? 'light' : 'dark'))]
-}
 
 export default function App() {
   const [theme, toggleTheme] = useTheme()
@@ -38,7 +20,6 @@ export default function App() {
             <span className="schedule-label">Fest Schedule</span>
             <span className="schedule-label-compact" aria-hidden="true">Schedule</span>
           </NavLink>
-          <NavLink to="/admin" className="admin-link">Admin</NavLink>
           {/* Task 1 (offline support) — built earlier (Phase X) but never
               actually rendered anywhere; renders nothing at all while
               online, so this is a purely additive, zero-risk mount. */}

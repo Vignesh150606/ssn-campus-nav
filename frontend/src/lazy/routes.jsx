@@ -29,4 +29,3 @@ function lazyRoute(load) {
 }
 
 export const EventPage = lazyRoute(() => import('../pages/EventPage.jsx'))
-export const AdminDashboard = lazyRoute(() => import('../pages/AdminDashboard.jsx'))

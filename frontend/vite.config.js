@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
+import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -33,8 +34,21 @@ function leafletGlobalFix() {
   }
 }
 
+// Vite's dev/preview servers do not read vercel.json. Match its admin entry
+// rewrite locally, including /admin without a trailing slash.
+function adminEntryRewrite(server) {
+  server.middlewares.use((request, _response, next) => {
+    if (/^\/admin(?:\/|\?|$)/.test(request.url || '')) {
+      const query = (request.url || '').split('?').slice(1).join('?')
+      request.url = `/admin/index.html${query ? `?${query}` : ''}`
+    }
+    next()
+  })
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ command, mode }) => {
+  const adminOnlyAssets = new Set(['admin/index.html'])
   // Item 18 (strengthened) — apiBase.js already throws at module-load time
   // in the browser if a production build shipped without VITE_API_BASE,
   // but that only surfaces the problem to the first real visitor, after
@@ -59,6 +73,14 @@ export default defineConfig(({ command, mode }) => {
   }
 
   return {
+  build: {
+    rollupOptions: {
+      input: {
+        visitor: fileURLToPath(new URL('./index.html', import.meta.url)),
+        admin: fileURLToPath(new URL('./admin/index.html', import.meta.url)),
+      },
+    },
+  },
   // A deployment identifier, not a periodic backend graph request.
   define: {
     'import.meta.env.CAMPUS_GRAPH_VERSION': JSON.stringify(createHash('sha256')
@@ -66,6 +88,35 @@ export default defineConfig(({ command, mode }) => {
       .digest('hex')),
   },
   plugins: [
+    {
+      name: 'isolate-admin-precache',
+      configureServer: adminEntryRewrite,
+      configurePreviewServer: adminEntryRewrite,
+      generateBundle(_options, bundle) {
+        // Follow actual emitted imports, including lazy tabs and CSS. Shared
+        // assets stay offline-ready; visitors never precache admin-only code.
+        function dependencies(entry) {
+          const seen = new Set()
+          function visit(name) {
+            if (seen.has(name)) return
+            seen.add(name)
+            const chunk = bundle[name]
+            if (chunk?.type !== 'chunk') return
+            for (const dependency of [...chunk.imports, ...chunk.dynamicImports]) visit(dependency)
+            for (const css of chunk.viteMetadata?.importedCss || []) seen.add(css)
+          }
+          if (entry) visit(entry.fileName)
+          return seen
+        }
+        const entries = Object.values(bundle).filter(item => item.type === 'chunk' && item.isEntry)
+        const visitorEntry = entries.find(item => item.name === 'visitor')
+        const adminEntry = entries.find(item => item.name === 'admin')
+        if (!visitorEntry || !adminEntry) this.error('Both visitor and admin build entries are required.')
+        const visitor = dependencies(visitorEntry)
+        const admin = dependencies(adminEntry)
+        for (const asset of admin) if (!visitor.has(asset)) adminOnlyAssets.add(asset)
+      },
+    },
     {
       name: 'baked-graph-consistency',
       buildStart() {
@@ -80,6 +131,7 @@ export default defineConfig(({ command, mode }) => {
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false,
       // generateSW's default globPatterns only match built js/css/html, so
       // these public/ image assets (referenced from index.html/App.jsx/
       // BootGate.jsx, not imported in JS) would otherwise never enter the
@@ -116,6 +168,10 @@ export default defineConfig(({ command, mode }) => {
         ],
       },
       workbox: {
+        manifestTransforms: [async entries => ({
+          manifest: entries.filter(entry => !adminOnlyAssets.has(entry.url.replace(/^\//, ''))),
+          warnings: [],
+        })],
         // Phase 4A.1: removed the previous NetworkFirst rule for `/api/*`.
         // Events/admin/route data already has its own freshness logic in
         // the app (EventsList's localStorage cache + 20s poll, BootGate's
@@ -140,7 +196,7 @@ export default defineConfig(({ command, mode }) => {
         // event list or a route does.
         clientsClaim: true,
         skipWaiting: true,
-        // SPA deep links (e.g. /event/abc123, /events, /admin) have no
+        // Visitor SPA deep links (e.g. /event/abc123, /events) have no
         // precached HTML of their own — only '/' (start_url) does. Without
         // this, refreshing (or cold-launching) on one of those routes
         // while offline 404s at the network layer before React Router
@@ -149,7 +205,7 @@ export default defineConfig(({ command, mode }) => {
         // request that isn't itself precached, letting client-side
         // routing take over exactly like an online first paint would.
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/(?:api|data|assets)\//],
+        navigateFallbackDenylist: [/^\/(?:api|data|assets)\//, /^\/admin(?:\/|$)/],
         runtimeCaching: [
           ...tilesCaching,
           ...shellCaching,

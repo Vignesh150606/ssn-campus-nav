@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, lazy, Suspense } from 'react'
-import { API_BASE } from '../api'
+import { API_BASE } from '../apiBase'
 import PosterManager from '../components/PosterManager'
 import VenueMenuAdmin from '../components/VenueMenuAdmin'
 import {
@@ -236,11 +236,11 @@ export default function AdminDashboard() {
     <div className="admin-fullpage">
       <div style={{fontFamily:'var(--font-display)',fontSize:'1.3rem',fontWeight:700}}>Admin Login</div>
       {/* Task 3 — dark mode safe input */}
-      <input type="text" placeholder="Username" defaultValue="" autoComplete="username"
+      <input type="text" aria-label="Username" placeholder="Username" defaultValue="" autoComplete="username"
         ref={usernameRef} onKeyDown={e=>e.key==='Enter'&&login()}
         className="admin-input"
         style={{...inputStyle, width:260}} />
-      <input type="password" placeholder="Password" defaultValue="" autoComplete="current-password"
+      <input type="password" aria-label="Password" placeholder="Password" defaultValue="" autoComplete="current-password"
         ref={passwordRef} onKeyDown={e=>e.key==='Enter'&&login()}
         className="admin-input"
         style={{...inputStyle, width:260}} />

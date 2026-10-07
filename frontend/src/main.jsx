@@ -4,7 +4,8 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 import Home from './pages/Home.jsx'
-import { EventPage, AdminDashboard } from './lazy/routes.jsx'
+import { EventPage } from './lazy/routes.jsx'
+import { registerSW } from 'virtual:pwa-register'
 import './pwa/updateGuards.js'
 import EventsList from './pages/EventsList.jsx'
 import LocationDeepLink from './pages/LocationDeepLink.jsx'
@@ -16,6 +17,9 @@ import { flushQueuedOffline } from './analytics/analyticsClient.js'
 // Resends any analytics events that were queued to IndexedDB while offline
 // (see analytics/analyticsClient.js) the moment connectivity returns.
 window.addEventListener('online', () => { flushQueuedOffline() })
+
+// Only the visitor entry installs the navigation PWA.
+registerSW({ immediate: true })
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -29,7 +33,6 @@ createRoot(document.getElementById('root')).render(
                 <Route path="event/:eventId" element={<EventPage />} />
                 <Route path="location/:locationId" element={<LocationDeepLink />} />
                 <Route path="events" element={<EventsList />} />
-                <Route path="admin" element={<AdminDashboard />} />
               </Route>
             </Routes>
           </BrowserRouter>

@@ -302,15 +302,6 @@ input, select, textarea { font-family: inherit; color: inherit; }
 }
 .app-header nav a:hover { background: var(--ring); color: var(--ink); }
 .app-header nav a.active { background: var(--ink); color: var(--surface); }
-/* "Admin" is a secondary, non-visitor-facing entrance, so it's deliberately
-   de-emphasised in the header — but only while it ISN'T the current page.
-   Previously this was an inline `opacity: 0.6` on the link itself, which
-   also dimmed its own .active state, so the tab looked washed-out/disabled
-   even while you were on it (unlike the solid-black "Fest Schedule" active
-   state). Scoping the dimming to :not(.active) keeps the browse-mode
-   de-emphasis while giving Admin the same full-strength active state as
-   every other nav item. */
-.app-header nav a.admin-link:not(.active) { opacity: 0.6; }
 
 .theme-toggle {
   width: 34px; height: 34px;
@@ -1475,6 +1466,23 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
 }
 
 /* ---------- Admin dashboard (preserved layout) ---------- */
+.admin-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: calc(12px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left));
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.admin-header nav { display: flex; align-items: center; gap: 12px; }
+.admin-header nav a { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink-2); font-size: 0.82rem; }
+.admin-header .theme-toggle { width: 44px; height: 44px; }
+.admin-main { display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom); }
+.admin-main > div { min-height: 0; flex: 1; }
+.admin-main .admin-input { max-width: 100%; }
 .admin-page { max-width: 960px; margin: 0 auto; padding: 24px 16px 60px; }
 /* admin-fullpage: avoids height:100% on a plain block child — percentage
    heights on non-flex elements only resolve against a containing block
@@ -1600,8 +1608,8 @@ html:not(.app-navmode) .leaflet-container .leaflet-top.leaflet-left {
      class. The full name is still one tap away (the logo is still the
      link home) and nothing about what's clickable changes, only how
      much text sits next to it. */
-  .brand span { display: none; }
-  .brand { gap: 0; }
+  .app-header .brand span { display: none; }
+  .app-header .brand { gap: 0; }
 }
 
 /* ===================================================================
