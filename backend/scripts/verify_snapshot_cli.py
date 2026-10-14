@@ -25,7 +25,7 @@ inputs = {
                 "event_categories": {"name": "Workshop"}, "venues": {"id": "v1", "name": "Venue", "lat": 12.7, "lng": 80.2},
                 "event_images": [{"url": "https://images.invalid/poster.png", "is_poster": True, "sort_order": 0}]}],
     "closures": [{"id": "r1", "name": "Road", "closed": False, "lat_min": 12, "lat_max": 13, "lng_min": 80, "lng_max": 81}],
-    "menus": [{"id": "m1", "venue_id": "v1", "date": "2026-10-06", "description": "Menu"}],
+    "menus": [{"id": "m1", "venue_id": "v1", "date": "2027-01-06", "description": "Future menu"}],
 }
 
 scratch = bootstrap.BACKEND.parent / "output/local-nav-check"
@@ -40,6 +40,7 @@ with tempfile.TemporaryDirectory(dir=scratch) as directory:
         if args[1:3] == ["db", "query"]:
             query = Path(args[args.index("--file") + 1]).read_text(encoding="utf-8")
             assert "where e.status='verified'" in query
+            assert "where date >=" in query and "where date between" not in query
             assert "'contact_info'" in query and "'review_notes'" in query
             assert "created_by" not in query.split("from public.venue_menus")[0].split("'menus'")[1]
             assert "SUPABASE_ACCESS_TOKEN" not in kwargs["env"]
@@ -68,7 +69,8 @@ with tempfile.TemporaryDirectory(dir=scratch) as directory:
         assert event["category"] == "Workshop" and event["location"]["id"] == "v1"
         assert event["poster_url"] == "https://images.invalid/poster.png"
         assert documents["closures"]["data"][0]["bbox"]["lat_min"] == 12
-        assert documents["menus"]["data"]["v1"]["2026-10-06"]["id"] == "m1"
+        assert documents["menus"]["data"]["v1"]["2027-01-06"]["id"] == "m1"
+        assert documents["menus"]["meta"]["future_complete"] is True
         bootstrap.publish_with_cli("a" * 20, ["closures", "menus"])
         assert [item["object"] for item in uploads] == ["closures.json", "menus.json"]
         try:

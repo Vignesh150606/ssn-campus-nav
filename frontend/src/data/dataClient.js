@@ -235,7 +235,10 @@ async function load(name) {
 export function noteAdminMutation(path, method) {
   if (!['POST', 'PATCH', 'PUT', 'DELETE'].includes(method?.toUpperCase())) return
   const pathname = path.split('?')[0]
-  const names = pathname.startsWith('/api/admin/events') ? ['schedule', 'posters']
+  const names = pathname === '/api/admin/snapshots/publish'
+    ? (path.includes('?') ? [new URLSearchParams(path.split('?')[1]).get('name')].filter(name => DATASETS[name])
+      : ['schedule', 'posters', 'closures', 'menus'])
+    : pathname.startsWith('/api/admin/events') ? ['schedule', 'posters']
     : pathname.startsWith('/api/admin/road-segments') ? ['closures']
     : /^\/api\/admin\/locations\/[^/]+\/menu$/.test(pathname) ? ['menus'] : []
   for (const name of names) {
@@ -301,7 +304,7 @@ export async function getClosures() {
   return clone(st.data)
 }
 
-/** { [venueId]: { [YYYY-MM-DD]: menuRow } } for yesterday..+14 days (UTC dates, like the backend). */
+/** { [venueId]: { [YYYY-MM-DD]: menuRow } }; new snapshots include all upcoming uploads. */
 export async function getMenus() {
   return clone((await load('menus')).data)
 }
@@ -313,13 +316,24 @@ export async function getVenueMenu(venueId, date) {
   const d = date || utcToday()
   let st
   try { st = await load('menus') } catch { st = null }
-  const { date_from: from, date_to: to } = st?.meta || {}
-  if (st && from && to && d >= from && d <= to) {
+  const coversDate = state => {
+    const { date_from: from, date_to: to, future_complete: complete } = state?.meta || {}
+    return !!(from && d >= from && (complete === true || (to && d <= to)))
+  }
+  // An expired legacy snapshot must not send every food-court visitor to
+  // Render. If load() started a TTL refresh, await that shared Storage read
+  // before deciding whether the new publisher has extended coverage.
+  if (st && !coversDate(st) && inflight.menus) {
+    try { st = await inflight.menus } catch { /* Keep the usable cached snapshot. */ }
+  }
+  if (st && coversDate(st)) {
     const row = st.data?.[venueId]?.[d]
     if (row) return clone(row)
     throw httpError("Today's menu has not been uploaded.", 404)
   }
-  return liveJSON(`/api/locations/${encodeURIComponent(venueId)}/menu?date=${encodeURIComponent(d)}`) // outside snapshot window / no snapshot
+  if (st) throw httpError('Menu information for this date is not available in the published snapshot yet.', 503)
+  // Retain the first-visit recovery path only when there is no usable cache.
+  return liveJSON(`/api/locations/${encodeURIComponent(venueId)}/menu?date=${encodeURIComponent(d)}`)
 }
 
 /** [{event_id, poster_url, photo_urls}] for verified events that have images. */

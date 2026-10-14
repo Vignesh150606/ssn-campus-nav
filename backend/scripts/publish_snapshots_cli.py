@@ -65,7 +65,8 @@ def publish_with_cli(project_ref, names, dry_run=False, api_base=None):
       ) items), '[]'::json),
       'closures', coalesce((select json_agg(r order by id) from public.road_segments r), '[]'::json),
       'menus', coalesce((select json_agg(m) from (select id,venue_id,date,image_url,description,created_at,updated_at
-        from public.venue_menus where date between (current_timestamp at time zone 'UTC')::date - 1 and (current_timestamp at time zone 'UTC')::date + 14) m), '[]'::json),
+        from public.venue_menus where date >= (current_timestamp at time zone 'UTC')::date - 1
+        order by date,venue_id,id) m), '[]'::json),
       'date_from', (current_timestamp at time zone 'UTC')::date - 1,
       'date_to', (current_timestamp at time zone 'UTC')::date + 14
     ) as snapshot_inputs;
@@ -91,7 +92,7 @@ def publish_with_cli(project_ref, names, dry_run=False, api_base=None):
                 "menus": menus, "posters": [{"event_id": e["id"], "poster_url": e.get("poster_url") or "",
                                               "photo_urls": e.get("photo_urls") or []}
                                              for e in events if e.get("poster_url") or e.get("photo_urls")]}
-    metadata = {"schedule": {"qr_ids": []}, "menus": {"date_from": inputs["date_from"], "date_to": inputs["date_to"]},
+    metadata = {"schedule": {"qr_ids": []}, "menus": {"date_from": inputs["date_from"], "date_to": inputs["date_to"], "future_complete": True},
                 "closures": {}, "posters": {}}
     # Build/validate every selected JSON before attempting any upload.
     def write(name):

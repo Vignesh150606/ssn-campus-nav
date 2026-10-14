@@ -13,6 +13,7 @@ const vite = await createServer({ root, configFile: false, envDir: false,
 const realFetch = globalThis.fetch
 const realNow = Date.now
 let now = realNow(), mode = 'absent', eventName = 'Fest', version = 1, calls = [], fallback = false
+let menuData = {}, menuMeta = { date_from: '2026-10-01', date_to: '2026-10-20' }
 Date.now = () => now
 const locations = JSON.parse(readFileSync(new URL('../public/data/locations.json', import.meta.url), 'utf8'))
 const events = () => [{ id: 'e1', name: eventName, location_id: 'main-gate', location: { id: 'main-gate' }, fest: 'Invente' }]
@@ -27,8 +28,8 @@ globalThis.fetch = async (url, options = {}) => {
   if (String(url).startsWith('https://storage.invalid')) {
     if (mode === 'absent') return new Response('', { status: 404 })
     const name = String(url).split('/').at(-1).split('.')[0]
-    const data = mode === 'malformed' ? {} : name === 'closures' ? closures : events()
-    return Response.json({ schema: 1, version, data, meta: { qr_ids: ['e1'] } },
+    const data = mode === 'malformed' ? {} : name === 'menus' ? menuData : name === 'closures' ? closures : events()
+    return Response.json({ schema: 1, version, data, meta: name === 'menus' ? menuMeta : { qr_ids: ['e1'] } },
       { headers: fallback ? { 'X-SSN-Snapshot-Source': 'sw-cache' } : {} })
   }
   if (String(url).endsWith('/api/events')) return Response.json(events())
@@ -87,6 +88,30 @@ try {
   await assert.rejects(data.getVenueMenu('main-gate'), /offline/)
   mode = 'absent'
   await assert.rejects(data.getVenueMenu('main-gate'), e => e.status === 404)
+  // Explicit dates keep expiry coverage independent of the wall clock.
+  mode = 'snapshot'; fallback = false; version++; calls = []
+  await assert.rejects(data.getVenueMenu('food-rishabhs', '2026-11-01'), e => e.status === 503)
+  assert(!calls.some(x => x.startsWith('https://api.invalid')))
+  calls = []
+  await Promise.all(Array.from({ length: 25 }, () =>
+    assert.rejects(data.getVenueMenu('food-rishabhs', '2026-11-01'), e => e.status === 503)))
+  assert.equal(calls.length, 0, 'fresh legacy metadata must not cause repeated Storage or Render calls')
+  menuMeta = { ...menuMeta, future_complete: true }
+  menuData = { 'food-rishabhs': { '2026-11-01': { id: 'future-menu', description: 'Future lunch' } } }
+  version++; now += 61_000; calls = []
+  assert.equal((await data.getVenueMenu('food-rishabhs', '2026-11-01')).id, 'future-menu')
+  await assert.rejects(data.getVenueMenu('food-rishabhs', '2030-01-01'), e => e.status === 404)
+  await assert.rejects(data.getVenueMenu('food-rishabhs', '2026-09-01'), e => e.status === 503)
+  assert(!calls.some(x => x.startsWith('https://api.invalid')))
+  mode = 'offline'; now += 61_000; calls = []
+  assert.equal((await data.getVenueMenu('food-rishabhs', '2026-11-01')).id, 'future-menu')
+  assert(!calls.some(x => x.startsWith('https://api.invalid')), 'an offline menu cache must protect Render too')
+  mode = 'snapshot'
+  await admin.adminFetch('/api/admin/snapshots/publish', 'POST', null, 'dummy-test-token')
+  await Promise.resolve()
+  for (const name of ['schedule', 'closures', 'menus']) assert.equal(data._state()[name].fetchedAt, 0)
+  assert.equal(data._state().menus.data['food-rishabhs']['2026-11-01'].id, 'future-menu')
+  console.log('PASS: expired legacy menu protection, 25 concurrent cached readers, future-complete menus beyond 14 days, offline retention and explicit publication invalidation')
   console.log('PASS: baked data, cold live fallback, no cached Render fallback, TTL/subscriptions, admin invalidation, Storage QR, missing IDs, venue enrichment, offline data and menu errors')
 } finally {
   globalThis.fetch = realFetch; Date.now = realNow

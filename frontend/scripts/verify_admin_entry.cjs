@@ -30,6 +30,7 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     const context = await browser.newContext({ viewport: { width: 320, height: 700 } })
     const requests = [], errors = []
     let role = 'superadmin', rejected = false, approved = false
+    let publishCount = 0, releasePublish, publicationStarted
     await context.addInitScript(() => {
       window.qaGPSRequests = 0
       navigator.geolocation.watchPosition = () => { window.qaGPSRequests++; return 1 }
@@ -45,6 +46,15 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
         : { json: { access_token: token(role), role, username: 'qa-admin' } })
       if (pathname.startsWith('/api/admin/')) {
         assert.equal(request.headers().authorization, `Bearer ${token(role)}`)
+        if (pathname === '/api/admin/snapshots/publish') {
+          assert.equal(request.method(), 'POST')
+          publishCount++
+          if (publishCount === 1) return route.fulfill({ status: 502, json: { detail: 'Snapshot upload failed.' } })
+          return new Promise(resolve => {
+            releasePublish = async () => { await route.fulfill({ json: ['schedule', 'menus', 'closures', 'posters'].map(name => ({ name, status: 'published' })) }); resolve() }
+            publicationStarted()
+          })
+        }
         if (pathname.endsWith('/verify')) { approved = true; return route.fulfill({ json: { message: 'Approved' } }) }
         if (pathname === '/api/admin/events') return route.fulfill({ json: [{ ...event, status: approved ? 'verified' : 'pending' }] })
       }
@@ -82,6 +92,15 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     await page.getByText('Add New Event', { exact: true }).waitFor()
     await page.getByRole('button', { name: /Account Settings/ }).click()
     await page.getByText('Signed in as', { exact: false }).waitFor()
+    await page.getByRole('button', { name: 'Publish public data', exact: true }).click()
+    await page.getByRole('alert').filter({ hasText: 'Your saved changes remain intact' }).waitFor()
+    const started = new Promise(resolve => { publicationStarted = resolve })
+    await page.getByRole('button', { name: 'Publish public data', exact: true }).click()
+    await started
+    assert.equal(await page.getByRole('button', { name: 'Publishing…', exact: true }).isDisabled(), true)
+    await releasePublish()
+    await page.getByRole('status').filter({ hasText: 'Public data published.' }).waitFor()
+    assert.equal(publishCount, 2, 'Each explicit click sends one authenticated publish request')
     await page.reload()
     await page.getByText('Role: Super Admin', { exact: true }).waitFor()
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
@@ -94,6 +113,7 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     await page.getByLabel('Password', { exact: true }).fill('test-only')
     await page.getByRole('button', { name: 'Sign in', exact: true }).click()
     await page.getByText('Role: Fest Admin', { exact: true }).waitFor()
+    assert.equal(await page.getByRole('button', { name: 'Publish public data', exact: true }).count(), 0)
     await page.getByText('QA Admin Event', { exact: true }).waitFor()
     assert.equal(await page.getByRole('button', { name: 'Road Closures', exact: true }).count(), 0)
     await page.getByRole('button', { name: '+ Add Fest Schedule', exact: true }).click()
@@ -101,6 +121,7 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     await page.getByRole('button', { name: 'Sign out', exact: true }).click()
     assert.equal(await page.evaluate(() => window.qaGPSRequests), 0)
     console.log('PASS: independent login without visitor bootstrap; rejected login; both roles, approval, tabs, session reload and logout; 320px layout.')
+    console.log('PASS: Super Admin publication failure/retry, disabled in-flight button, one POST per click; no publish control for Fest Admin.')
 
     await page.getByRole('link', { name: 'Open campus app', exact: true }).click()
     await page.getByRole('textbox', { name: 'Search campus' }).waitFor()

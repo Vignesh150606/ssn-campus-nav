@@ -34,7 +34,7 @@ Env vars (all optional except the two Supabase ones that already exist):
     SNAPSHOT_DEBOUNCE_SECONDS=5      quiet period before an upload fires
     SNAPSHOT_MAX_WAIT_SECONDS=30     upper bound if edits keep arriving
     SNAPSHOT_PUBLISH_ON_STARTUP=false  republish everything ~5s after boot
-    SNAPSHOT_MENU_DAYS_AHEAD=14      menus window: today-1 .. today+N (UTC dates)
+    SNAPSHOT_MENU_DAYS_AHEAD=14      legacy date_to hint; all upcoming menus included
     SNAPSHOT_INCLUDE_CONTACT_INFO=false  contact_info can hold a phone/email
     SNAPSHOT_IMAGE_MAX_WIDTH=1080
     SNAPSHOT_IMAGE_TARGET_KB=150
@@ -178,13 +178,26 @@ def _build_menus() -> tuple[object, dict]:
     today = datetime.now(timezone.utc).date()
     d_from = (today - timedelta(days=1)).isoformat()
     d_to = (today + timedelta(days=int(_env_num("SNAPSHOT_MENU_DAYS_AHEAD", 14)))).isoformat()
-    rows = (get_client().table("venue_menus")
-            .select("id, venue_id, date, image_url, description, created_at, updated_at")
-            .gte("date", d_from).lte("date", d_to).execute().data or [])
+    # Capture all upcoming uploads, rather than expiring the snapshot after
+    # N days. A new upload/delete already triggers republication. Paginate so
+    # PostgREST's default response limit cannot silently omit future menus.
+    client = get_client()
+    rows = []
+    page_size = 500
+    while True:
+        page = (client.table("venue_menus")
+                .select("id, venue_id, date, image_url, description, created_at, updated_at")
+                .gte("date", d_from).order("date").order("venue_id").order("id")
+                .range(len(rows), len(rows) + page_size - 1).execute().data or [])
+        rows.extend(page)
+        if len(page) < page_size:
+            break
     data: dict[str, dict] = {}
     for r in rows:  # {venue_id: {date: row}}; storage_path / created_by deliberately omitted
         data.setdefault(r["venue_id"], {})[str(r["date"])[:10]] = r
-    return data, {"date_from": d_from, "date_to": d_to}
+    # date_to remains for older clients; new clients use future_complete to
+    # distinguish an absent upcoming menu from an expired legacy snapshot.
+    return data, {"date_from": d_from, "date_to": d_to, "future_complete": True}
 
 
 _BUILDERS = {"schedule": _build_schedule, "menus": _build_menus,

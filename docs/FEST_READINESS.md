@@ -25,9 +25,13 @@ requested dataset has no usable cached copy. This is not a claim of measured
   Render. An explicit graph synchronization debug operation still can.
 - Visitor QR images use public Storage when configured. If a QR is unavailable,
   Share Event Link remains available, without an automatic backend image call.
-- Menus inside the published date window use the snapshot/cache (including
-  confirmed absence). A requested date outside that window has no usable menu
-  cache and can still use the existing live menu fallback.
+- New menu snapshots include all uploaded upcoming menus and declare
+  `meta.future_complete=true`; passing the legacy 14-day `date_to` no longer
+  makes today's menu fall back to Render. Uploads/deletions republish as before.
+  A cached legacy snapshot outside its coverage shows menu unavailable (503),
+  rather than claiming no upload (404) or waking Render. Only a browser with
+  no usable menu dataset retains the existing live menu fallback. Historical
+  dates outside the retained snapshot also show unavailable without Render.
 - No visitor health polling or backend keep-warm loop is introduced. Existing
   external cron-job.org health pings, if enabled, are a separate intentional
   operator choice, not browser requests.
@@ -68,6 +72,26 @@ in the public schedule. Successful event, road-state and menu/image writes
 expire this browser's public cache metadata without discarding its good data.
 The server's publisher still builds the actual public files. Other open tabs
 refresh through their existing subscriptions.
+
+Super Admin has a **Publish public data** button, using the existing protected
+`POST /api/admin/snapshots/publish`. It forces publication of all four datasets
+and refreshes this browser's cache metadata without deleting saved data. It
+does not approve pending events. Successful publication is reported only
+after the endpoint completes; on failure, saved admin edits remain intact and
+the admin can retry. Existing automatic publication remains enabled, so a
+missed button click cannot silently stop routine event/closure/menu updates.
+
+This button bypasses the publication debounce, not CDN/browser freshness.
+Visitors still check Storage for updates; they do not contact Render merely
+because an event was added. Without polling or a push connection, already-open
+apps cannot discover a new publication. No new push infrastructure is added.
+
+Before deploying this menu fix, ship both the backend publisher and frontend,
+then use **Publish public data** once to replace the legacy menu envelope.
+Verify `menus.json` has `meta.future_complete=true`. The CLI bootstrap publisher
+produces the same format. `SNAPSHOT_MENU_DAYS_AHEAD` remains only as a legacy
+`date_to` hint; future coverage is no longer capped by it. Query pagination
+prevents PostgREST's usual row limit truncating the upcoming menu list.
 
 Keep schedule and closure TTL at 30 seconds and snapshot Cache-Control at 60
 seconds. The approximately 90-second delivery target is **after publication**;

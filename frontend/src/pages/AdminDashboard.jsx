@@ -58,6 +58,8 @@ export default function AdminDashboard() {
   const [submitting, setSubmitting] = useState(false)
   // Phase 4.2: which event card has its poster manager open
   const [expandedEventId, setExpandedEventId] = useState(null)
+  const [publishing, setPublishing] = useState(false)
+  const [publication, setPublication] = useState(null)
 
   function flash(text, isErr=false) {
     if (isErr) setError(text); else setMsg(text)
@@ -173,6 +175,18 @@ export default function AdminDashboard() {
     } catch(e) { flash(e.message,true) }
   }
 
+  async function publishPublicData() {
+    if (publishing) return
+    setPublishing(true)
+    setPublication(null)
+    try {
+      await adminFetch('/api/admin/snapshots/publish', 'POST', null, token)
+      setPublication({ text: 'Public data published. Only approved events are included. Visitor updates can take about 90 seconds.' })
+    } catch (e) {
+      setPublication({ error: true, text: `Publication failed: ${e.message} Your saved changes remain intact; retry publishing.` })
+    } finally { setPublishing(false) }
+  }
+
   async function reloadSegments() {
     const data = await fetch(`${API_BASE}/api/road-segments`).then(r=>r.json())
     setSegments(data)
@@ -284,10 +298,21 @@ export default function AdminDashboard() {
           </button>
         ))}
         <div style={{flex:1}}/>
+        <button type="button" onClick={publishPublicData} disabled={publishing}
+          style={{...pill,background:'var(--brand)',color:'#fff'}}>
+          {publishing ? 'Publishing…' : 'Publish public data'}
+        </button>
         {msg   && <span style={{fontSize:'0.8rem',color:'#2E9E5B',alignSelf:'center'}}>{msg}</span>}
         {error && <span style={{fontSize:'0.8rem',color:'#D7263D',alignSelf:'center'}}>{error}</span>}
         <button onClick={logout} style={{...pill,background:'transparent',border:'1px solid var(--line)',color:'var(--muted)'}}>Sign out</button>
       </div>
+
+      {publication && (
+        <div role={publication.error ? 'alert' : 'status'}
+          style={{padding:'10px 16px',borderBottom:'1px solid var(--line)',fontSize:'0.82rem',color:'var(--ink)',flexShrink:0}}>
+          {publication.text}
+        </div>
+      )}
 
       {/* Events list */}
       {tab==='events' && (
