@@ -11,6 +11,8 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { runTurn } from './copilotEngine'
+import { savedImageUrl } from './savedImage'
+import { retainIntentModel } from './intentModelClient'
 
 const STARTER_PROMPTS = [
   'Take me to Main Auditorium',
@@ -24,6 +26,26 @@ const STARTER_PROMPTS = [
 function initials(name) { return (name || '?').slice(0, 1).toUpperCase() }
 
 // ── Card components ────────────────────────────────────────────────────────
+
+function SavedChatImage({ src, alt, className, fallback }) {
+  const [image, setImage] = useState(null)
+  useEffect(() => {
+    let disposed = false, objectUrl = null
+    savedImageUrl(src).then(url => {
+      objectUrl = url
+      if (disposed) {
+        if (url) URL.revokeObjectURL(url)
+      } else setImage({ src, url })
+    })
+    return () => {
+      disposed = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [src])
+  return image?.src === src && image.url
+    ? <img src={image.url} alt={alt} className={className} />
+    : fallback
+}
 
 function ChatCard({ card, onPreview, onStart, onDetails }) {
   if (card.type === 'info') {
@@ -41,9 +63,8 @@ function ChatCard({ card, onPreview, onStart, onDetails }) {
     return (
       <div className="copilot-card copilot-card-event">
         <div className="copilot-card-media">
-          {card.thumbnail
-            ? <img src={card.thumbnail} alt="" />
-            : <span className="copilot-card-media-fallback">🎉</span>}
+          <SavedChatImage src={card.thumbnail} alt=""
+            fallback={<span className="copilot-card-media-fallback">🎉</span>} />
         </div>
         <div className="copilot-card-body">
           {card.statusBadge && (
@@ -77,11 +98,11 @@ function ChatCard({ card, onPreview, onStart, onDetails }) {
       {/* Phase 4.2 — show today's menu thumbnail if this is a food venue */}
       {card.menuImageUrl && (
         <div className="copilot-card-menu-img-wrap">
-          <img
+          <SavedChatImage
             src={card.menuImageUrl}
             alt="Today's menu"
             className="copilot-card-menu-img"
-            loading="lazy"
+            fallback={<span className="copilot-card-menu-empty">Menu image is not saved on this phone.</span>}
           />
           <span className="copilot-card-menu-badge">🍴 Today's Menu</span>
         </div>
@@ -160,6 +181,10 @@ export default function ChatbotWidget({
   const inputRef      = useRef(null)
   const lastArrivedRef = useRef(null)
 
+  useEffect(() => {
+    if (open) return retainIntentModel()
+  }, [open])
+
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (listRef.current) {
@@ -207,12 +232,10 @@ export default function ChatbotWidget({
       if (replyText || cards?.length) {
         setMessages(m => [...m, { role: 'assistant', text: replyText, cards, suggestions }])
       }
-    } catch (err) {
+    } catch {
       setMessages(m => [...m, {
         role: 'assistant',
-        text: err?.name === 'CopilotError'
-          ? err.message
-          : "I couldn't load that information. Directions and common questions work locally; connect to refresh missing events or menus, then try again.",
+        text: "That information isn't saved on this phone yet. Chat works entirely on your phone. Open Fest Schedule or the venue while connected to save events or menus, then ask again.",
       }])
     } finally {
       setBusy(false)
@@ -280,7 +303,7 @@ export default function ChatbotWidget({
               <div>
                 <div className="copilot-sheet-title-text">Campus Copilot</div>
                 <div className="copilot-sheet-subtitle">
-                  {busy ? 'Thinking…' : 'Ask about buildings, events or facilities'}
+                  {busy ? 'Thinking on your phone…' : 'On-device · messages stay on your phone'}
                 </div>
               </div>
             </div>

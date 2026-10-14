@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "model_id": "campus-98a5c48f13d2",
+  "features": {
+    "bins": 2048,
+    "min_n": 3,
+    "max_n": 5,
+    "max_chars": 200,
+    "hash": "fnv1a32-utf8",
+    "normalization": "nfkc-lower-punctuation-whitespace-v1"
+  },
+  "hidden": 64,
+  "labels": [
+    "greeting",
+    "building_finder",
+    "building_info",
+    "department_finder"
+  ],
+  "weights": {
+    "file": "weights.bin",
+    "bytes": 525584,
+    "sha256": "98a5c48f13d2aeb41bb06eaeb26adbd9cc8a82e3059cc9f9de320c01c9ad6f77"
+  },
+  "decision": {
+    "enabled": false,
+    "confidence": 1.01,
+    "margin": 1.01
+  },
+  "training": {
+    "seed": 42,
+    "dataset_sha256": "227e85f54dfce345a35a96603277a765d14fb22b18730a11ec400c1e1726f66f",
+    "from_scratch": true,
+    "prototype": true,
+    "missing_labels": [
+      "classroom_finder",
+      "venue_menu",
+      "event_now",
+      "event_today",
+      "event_upcoming",
+      "event_list",
+      "event_near_me",
+      "event_upcoming_30",
+      "nearby_search",
+      "distance_query",
+      "current_location",
+      "need.dining",
+      "need.water_station",
+      "need.restroom",
+      "need.parking",
+      "need.medical",
+      "need.accessibility",
+      "need.placement",
+      "follow_up_navigate",
+      "follow_up_preview",
+      "follow_up_eta",
+      "follow_up_details",
+      "follow_up_filter_closest",
+      "follow_up_filter_unsupported",
+      "follow_up_cancel_nav",
+      "faq.usage",
+      "faq.offline",
+      "faq.gps",
+      "faq.navigation",
+      "faq.rooms",
+      "faq.hours",
+      "faq.registration",
+      "faq.accessibility",
+      "unknown",
+      "out_of_scope"
+    ]
+  },
+  "approved_for_production": false
+}

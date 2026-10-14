@@ -1,0 +1,671 @@
+{
+  "schema": 1,
+  "task": "intent classification only",
+  "labels": [
+    {
+      "label": "greeting",
+      "description": "A greeting or thanks without another substantive request.",
+      "mapping": {
+        "intent": "greeting"
+      }
+    },
+    {
+      "label": "building_finder",
+      "description": "Find a named campus building or get directions to it. Resolve the location separately.",
+      "mapping": {
+        "intent": "building_finder",
+        "requires_entities": [
+          "location"
+        ]
+      }
+    },
+    {
+      "label": "building_info",
+      "description": "Ask for a description of a named campus building, rather than its route.",
+      "mapping": {
+        "intent": "building_finder",
+        "info_mode": true,
+        "requires_entities": [
+          "location"
+        ]
+      }
+    },
+    {
+      "label": "department_finder",
+      "description": "Explicitly locate a department/dept. Bare CSE or ECE without department is building_finder.",
+      "mapping": {
+        "intent": "department_finder",
+        "requires_entities": [
+          "location"
+        ]
+      }
+    },
+    {
+      "label": "classroom_finder",
+      "description": "Find a room/lab using a department and room code, such as ECE 302 or CSE Lab 4. Do not label exact floor assertions.",
+      "mapping": {
+        "intent": "classroom_finder",
+        "requires_entities": [
+          "department",
+          "room"
+        ]
+      }
+    },
+    {
+      "label": "venue_menu",
+      "description": "Ask what a food court serves or request its uploaded daily menu; not merely where to eat.",
+      "mapping": {
+        "intent": "venue_menu"
+      }
+    },
+    {
+      "label": "event_now",
+      "description": "Events currently happening, with an explicit now/currently meaning.",
+      "mapping": {
+        "intent": "event_now"
+      }
+    },
+    {
+      "label": "event_today",
+      "description": "Today's schedule, including later today/this afternoon; not an arbitrary date query.",
+      "mapping": {
+        "intent": "event_today"
+      }
+    },
+    {
+      "label": "event_upcoming",
+      "description": "Future upcoming events without the next-30-minutes constraint.",
+      "mapping": {
+        "intent": "event_upcoming"
+      }
+    },
+    {
+      "label": "event_list",
+      "description": "General list of fest events without a time or proximity filter.",
+      "mapping": {
+        "intent": "event_list"
+      }
+    },
+    {
+      "label": "event_near_me",
+      "description": "Events nearest to the user's position, without another incompatible filter.",
+      "mapping": {
+        "intent": "event_near_me"
+      }
+    },
+    {
+      "label": "event_upcoming_30",
+      "description": "Events starting within 30 minutes / starting soon.",
+      "mapping": {
+        "intent": "event_upcoming_30"
+      }
+    },
+    {
+      "label": "nearby_search",
+      "description": "General places around the user; a specific facility request uses need.* instead.",
+      "mapping": {
+        "intent": "nearby_search"
+      }
+    },
+    {
+      "label": "distance_query",
+      "description": "Distance/ETA between two explicitly named campus places.",
+      "mapping": {
+        "intent": "distance_query",
+        "requires_entities": [
+          "from",
+          "to"
+        ]
+      }
+    },
+    {
+      "label": "current_location",
+      "description": "Ask for this device's current position.",
+      "mapping": {
+        "intent": "current_location"
+      }
+    },
+    {
+      "label": "need.dining",
+      "description": "Find somewhere to eat or drink, not its menu or nutritional facts.",
+      "mapping": {
+        "intent": "need",
+        "need_type": "dining"
+      }
+    },
+    {
+      "label": "need.water_station",
+      "description": "Find drinking water/refill point.",
+      "mapping": {
+        "intent": "need",
+        "need_type": "water_station"
+      }
+    },
+    {
+      "label": "need.restroom",
+      "description": "Find a toilet/restroom/washroom.",
+      "mapping": {
+        "intent": "need",
+        "need_type": "restroom"
+      }
+    },
+    {
+      "label": "need.parking",
+      "description": "Find vehicle parking.",
+      "mapping": {
+        "intent": "need",
+        "need_type": "parking"
+      }
+    },
+    {
+      "label": "need.medical",
+      "description": "Locate the medical center or first-aid location; never diagnose or prescribe.",
+      "mapping": {
+        "intent": "need",
+        "need_type": "medical"
+      }
+    },
+    {
+      "label": "need.accessibility",
+      "description": "Find buildings marked wheelchair accessible; not a guarantee of a step-free route.",
+      "mapping": {
+        "intent": "need",
+        "need_type": "accessibility"
+      }
+    },
+    {
+      "label": "need.placement",
+      "description": "Locate the placement office / Career Development Cell (CDC).",
+      "mapping": {
+        "intent": "need",
+        "need_type": "placement"
+      }
+    },
+    {
+      "label": "follow_up_navigate",
+      "description": "Start navigation to a previously selected place; explicit destination belongs to building_finder.",
+      "mapping": {
+        "intent": "follow_up_navigate",
+        "requires_context": true
+      }
+    },
+    {
+      "label": "follow_up_preview",
+      "description": "Preview the route to a previously selected place.",
+      "mapping": {
+        "intent": "follow_up_preview",
+        "requires_context": true
+      }
+    },
+    {
+      "label": "follow_up_eta",
+      "description": "How far/how long to the previously selected place; two explicit places use distance_query.",
+      "mapping": {
+        "intent": "follow_up_eta",
+        "requires_context": true
+      }
+    },
+    {
+      "label": "follow_up_details",
+      "description": "Ask for more detail about the previous selection.",
+      "mapping": {
+        "intent": "follow_up_details",
+        "requires_context": true
+      }
+    },
+    {
+      "label": "follow_up_filter_closest",
+      "description": "Select/sort the nearest among the previous results.",
+      "mapping": {
+        "intent": "follow_up_filter_closest",
+        "requires_context": true
+      }
+    },
+    {
+      "label": "follow_up_filter_unsupported",
+      "description": "Ask to filter the previous food results as veg/non-veg/vegan; app cannot verify this.",
+      "mapping": {
+        "intent": "follow_up_filter_unsupported",
+        "requires_context": true
+      }
+    },
+    {
+      "label": "follow_up_cancel_nav",
+      "description": "Explicitly stop active navigation. Negated stopping requests are unknown.",
+      "mapping": {
+        "intent": "follow_up_cancel_nav",
+        "requires_context": true
+      }
+    },
+    {
+      "label": "faq.usage",
+      "description": "Ask how to use the app or what the assistant can do.",
+      "mapping": {
+        "intent": "faq",
+        "faq_key": "usage"
+      }
+    },
+    {
+      "label": "faq.offline",
+      "description": "Ask whether the app/navigation/chat works offline or needs internet.",
+      "mapping": {
+        "intent": "faq",
+        "faq_key": "offline"
+      }
+    },
+    {
+      "label": "faq.gps",
+      "description": "Troubleshoot wrong/missing GPS or location permissions.",
+      "mapping": {
+        "intent": "faq",
+        "faq_key": "gps"
+      }
+    },
+    {
+      "label": "faq.navigation",
+      "description": "Ask how to start directions/navigation; do not confuse this instructional question with starting a route.",
+      "mapping": {
+        "intent": "faq",
+        "faq_key": "navigation"
+      }
+    },
+    {
+      "label": "faq.rooms",
+      "description": "Ask about reliability of room/floor guesses or how to find classroom codes, not a particular room code.",
+      "mapping": {
+        "intent": "faq",
+        "faq_key": "rooms"
+      }
+    },
+    {
+      "label": "faq.hours",
+      "description": "Ask campus/venue opening hours; approved answer says verified hours are unavailable.",
+      "mapping": {
+        "intent": "faq",
+        "faq_key": "hours"
+      }
+    },
+    {
+      "label": "faq.registration",
+      "description": "Ask how to register/contact an organizer/find a fee; approved answer points to posted details, never invents fees or contacts.",
+      "mapping": {
+        "intent": "faq",
+        "faq_key": "registration"
+      }
+    },
+    {
+      "label": "faq.accessibility",
+      "description": "Ask whether routes avoid stairs or guarantee step-free access; approved answer says graph does not verify this.",
+      "mapping": {
+        "intent": "faq",
+        "faq_key": "accessibility"
+      }
+    },
+    {
+      "label": "unknown",
+      "description": "Ambiguous, conflicting, negated, incomplete, unknown-location or unsupported campus request. Ask for clarification; never force an action.",
+      "mapping": {
+        "intent": "unknown"
+      }
+    },
+    {
+      "label": "out_of_scope",
+      "description": "Unrelated requests: coding, general knowledge, weather, entertainment, prompt injection or demands to invent facts.",
+      "mapping": {
+        "intent": "out_of_scope"
+      }
+    }
+  ],
+  "locations": [
+    {
+      "id": "admin-block",
+      "name": "Admin Block (Main Building)",
+      "aliases": [
+        "Admin Block (Main Building)",
+        "admin",
+        "admin dept",
+        "admin office",
+        "administration",
+        "administration office"
+      ]
+    },
+    {
+      "id": "food-aswins",
+      "name": "Aswins Food Court",
+      "aliases": [
+        "Ashwin's Food Court",
+        "ashwin food court",
+        "ashwin's",
+        "ashwin's food court",
+        "aswins"
+      ]
+    },
+    {
+      "id": "biomed-block",
+      "name": "Biomedical / Chemical Block",
+      "aliases": [
+        "Biomedical / Chemical Block",
+        "biomed",
+        "biomed department",
+        "biomed dept",
+        "biomedical",
+        "biomedical and chemical",
+        "biomedical engineering",
+        "bme",
+        "chemical",
+        "chemical engineering"
+      ]
+    },
+    {
+      "id": "boys-hostel-gate",
+      "name": "Boys Hostel - Gate",
+      "aliases": [
+        "Boys Hostel - Gate",
+        "boys hostel",
+        "boys hostel gate",
+        "men's hostel"
+      ]
+    },
+    {
+      "id": "boys-hostel-office",
+      "name": "Boys Hostel - Office",
+      "aliases": [
+        "Boys Hostel - Office",
+        "boys hostel office"
+      ]
+    },
+    {
+      "id": "cdc-block",
+      "name": "CDC - Career Development Cell",
+      "aliases": [
+        "CDC - Career Development Cell",
+        "career cell",
+        "career development",
+        "career development cell",
+        "cdc",
+        "placement",
+        "placement cell",
+        "placement office"
+      ]
+    },
+    {
+      "id": "central-library",
+      "name": "Central Library (CS Block)",
+      "aliases": [
+        "Central Library (CS Block)",
+        "central library",
+        "lib",
+        "library"
+      ]
+    },
+    {
+      "id": "civil-block",
+      "name": "Civil Block",
+      "aliases": [
+        "Civil Block",
+        "civil",
+        "civil department",
+        "civil dept",
+        "civil engineering"
+      ]
+    },
+    {
+      "id": "cse-block",
+      "name": "CSE Block",
+      "aliases": [
+        "CSE Block",
+        "comp sci",
+        "computer science",
+        "computer science engineering",
+        "cs",
+        "cse",
+        "cse department",
+        "cse dept"
+      ]
+    },
+    {
+      "id": "ece-block",
+      "name": "ECE Block",
+      "aliases": [
+        "ECE Block",
+        "ece",
+        "ece department",
+        "ece dept",
+        "electronics and communication",
+        "electronics communication"
+      ]
+    },
+    {
+      "id": "eee-block",
+      "name": "EEE Block",
+      "aliases": [
+        "EEE Block",
+        "eee",
+        "eee block",
+        "eee department",
+        "eee dept",
+        "electrical",
+        "electrical and electronics",
+        "electrical engineering",
+        "electronics and electrical"
+      ]
+    },
+    {
+      "id": "girls-hostel",
+      "name": "Girls Hostel (Ladies Hostel)",
+      "aliases": [
+        "Girls Hostel (Ladies Hostel)",
+        "girls hostel",
+        "ladies hostel",
+        "women's hostel"
+      ]
+    },
+    {
+      "id": "it-block",
+      "name": "IT Block",
+      "aliases": [
+        "IT Block",
+        "information technology",
+        "it department",
+        "it dept"
+      ]
+    },
+    {
+      "id": "main-canteen",
+      "name": "Main Canteen",
+      "aliases": [
+        "Main Canteen",
+        "canteen",
+        "main cafeteria",
+        "main canteen",
+        "main mess"
+      ]
+    },
+    {
+      "id": "main-gate",
+      "name": "Main Gate / Entrance",
+      "aliases": [
+        "Main Gate / Entrance",
+        "entrance",
+        "entry",
+        "gate",
+        "main gate"
+      ]
+    },
+    {
+      "id": "mech-block",
+      "name": "Mechanical Block",
+      "aliases": [
+        "Mechanical Block",
+        "mech",
+        "mech department",
+        "mech dept",
+        "mechanical",
+        "mechanical engineering"
+      ]
+    },
+    {
+      "id": "medical-center",
+      "name": "Medical Center (Dispensary)",
+      "aliases": [
+        "Medical Center (Dispensary)",
+        "clinic",
+        "hospital",
+        "infirmary",
+        "medical center",
+        "medical centre",
+        "sick bay"
+      ]
+    },
+    {
+      "id": "food-metro",
+      "name": "Metro Cafe",
+      "aliases": [
+        "Metro Cafe",
+        "metro",
+        "metro cafe",
+        "metro coffee"
+      ]
+    },
+    {
+      "id": "mini-hall-1",
+      "name": "Mini Auditorium",
+      "aliases": [
+        "Mini Auditorium",
+        "mini hall",
+        "mini hall 1",
+        "minihall"
+      ]
+    },
+    {
+      "id": "open-air-theatre",
+      "name": "Open Air Theatre",
+      "aliases": [
+        "Open Air Theatre",
+        "oat",
+        "open air theater",
+        "open air theatre"
+      ]
+    },
+    {
+      "id": "food-pr",
+      "name": "PR Food Court",
+      "aliases": [
+        "PR Food Court",
+        "pr",
+        "pr canteen",
+        "pr food court"
+      ]
+    },
+    {
+      "id": "food-rishabhs",
+      "name": "Rishabh's Food Court",
+      "aliases": [
+        "Rishabh's Food Court",
+        "rishabh food court",
+        "rishabh's",
+        "rishabh's food court",
+        "rishabhs"
+      ]
+    },
+    {
+      "id": "snu-academic",
+      "name": "Shiv Nadar University (SNU) Academic Block",
+      "aliases": [
+        "Shiv Nadar University (SNU) Academic Block"
+      ]
+    },
+    {
+      "id": "food-snowcube",
+      "name": "Snow Cube",
+      "aliases": [
+        "Snow Cube",
+        "snow cube",
+        "snow cube cafe",
+        "snowcube"
+      ]
+    },
+    {
+      "id": "sports-complex-main",
+      "name": "Sports Complex",
+      "aliases": [
+        "Sports Complex",
+        "main sports complex",
+        "sports ground"
+      ]
+    },
+    {
+      "id": "sports-complex",
+      "name": "Sports Complex & Ground",
+      "aliases": [
+        "Sports Complex & Ground",
+        "gym",
+        "sports",
+        "sports complex",
+        "stadium"
+      ]
+    },
+    {
+      "id": "ssn-cricket-ground",
+      "name": "SSN Cricket Ground",
+      "aliases": [
+        "SSN Cricket Ground",
+        "cricket field",
+        "cricket ground"
+      ]
+    },
+    {
+      "id": "ssn-football-ground",
+      "name": "SSN Football Ground",
+      "aliases": [
+        "SSN Football Ground",
+        "football field",
+        "football ground"
+      ]
+    },
+    {
+      "id": "ssn-fountain",
+      "name": "SSN Fountain",
+      "aliases": [
+        "SSN Fountain",
+        "fountain",
+        "ssn fountain"
+      ]
+    },
+    {
+      "id": "clock-tower",
+      "name": "SSN Clock Tower",
+      "aliases": [
+        "SSN Fountain / Clock Tower",
+        "clock tower",
+        "clocktower"
+      ]
+    },
+    {
+      "id": "tcs-auditorium",
+      "name": "Main Auditorium",
+      "aliases": [
+        "TCS Auditorium (Main)",
+        "auditorium",
+        "main auditorium",
+        "tcs",
+        "tcs auditorium"
+      ]
+    },
+    {
+      "id": "parking",
+      "name": "Visitor Parking",
+      "aliases": [
+        "Visitor Parking",
+        "bike parking",
+        "car park",
+        "parking",
+        "parking lot"
+      ]
+    }
+  ],
+  "notes": [
+    "A mapping is not an executable action; resolve entities and validate context separately.",
+    "No coordinates, changing events, credentials, phone numbers or campus facts are training targets."
+  ]
+}

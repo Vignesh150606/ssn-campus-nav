@@ -280,6 +280,26 @@ export async function getSchedule({ fest, date } = {}) {
   return list
 }
 
+/** Chat reads only existing memory/IndexedDB data. Unlike load(), this never
+ * revalidates, polls or falls back to Render, even on an empty device. */
+export async function getSavedSchedule() {
+  const st = mem.schedule || await hydrate('schedule')
+  if (!st) throw httpError('No schedule is saved on this phone yet. Open Fest Schedule while connected, then ask again.', 503)
+  return clone(st.data)
+}
+
+export async function getSavedVenueMenu(venueId, date) {
+  const d = date || utcToday()
+  const st = mem.menus || await hydrate('menus')
+  const { date_from: from, date_to: to, future_complete: complete } = st?.meta || {}
+  if (!st || !from || d < from || !(complete === true || (to && d <= to))) {
+    throw httpError('No menu information for this date is saved on this phone. Open the venue while connected to refresh it.', 503)
+  }
+  const row = st.data?.[venueId]?.[d]
+  if (!row) throw httpError("Today's menu has not been uploaded in the saved data.", 404)
+  return clone(row)
+}
+
 /** Same object as GET /api/events/{id}: location is the full venue row. 404 error if unknown. */
 export async function getEvent(id, { refresh = false } = {}) {
   // An explicit Retry bypasses the memory TTL, but still obeys the cached-data

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>Campus model phone test</title>
+<style>
+:root{font:16px system-ui;color-scheme:light dark}body{max-width:640px;margin:auto;padding:20px;line-height:1.5}
+button,input,textarea{font:inherit;box-sizing:border-box}button{min-height:44px;padding:8px 14px;margin:6px 4px 6px 0;cursor:pointer}
+textarea{width:100%;min-height:96px;padding:10px}input{max-width:100%}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:light-dark(#f1f4f8,#222);padding:12px;border-radius:8px}
+fieldset{margin:16px 0;padding:12px}label{display:block;margin:10px 0}h1{font-size:1.4rem}
+</style></head><body>
+<h1>Campus model phone test</h1>
+<p>Experimental intent classification only. This page does not send chat messages to a server, answer campus facts, or start navigation.</p>
+<button id="packaged">Load packaged model</button>
+<fieldset><legend>Or choose the two Colab output files</legend>
+<label>model.json <input id="manifest" type="file" accept=".json"></label>
+<label>weights.bin <input id="weights" type="file" accept=".bin"></label>
+<button id="local">Load selected files</button></fieldset>
+<p id="status" role="status">No model loaded.</p>
+<label for="question">Campus question (English or Tanglish)</label>
+<textarea id="question" maxlength="200" placeholder="Where can I get something to eat?"></textarea>
+<button id="predict" disabled>Classify question</button><button id="benchmark" disabled>Benchmark 100 predictions</button>
+<pre id="result" aria-live="polite">Results appear here.</pre>
+<p>Record your phone, browser, loading time, p50/p95, and whether predictions match your intended question. High confidence alone does not establish correctness.</p>
+<button id="download">Download test log</button>
+<script type="module">
+const $ = id => document.getElementById(id), log = [], worker = new Worker('./worker.mjs', {type:'module'})
+let loaded = false, busy = false
+function controls() { for (const id of ['packaged','local','predict','benchmark']) $(id).disabled = busy || (!loaded && ['predict','benchmark'].includes(id)) }
+function fail(error) { busy = false; $('status').textContent = error.message || String(error); controls() }
+function send(manifest, buffer) { loaded = false; busy = true; controls(); $('status').textContent = 'Verifying and loading model…'; worker.postMessage({type:'load', manifest, buffer}, [buffer]) }
+worker.onmessage = ({data}) => {
+  busy = false
+  if (data.type === 'loaded') { loaded = true; $('status').textContent = `${data.id}: ${(data.bytes/1024).toFixed(0)} KB weights, loaded in ${data.ms.toFixed(1)} ms. ${data.enabled ? 'Confidence policy enabled.' : 'Policy rejected validation quality; predictions are diagnostic only.'}` }
+  else if (data.type === 'error') { fail(data.message); return }
+  else $('result').textContent = JSON.stringify(data, null, 2)
+  log.push({time:new Date().toISOString(), ...data}); controls()
+}
+worker.onerror = event => fail(`Worker failed: ${event.message}. Serve this folder over HTTPS or localhost.`)
+$('packaged').onclick = async () => {
+  busy = true; controls()
+  try { const [a,b] = await Promise.all([fetch('./model.json'),fetch('./weights.bin')]); if (!a.ok || !b.ok) throw Error('Model files missing beside this page; choose files instead.'); send(await a.json(),await b.arrayBuffer()) } catch(e) { fail(e) }
+}
+$('local').onclick = async () => {
+  try { const a=$('manifest').files[0], b=$('weights').files[0]; if (!a || !b) throw Error('Select model.json and weights.bin.'); if (a.size > 100000 || b.size > 1000000) throw Error('Model exceeds size budget.'); send(JSON.parse(await a.text()),await b.arrayBuffer()) } catch(e) { fail(e) }
+}
+for (const type of ['predict','benchmark']) $(type).onclick = () => { busy=true; controls(); log.push({question:$('question').value}); worker.postMessage({type,text:$('question').value}) }
+$('download').onclick = () => { const url=URL.createObjectURL(new Blob([JSON.stringify({browser:navigator.userAgent,log},null,2)],{type:'application/json'})); const a=document.createElement('a'); a.href=url; a.download='campus-phone-test.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000) }
+</script></body></html>

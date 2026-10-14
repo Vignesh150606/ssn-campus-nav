@@ -52,3 +52,9 @@ backend/data/route_quality_report.json
 
 # Private event-day recovery exports (may contain unpublished events/contacts).
 /backups/
+
+# Local ML experiment data/artifacts; source notebooks and prompts stay tracked.
+/ml/campus_intents/*.jsonl
+/ml/campus_intents/data/
+/ml/campus_intents/trained_model/
+/ml/campus_intents/model_bundle.zip

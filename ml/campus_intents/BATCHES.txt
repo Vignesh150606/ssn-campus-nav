@@ -1,0 +1,12 @@
+Attach DATASET_PROMPT.md and catalog.json to Claude. Then send one line at a time:
+
+Batch b01: greeting, building_finder, building_info, department_finder
+Batch b02: classroom_finder, venue_menu, event_now, event_today
+Batch b03: event_upcoming, event_list, event_near_me, event_upcoming_30
+Batch b04: nearby_search, distance_query, current_location, need.dining
+Batch b05: need.water_station, need.restroom, need.parking, need.medical
+Batch b06: need.accessibility, need.placement, follow_up_navigate, follow_up_preview
+Batch b07: follow_up_eta, follow_up_details, follow_up_filter_closest, follow_up_filter_unsupported
+Batch b08: follow_up_cancel_nav, faq.usage, faq.offline, faq.gps
+Batch b09: faq.navigation, faq.rooms, faq.hours, faq.registration
+Batch b10: faq.accessibility, unknown, out_of_scope

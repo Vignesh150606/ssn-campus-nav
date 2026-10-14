@@ -6,26 +6,28 @@ const vite = await createServer({ root, configFile: false, envDir: false,
   optimizeDeps: { noDiscovery: true, entries: [] },
   define: { 'import.meta.env.VITE_API_BASE': JSON.stringify('https://api.invalid') },
   server: { middlewareMode: true, hmr: false }, appType: 'custom', logLevel: 'error' })
-const original = globalThis.fetch
+const original = { fetch: globalThis.fetch, caches: globalThis.caches }
 try {
-  const { copilotChat } = await vite.ssrLoadModule('/src/copilot/copilotApi.js')
-  let request
-  globalThis.fetch = async (url, options) => {
-    request = { url, body: JSON.parse(options.body) }
-    return Response.json({ intent: 'greeting' })
-  }
-  assert.equal((await copilotChat('hello', { hasPending: true })).intent, 'greeting')
-  assert.deepEqual(request, { url: 'https://api.invalid/api/copilot/chat', body: { message: 'hello', context: { hasPending: true } } })
-  globalThis.fetch = async () => Response.json({ detail: 'Busy now', error: 'busy', retry_after: 4 }, { status: 503 })
-  await assert.rejects(copilotChat('hello'), e => e.name === 'CopilotError' && e.isOverload && e.retryAfter === 4 && e.status === 503)
-  globalThis.fetch = async () => Response.json({ detail: 'Wait' }, { status: 429, headers: { 'Retry-After': '6' } })
-  await assert.rejects(copilotChat('hello'), e => e.code === 'rate_limited' && e.retryAfter === 6)
-  globalThis.fetch = async () => { throw new TypeError('offline') }
-  await assert.rejects(copilotChat('hello'), e => e.code === 'network' && e.status === 0)
-  globalThis.fetch = async () => { throw new DOMException('timeout', 'AbortError') }
-  await assert.rejects(copilotChat('hello'), e => e.code === 'timeout')
-  console.log('PASS: Copilot request contract, typed overload, legacy 429/Retry-After, network/timeout errors')
+  const { savedImageUrl } = await vite.ssrLoadModule('/src/copilot/savedImage.js')
+  let requests = 0
+  globalThis.fetch = async () => { requests++; throw new Error('Network forbidden') }
+  delete globalThis.caches
+  assert.equal(await savedImageUrl('https://static.invalid/image.png'), null)
+  globalThis.caches = { match: async () => undefined }
+  assert.equal(await savedImageUrl('https://static.invalid/image.png'), null)
+  globalThis.caches = { match: async () => Response.json({ message: 'not an image' }) }
+  assert.equal(await savedImageUrl('https://static.invalid/image.png'), null)
+  globalThis.caches = { match: async () => new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'Content-Type': 'image/png' } }) }
+  const url = await savedImageUrl('https://static.invalid/image.png')
+  assert.ok(url.startsWith('blob:'))
+  URL.revokeObjectURL(url)
+  globalThis.caches = { match: async () => { throw new Error('Storage unavailable') } }
+  assert.equal(await savedImageUrl('https://static.invalid/image.png'), null)
+  assert.equal(requests, 0)
+  console.log('PASS: saved chat images use CacheStorage only; absent/unavailable cache and non-image responses never fetch.')
 } finally {
-  globalThis.fetch = original
+  globalThis.fetch = original.fetch
+  if (original.caches === undefined) delete globalThis.caches
+  else globalThis.caches = original.caches
   await vite.close()
 }

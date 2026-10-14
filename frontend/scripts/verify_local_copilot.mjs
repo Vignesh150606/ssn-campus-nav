@@ -95,6 +95,40 @@ try {
   assert.match(menus.replyText, /Using saved data/)
   assert.equal(requests, 0, 'Cached event/menu answers must not require a chat endpoint or live API')
   delete data._state().schedule
-  await assert.rejects(runTurn('fest schedule', {}, deps), /No internet/, 'Missing data must not be presented as an empty schedule')
+  await assert.rejects(runTurn('fest schedule', {}, deps), /No schedule is saved/, 'Missing data must not be presented as an empty schedule')
+  status.setNavigationStatus({ online: true })
+  await assert.rejects(runTurn('fest schedule', {}, deps), /No schedule is saved/)
+  delete data._state().menus
+  assert.ok((await runTurn('show main canteen menu', {}, deps)).cards[0].menuError)
+  // Stale memory must not refresh during a turn, even when online. An empty
+  // saved schedule differs from a missing schedule. Copies must be isolated.
+  data._state().schedule = { data: [], fetchedAt: 0, version: 1, meta: {} }
+  assert.match((await runTurn('fest schedule', {}, deps)).replyText, /No events/)
+  const copy = await data.getSavedSchedule()
+  copy.push({ id: 'do-not-mutate-memory' })
+  assert.equal((await data.getSavedSchedule()).length, 0)
+  data._state().menus = { data: {}, fetchedAt: 0, meta: { date_from: today, date_to: today }, version: 1 }
+  assert.ok((await runTurn('show main canteen menu', {}, deps)).cards[0].noMenuToday)
+  data._state().menus.meta.date_to = '2000-01-01'
+  assert.ok((await runTurn('show main canteen menu', {}, deps)).cards[0].menuError, 'Expired menu coverage must not look like no uploaded menu')
+  assert.equal(requests, 0, 'Cold/expired data must not fall back to Render or Storage during chat')
+  // Hydrate graph as app startup would, then forbid all network for ETA turns.
+  const graphData = await vite.ssrLoadModule('/src/routing/graphData.js')
+  const routing = await vite.ssrLoadModule('/src/routing/clientRouting.js')
+  globalThis.fetch = async url => {
+    assert.equal(url, '/data/graph.json')
+    return Response.json(JSON.parse(readFileSync(new URL('../public/data/graph.json', import.meta.url), 'utf8')))
+  }
+  await graphData.loadGraph(locations)
+  routing.setLocationsSnapshot(locations)
+  routing.setRoadSegmentsSnapshot(JSON.parse(readFileSync(new URL('../public/data/closures.json', import.meta.url), 'utf8')))
+  globalThis.fetch = async () => { requests++; throw new Error('Network forbidden') }
+  for (const position of [null, deps.position]) {
+    const expected = position ? routing.routeFromCoordsSync(position.lat, position.lng, 'central-library')
+      : routing.routeToLocationSync('main-gate', 'central-library')
+    const answer = await runTurn('how long', building.newState, { ...deps, position })
+    assert.match(answer.replyText, new RegExp(`About ${expected.eta_minutes} min`))
+  }
+  assert.equal(requests, 0, 'ETA turns must use hydrated routing inputs, without analytics or bootstrap requests')
   console.log(`PASS: ${questions.length} classifier/entity parity cases; compact rooms; library/follow-up/cancel actions; cached offline event/menu cards and missing-data errors; 500 concurrent FAQ turns without network (${elapsed.toFixed(1)}ms desktop).`)
 } finally { globalThis.fetch = originalFetch; await vite.close() }

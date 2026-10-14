@@ -8,13 +8,13 @@
 //  • info_mode flag  — "tell me about X" → shows description before nav card
 //  • suggestions[]   — 2-4 contextual follow-up chips appended to every response
 //  • follow_up_cancel_nav — cancel active navigation from chat
-import { classifyLocal } from './localClassifier'
+import { classifyOnDevice } from './onDeviceClassifier'
 import { haversine } from '../utils/geo'
 import { nearestWithFacility } from '../utils/facilities'
 import { isSafeUrl } from '../utils/url'
-import { getEvents, getRoute, getRouteFromCoords, getVenueMenu } from '../api'
+import { getSavedSchedule, getSavedVenueMenu } from '../data/dataClient'
+import { routeToLocationSync, routeFromCoordsSync } from '../routing/clientRouting'
 import { displayLocationName } from '../constants'
-import { getOfflineStatus } from '../offline/offlineBundle'
 
 const NEED_LABELS = {
   dining: 'somewhere to eat',
@@ -117,7 +117,7 @@ const addMinutes = (hhmm, min) => {
 }
 
 async function fetchVerifiedEvents() {
-  const events = await getEvents()
+  const events = await getSavedSchedule()
   return events
 }
 
@@ -419,8 +419,8 @@ function distanceQueryTurn(result, locationsById, position) {
 async function etaForLocation(locId, position) {
   try {
     return position
-      ? await getRouteFromCoords(position.lat, position.lng, locId)
-      : await getRoute('main-gate', locId)
+      ? routeFromCoordsSync(position.lat, position.lng, locId)
+      : routeToLocationSync('main-gate', locId)
   } catch { return null }
 }
 
@@ -506,7 +506,7 @@ export async function runTurn(message, state, deps) {
   const { locations, position } = deps
   const locationsById = Object.fromEntries(locations.map(l => [l.id, l]))
 
-  const result = classifyLocal(message, locations)
+  const result = classifyOnDevice(message, locations)
   const intent = result.intent
 
   const isFollowUp = intent.startsWith('follow_up_')
@@ -622,14 +622,11 @@ export async function runTurn(message, state, deps) {
           suggestions: all.length ? ['Navigate to Main Canteen', 'Nearest canteen'] : [],
         }
       } else {
-        // Specific venue(s) requested — also attempt to fetch menu image.
-        // This is the same getVenueMenu() call (same /api/locations/{id}/menu
-        // endpoint) that VenueMenuCard uses, so Copilot never disagrees with
-        // what the food court preview panel shows — one data source, not two.
+        // Same published menu data as the venue page, read locally only.
         const cards = await Promise.all(menuLocs.map(async (l) => {
           const base = locationCard(l, { position })
           try {
-            const menu = await getVenueMenu(l.id)
+            const menu = await getSavedVenueMenu(l.id)
             if (menu?.image_url) {
               base.menuImageUrl = menu.image_url
               base.menuDescription = menu.description || null
@@ -654,7 +651,7 @@ export async function runTurn(message, state, deps) {
         const replyText = withMenu.length
           ? `Here's today's menu at ${withMenu[0].title}.`
           : withError.length
-            ? `I couldn't load the menu right now — the menu service seems to be having an issue. Try again in a bit.`
+            ? 'Menu information for today is not saved on this phone. Open the venue while connected to refresh it, then ask again.'
             : `No menu uploaded for today at ${menuLocs.map(l => displayLocationName(l)).join(', ')}.`
         outcome = {
           replyText,
@@ -679,7 +676,7 @@ export async function runTurn(message, state, deps) {
   }
 
   return {
-    replyText: (outcome.replyText || '') + ((intent.startsWith('event_') || intent === 'venue_menu') && getOfflineStatus().online === false
+    replyText: (outcome.replyText || '') + ((intent.startsWith('event_') || intent === 'venue_menu')
       ? '\nUsing saved data; events, menus and road status may have changed.' : ''),
     cards:       outcome.cards       || [],
     action:      outcome.action      || null,

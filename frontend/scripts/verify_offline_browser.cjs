@@ -63,6 +63,17 @@ async function headerLayout(page) {
   const browser = await chromium.launch({ channel: 'chrome', headless: true })
   try {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['geolocation'], geolocation: { latitude: 12.75137, longitude: 80.204085, accuracy: 5 } })
+    await context.addInitScript(() => {
+      // Observe responses from the real bundled Worker, without recording input.
+      const NativeWorker = window.Worker
+      window.modelResponses = []
+      window.Worker = class extends NativeWorker {
+        constructor(...args) {
+          super(...args)
+          this.addEventListener('message', event => window.modelResponses.push(event.data))
+        }
+      }
+    })
     await configure(context)
     let page = await context.newPage()
     const errors = []
@@ -87,6 +98,7 @@ async function headerLayout(page) {
     })
     assert(caches.some(c => c.urls.some(u => new URL(u).pathname === '/data/graph.json')))
     assert(caches.some(c => c.urls.some(u => new URL(u).pathname === '/data/closures.json')))
+    assert(caches.some(c => c.urls.some(u => new URL(u).pathname.endsWith('.bin'))), 'Model weights must be precached before offline reopen')
     await page.close()
     await context.setOffline(true)
     page = await context.newPage()
@@ -95,12 +107,53 @@ async function headerLayout(page) {
     await page.locator('.location-card').first().waitFor({ timeout: 10000 })
     assert.equal((await graphRecord(page)).hash, record.hash)
     await headerLayout(page)
+    // Seed the same IndexedDB records used by ordinary snapshot downloads.
+    // No app/API request is involved; the next offline session must hydrate them.
+    await page.evaluate(async ({ venue, png }) => {
+      const today = new Date().toISOString().slice(0, 10)
+      await new Promise((resolve, reject) => {
+        const open = indexedDB.open('ssn-campus-offline', 3)
+        open.onsuccess = () => {
+          const db = open.result, tx = db.transaction('bundle-cache', 'readwrite'), store = tx.objectStore('bundle-cache')
+          const put = (key, data) => store.put({ data, cachedAt: Date.now() }, key)
+          put('events', [{ id: 'saved-chat-event', name: 'Saved chat event', date: today,
+            start_time: '09:00', end_time: '17:00', location_id: venue.id, location: venue,
+            poster_url: 'https://images.invalid/uncached-poster.png' }])
+          put('snapshot-meta:schedule', { version: 1, fetchedAt: 0, meta: {} })
+          put('snapshot-menus', { [venue.id]: { [today]: { image_url: 'https://images.invalid/saved-menu.png', description: 'Saved menu description' } } })
+          put('snapshot-meta:menus', { version: 1, fetchedAt: 0, meta: { date_from: today, date_to: today } })
+          tx.oncomplete = () => { db.close(); resolve() }
+          tx.onabort = () => reject(tx.error)
+        }
+        open.onerror = () => reject(open.error)
+      })
+      const bytes = Uint8Array.from(atob(png), c => c.charCodeAt(0))
+      await (await caches.open('chat-test-images')).put('https://images.invalid/saved-menu.png', new Response(bytes, { headers: { 'Content-Type': 'image/png' } }))
+    }, { venue: data('locations').find(l => l.id === 'main-canteen'), png: png.toString('base64') })
+    await page.reload()
+    await page.locator('.location-card').first().waitFor()
     await page.getByRole('button', { name: 'Open campus assistant' }).click()
+    const chatNetwork = []
+    const recordChatRequest = request => {
+      if (/\/api\/|storage\.invalid|images\.invalid/.test(request.url())) chatNetwork.push(request.url())
+    }
+    page.on('request', recordChatRequest)
     const chat = page.locator('.copilot-input')
     await chat.fill('Does this work offline?'); await chat.press('Enter')
     await page.locator('.copilot-msg-assistant').filter({ hasText: 'Open the app once with internet' }).waitFor()
     await chat.fill('Where is the library?'); await chat.press('Enter')
     await page.locator('.copilot-cards').filter({ hasText: 'Library' }).waitFor()
+    await page.waitForFunction(() => window.modelResponses.some(r => r.type === 'prediction'))
+    const modelReply = await page.evaluate(() => window.modelResponses.find(r => r.type === 'prediction'))
+    assert.equal(modelReply.result.accepted, false, 'Prototype must not override rule-based replies')
+    assert(await page.evaluate(() => window.modelResponses.some(r => r.type === 'ready' && r.modelId === 'campus-98a5c48f13d2')))
+    await chat.fill('fest schedule'); await chat.press('Enter')
+    await page.locator('.copilot-card-title').filter({ hasText: 'Saved chat event' }).waitFor()
+    await chat.fill('show main canteen menu'); await chat.press('Enter')
+    await page.locator('.copilot-card-menu-desc').filter({ hasText: 'Saved menu description' }).waitFor()
+    await page.waitForFunction(() => document.querySelector('.copilot-card-menu-img')?.src.startsWith('blob:'))
+    assert.deepEqual(chatNetwork, [], 'Chat turns and cached images must never request API, Storage or remote images')
+    page.off('request', recordChatRequest)
     await page.getByRole('button', { name: 'Close', exact: true }).click()
     assert.equal(chatRequests, 0, 'Offline chatbot must not request backend classification')
     if (!await page.locator('.location-btn.active').count()) await page.locator('.location-btn').click()

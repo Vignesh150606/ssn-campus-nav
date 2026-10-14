@@ -168,6 +168,9 @@ export default defineConfig(({ command, mode }) => {
         ],
       },
       workbox: {
+        // The small, content-hashed model binary is a local PWA asset. Worker
+        // JavaScript is already included by the default extension set.
+        globPatterns: ['**/*.{js,css,html,bin}'],
         manifestTransforms: [async entries => ({
           manifest: entries.filter(entry => !adminOnlyAssets.has(entry.url.replace(/^\//, ''))),
           warnings: [],
