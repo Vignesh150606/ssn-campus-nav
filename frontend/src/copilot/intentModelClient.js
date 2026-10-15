@@ -1,13 +1,14 @@
-/** One lazy Worker while chat is open. Preview inference never delays answers,
- * stores conversations, or falls back to a remote service on failure. */
+/** One Worker while chat is open. Cold inference never delays replies, stores
+ * conversations, or falls back to a remote service. Choices need confirmation. */
 import { normalize } from './model/runtime.mjs'
 
 let worker = null, ready = null, sequence = 0, users = 0, evaluations = 0
-let status = { state: 'idle', mode: 'evaluation', lastPrediction: null }
+let status = { state: 'idle', mode: 'confirmation', lastPrediction: null }
 const pending = new Map()
 const MAX_PENDING = 8
 
 export function getIntentModelStatus() { return structuredClone(status) }
+export function warmIntentModel() { void initialize().catch(() => {}) }
 
 function stop(state = 'idle') {
   worker?.terminate()
@@ -18,7 +19,7 @@ function stop(state = 'idle') {
     request.resolve(null)
   }
   pending.clear()
-  status = { state, mode: 'evaluation', lastPrediction: null }
+  status = { state, mode: 'confirmation', lastPrediction: null }
 }
 
 export function retainIntentModel() {
@@ -48,7 +49,7 @@ function initialize() {
   try {
     const instance = new Worker(new URL('./intentModel.worker.js', import.meta.url), { type: 'module' })
     worker = instance
-    status = { state: 'loading', mode: 'evaluation', lastPrediction: null }
+    status = { state: 'loading', mode: 'confirmation', lastPrediction: null }
     instance.onmessage = ({ data }) => {
       if (worker !== instance) return
       const entry = pending.get(data.id)
@@ -62,7 +63,7 @@ function initialize() {
     instance.onmessageerror = instance.onerror
     ready = request('init', {}, 16000).then(response => {
       if (worker !== instance || !response) return false
-      status = { state: 'ready', mode: 'evaluation', modelId: response.modelId,
+      status = { state: 'ready', mode: 'confirmation', modelId: response.modelId,
         labels: response.labels, bytes: response.bytes, lastPrediction: null }
       return true
     })
@@ -84,6 +85,6 @@ export async function predictWithIntentModel(text) {
     // Keep a single diagnostic prediction, never the question or conversation.
     status = { ...status, lastPrediction: { label: result.label, confidence: result.confidence,
       margin: result.margin, accepted: false, ms: response.ms } }
-    return status.lastPrediction
+    return { ...status.lastPrediction, top: result.top }
   } finally { evaluations-- }
 }

@@ -506,7 +506,7 @@ export async function runTurn(message, state, deps) {
   const { locations, position } = deps
   const locationsById = Object.fromEntries(locations.map(l => [l.id, l]))
 
-  const result = classifyOnDevice(message, locations, state)
+  const result = await classifyOnDevice(message, locations, state)
   const intent = result.intent
 
   const isFollowUp = intent.startsWith('follow_up_')
@@ -670,7 +670,7 @@ export async function runTurn(message, state, deps) {
     default:
       outcome = {
         replyText: result.reply, cards: [], state: {},
-        suggestions: ['Where is the Library?', "What's happening today?", 'Nearest canteen', 'ECE 302'],
+        suggestions: result.suggested_queries || ['Where is the Library?', "What's happening today?", 'Nearest canteen', 'ECE 302'],
       }
       break
   }

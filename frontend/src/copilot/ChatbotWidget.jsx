@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { runTurn } from './copilotEngine'
 import { savedImageUrl } from './savedImage'
-import { retainIntentModel } from './intentModelClient'
+import { retainIntentModel, warmIntentModel } from './intentModelClient'
 
 const STARTER_PROMPTS = [
   'Take me to Main Auditorium',
@@ -182,7 +182,11 @@ export default function ChatbotWidget({
   const lastArrivedRef = useRef(null)
 
   useEffect(() => {
-    if (open) return retainIntentModel()
+    if (open) {
+      const release = retainIntentModel()
+      warmIntentModel()
+      return release
+    }
   }, [open])
 
   // Auto-scroll to bottom when messages change

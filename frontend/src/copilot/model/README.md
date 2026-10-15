@@ -1,35 +1,45 @@
-# Colab model integration
+# Full campus intent model: confirmation suggestions only
 
-Imported from the user's `model_bundle.zip`, model ID `campus-98a5c48f13d2`.
-Weights SHA-256: `98a5c48f13d2aeb41bb06eaeb26adbd9cc8a82e3059cc9f9de320c01c9ad6f77`.
-525,584 bytes; four labels: greeting, building_finder, building_info,
-department_finder. Dataset SHA-256 and missing labels are in `model.json`.
+Model `campus-7120263eb0f2`, trained locally from random weights using NumPy.
+The same job is prepared in Colab; **Colab training was not completed** because
+the browser's archive-upload flow failed. Do not attribute this export to Colab.
 
-Synthetic validation accuracy: 67/80 (83.75%). Synthetic test accuracy:
-65/80 (81.25%); macro F1 0.8128. No unknown/out-of-scope examples; 35 labels
-are absent. `decision.enabled=false`, `approved_for_production=false`.
+39 labels; 534,684 bytes of float32 weights. Training data: original reviewed
+b01 (unchanged) plus 4,200 authored English synthetic examples. Total 4,680:
+3,120 train, 780 validation, 780 test. 4,520 English and the 160 original
+Tanglish examples. No raw training data is in the frontend or needed to deploy.
+Dataset SHA-256 and weights SHA-256 are recorded in `model.json`.
 
-The application runs this model in **evaluation mode only**, in a lazy Web
-Worker, while the existing offline rules supply all replies/entities/actions.
-Model scores never start/stop navigation or invent campus facts. This is not
-a generative language model and is not claimed to understand all questions.
-Do not change its flags or thresholds to enable it without the remaining
-training data, independent evaluation and phone tests.
+Full generated test accuracy: 77.95%, macro F1 0.7750. Separately authored
+180-question synthetic challenge: 62.78% top-1, 81.11% top-3, macro F1 0.6352.
+These questions are NOT independent student-written evidence. The global
+97% accepted-precision / 2% reject-false-accept validation gate failed, so
+`decision.enabled=false` and `approved_for_production=false` remain intact.
+Do not lower thresholds or flip those flags to advertise a successful model.
 
-Opening chat alone does not download a model. On the first question, evaluation
-loads the same-origin binary without delaying the rule-based response. The
-PWA precaches that binary and Worker for subsequent offline sessions. There is
-no Render, Supabase or AI-provider fallback. Missing assets, failed integrity
-checks and unsupported Workers leave offline rules functional. Closing chat
-terminates the Worker and clears pending work and diagnostic predictions.
+## What it does in the app
 
-Only model data was imported. `runtime.mjs` is the reviewed runtime from
-`ml/campus_intents/phone-test/runtime.mjs`, checked for parity in the integration
-test. Uploaded HTML/JavaScript was not executed or shipped. The Worker holds
-input text only to classify it; no conversations are persisted or transmitted.
-The client retains only the last label/score/timing until chat closes.
+The offline rules remain authoritative for understood requests, FAQs and
+navigation commands. Chat opens a lazy Worker and warms the precached model
+in the background. Cold/missing/failed models never delay the first reply.
 
-Run `node scripts/verify_copilot_model.mjs` from frontend for model integrity,
-Python/JS conformance, disabled acceptance and Worker client lifecycle tests.
-The existing `verify_offline_browser.cjs` also checks the actual built Worker
-inside the offline PWA. Actual phone performance remains unverified.
+For a message that rules cannot understand, a warm model may offer up to three
+supported questions to confirm, above an explicit suggestion-score floor.
+This is **not acceptance of the prediction**. The UI says it is uncertain;
+only tapping a visible suggestion runs that canonical request through the
+normal classifier and saved data. Predictions never generate campus facts,
+invent a destination, start navigation or stop navigation. Negation guards
+cannot be overridden. Unknown/out-of-scope top predictions are not suggestions.
+
+This makes the model useful for novel English wording while exposing its
+uncertainty honestly. Some suggestions will still be wrong. Better automatic
+understanding needs more varied reviewed data and real student/phone testing.
+
+All inference is in a Web Worker. Binary/Worker assets are content-hashed and
+PWA-precached. There is no Render, Supabase or paid AI-provider fallback.
+Neither chat text nor conversations are persisted or sent to any server.
+Closing chat terminates the Worker and clears pending work/diagnostics.
+
+Run from frontend: `node scripts/verify_copilot_model.mjs`,
+`node scripts/verify_model_assistance.mjs`, `node scripts/verify_english_copilot.mjs`.
+The actual offline PWA is checked by `verify_offline_browser.cjs`.

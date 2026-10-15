@@ -10,11 +10,11 @@ const manifest = JSON.parse(readFileSync(new URL('../src/copilot/model/model.jso
 const bytes = readFileSync(new URL('../src/copilot/model/weights.bin', import.meta.url))
 const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
 const model = await loadModel(manifest, buffer)
-assert.equal(manifest.training.prototype, true)
+assert.equal(manifest.training.prototype, false)
 assert.equal(manifest.decision.enabled, false)
 assert.equal(manifest.approved_for_production, false)
-assert.equal(manifest.labels.length, 4)
-assert.equal(manifest.training.missing_labels.length, 35)
+assert.equal(manifest.labels.length, 39)
+assert.equal(manifest.training.missing_labels.length, 0)
 const cases = JSON.parse(readFileSync(new URL('./fixtures/campus-model-conformance.json', import.meta.url), 'utf8'))
 let delta = 0
 for (const sample of cases) {
@@ -42,7 +42,7 @@ class FakeWorker {
     queueMicrotask(() => {
       if (this.terminated) return
       this.onmessage({ data: data.type === 'init'
-        ? { id: data.id, type: 'ready', modelId: manifest.model_id, labels: 4, bytes: bytes.length }
+        ? { id: data.id, type: 'ready', modelId: manifest.model_id, labels: manifest.labels.length, bytes: bytes.length }
         : { id: data.id, type: 'prediction', result: predict(model, data.text), ms: 1 } })
     })
   }
@@ -54,7 +54,7 @@ try {
   assert.equal(await client.predictWithIntentModel('hello'), null, 'No work while chat is closed')
   const release = client.retainIntentModel()
   const releaseOther = client.retainIntentModel()
-  assert.equal(instances.length, 0, 'Opening chat alone must not download the model')
+  assert.equal(instances.length, 0, 'Retaining ownership alone must not download the model')
   const results = await Promise.all(Array.from({ length: 20 }, () => client.predictWithIntentModel('hello')))
   assert.equal(instances.length, 1, 'Cold model initialization must coalesce')
   assert.ok(results.filter(Boolean).length <= 8 && results.some(Boolean), 'Bound cold-start waiters')
@@ -81,10 +81,10 @@ try {
   assert.equal(await client.predictWithIntentModel('hello'), null)
   assert.equal(client.getIntentModelStatus().state, 'unavailable')
   const { classifyOnDevice } = await vite.ssrLoadModule('/src/copilot/onDeviceClassifier.js')
-  assert.equal(classifyOnDevice('hello', []).intent, 'greeting', 'Worker failure must preserve local replies')
+  assert.equal((await classifyOnDevice('hello', [])).intent, 'greeting', 'Worker failure must preserve local replies')
   cleanupFailure()
   assert.equal(requests, 0)
-  console.log(`PASS: ${cases.length} Colab/Python-JS vectors (delta ${delta}); hash rejection; lazy/coalesced/bounded Worker, cleanup, no chat text storage, disabled model acceptance and local-only failure handling.`)
+  console.log(`PASS: ${cases.length} Python-JS vectors (delta ${delta}); hash rejection; lazy/coalesced/bounded Worker, cleanup, no chat text storage, disabled model acceptance and local-only failure handling.`)
 } finally {
   if (originals.Worker === undefined) delete globalThis.Worker
   else globalThis.Worker = originals.Worker

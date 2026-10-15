@@ -1,5 +1,45 @@
 # Campus intent model training kit
 
+## Full English-focused run
+
+`build_next_batches.py` preserves reviewed `data/b01.jsonl` and creates the
+remaining 35 labels from authored English wording families. Output stays under
+ignored `data/english-next/`: ten batches, 4,680 examples, 815 groups. Per label:
+80 train, 20 validation, 20 test. Total English 4,520; original Tanglish 160.
+Only public location aliases and user questions are targets, never campus facts.
+These are synthetic templates with courtesy/slot variation, not real conversations.
+
+`prepare_full_kit.py` creates an ignored, self-contained notebook under
+`output/local-nav-check/Train_Full_Campus_English.ipynb`, with all sources and
+data embedded. Upload just that notebook into Colab and run its three cells
+on CPU. It needs no further file-upload widget, pretrained model, credential,
+Drive mount, GPU or paid API. Do not commit that data-containing notebook.
+
+The full run was completed **locally**, not in Colab; the live browser archive
+upload failed. Test accuracy 77.95%, macro F1 0.7750. A separately authored
+180-question synthetic challenge scored 62.78% top-1 and 81.11% top-3. It is not
+independent student evidence. Model weights are 534,684 bytes. The automatic
+confidence gate FAILED, so acceptance and production approval remain disabled.
+
+The full model is used for **confirmation choices only** when warm and the
+offline rules cannot understand a request. This is useful uncertainty handling,
+not permission to execute predictions. On the current development challenge,
+32 unsupported rule inputs received choices; 29 had a correct top intent.
+This figure includes integration guards reviewed against this set and is NOT
+an unbiased generalization claim. User confirmation runs a supported canonical
+question through existing data/actions. Commands/unknown destinations are not
+synthesized. Actual student and phone feedback remains needed.
+
+Reproduce locally (PowerShell collects the ten files before invocation):
+```text
+python ml/campus_intents/build_next_batches.py
+python ml/campus_intents/prepare_full_kit.py
+python ml/campus_intents/train.py <ten batch paths> --epochs 80 --output <model directory>
+python ml/campus_intents/evaluate_challenge.py <model directory> <ten batch paths>
+```
+
+The original first-batch workflow below remains available for reference.
+
 An isolated model experiment. The production chatbot uses the existing local
 rule classifier, saved event/menu data and hydrated local routes; chat turns
 never call Render, Storage or an AI provider. Snapshot updates still happen in

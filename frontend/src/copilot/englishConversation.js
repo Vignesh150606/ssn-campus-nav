@@ -43,7 +43,7 @@ export function classifyEnglish(message, locations, state = {}) {
       : classifyLocal('how do i start navigation', locations).reply)
   }
 
-  if (/^(?:thanks?(?: a lot| so much| very much| for (?:your|the) help)?|thank you(?: so much| very much| for (?:your|the) help)?|that helps|that was helpful|appreciate (?:it|your help)|great thanks|awesome thanks)$/.test(text)) {
+  if (/^(?:thanks?(?: a lot| so much| very much| for (?:your|the|that) (?:help|explanation|directions|guidance))?|thank you(?: so much| very much| for (?:your|the|that) (?:help|explanation|directions|guidance))?|that helps|that was helpful|appreciate (?:it|your help)|great thanks|awesome thanks)$/.test(text)) {
     return answer('greeting', "You're welcome! Ask me for another campus place, or continue with your selected destination.")
   }
   if (/^(?:how are you(?: doing)?|how s it going|how do you do)$/.test(text)) {

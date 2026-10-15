@@ -23,7 +23,7 @@ self.onmessage = async ({ data }) => {
     if (data.type === 'init') {
       await initialize()
       self.postMessage({ id: data.id, type: 'ready', modelId: manifest.model_id,
-        mode: 'evaluation', labels: manifest.labels.length, bytes: manifest.weights.bytes })
+        mode: 'confirmation', labels: manifest.labels.length, bytes: manifest.weights.bytes })
     } else if (data.type === 'predict') {
       if (!model || typeof data.text !== 'string') throw new Error('Model is not ready')
       const start = performance.now()
