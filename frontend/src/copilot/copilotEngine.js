@@ -506,11 +506,11 @@ export async function runTurn(message, state, deps) {
   const { locations, position } = deps
   const locationsById = Object.fromEntries(locations.map(l => [l.id, l]))
 
-  const result = classifyOnDevice(message, locations)
+  const result = classifyOnDevice(message, locations, state)
   const intent = result.intent
 
   const isFollowUp = intent.startsWith('follow_up_')
-  const baseState  = isFollowUp || intent === 'faq' ? state : {}
+  const baseState  = isFollowUp || intent === 'faq' || intent === 'greeting' || result.preserve_context ? state : {}
 
   let outcome
 

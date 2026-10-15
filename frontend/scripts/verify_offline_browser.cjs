@@ -143,6 +143,20 @@ async function headerLayout(page) {
     await page.locator('.copilot-msg-assistant').filter({ hasText: 'Open the app once with internet' }).waitFor()
     await chat.fill('Where is the library?'); await chat.press('Enter')
     await page.locator('.copilot-cards').filter({ hasText: 'Library' }).waitFor()
+    for (const [question, expected] of [
+      ['Thanks!', /You.re welcome/],
+      ['Tell me more about it', /Main library with reading halls/],
+      ['I do not want to cancel navigation', /won.t change your navigation/],
+      ['How are you?', /ready to help you get around SSN/],
+      ['Can I use this without internet?', /Open the app once with internet/],
+      ['What time does the library close?', /do not have verified opening hours/],
+      ['Where is CSE?', /CSE Block/],
+    ]) {
+      await chat.fill(question); await chat.press('Enter')
+      await page.locator('.copilot-msg-assistant').last().filter({ hasText: expected }).waitFor()
+      assert(await page.getByRole('dialog', { name: 'Campus Copilot chat' }).isVisible(), 'Negated actions must not close chat')
+    }
+    assert.equal(await page.locator('.copilot-msg-assistant').last().locator('.copilot-card').count(), 1, 'Exact CSE request must not include ECE/auditorium')
     await page.waitForFunction(() => window.modelResponses.some(r => r.type === 'prediction'))
     const modelReply = await page.evaluate(() => window.modelResponses.find(r => r.type === 'prediction'))
     assert.equal(modelReply.result.accepted, false, 'Prototype must not override rule-based replies')

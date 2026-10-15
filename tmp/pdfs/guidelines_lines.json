@@ -1,0 +1,3424 @@
+[
+  {
+    "page": 1,
+    "width": 595,
+    "height": 842,
+    "lines": [
+      {
+        "n": 1,
+        "text": "Sri Sivasubramaniya Nadar College of Engineering",
+        "top": 59.41255303510388,
+        "bottom": 73.4525474191039,
+        "x0": 151.439939424,
+        "x1": 458.33590119721526
+      },
+      {
+        "n": 2,
+        "text": "(An Autonomous Institution Affiliated to Anna University, Chennai)",
+        "top": 82.93158362748795,
+        "bottom": 92.89157964348794,
+        "x0": 167.159933136,
+        "x1": 442.51478217150606
+      },
+      {
+        "n": 3,
+        "text": "Guidelines for Preparation of B.E. / B.Tech. Project Report",
+        "top": 118.11004955609599,
+        "bottom": 131.07004437209594,
+        "x0": 140.279943888,
+        "x1": 469.43269933426393
+      },
+      {
+        "n": 4,
+        "text": "1. GENERAL:",
+        "top": 157.51227379520003,
+        "bottom": 169.51226899519997,
+        "x0": 71.9999712,
+        "x1": 153.2735984432193
+      },
+      {
+        "n": 5,
+        "text": "The broad guidelines to the preparation of B.E. / B.Tech. report are outlined below.",
+        "top": 178.17626552959996,
+        "bottom": 190.1762607295999,
+        "x0": 72.000001182288,
+        "x1": 539.9975013894747
+      },
+      {
+        "n": 6,
+        "text": "2. NUMBER OF COPIES TO BE SUBMITTED FOR EVALUATION:",
+        "top": 219.6722489312,
+        "bottom": 231.67224413119993,
+        "x0": 72.00000118228803,
+        "x1": 441.63342286143063
+      },
+      {
+        "n": 7,
+        "text": "B.E. / B.Tech. Report: The number copies to be submitted to the Department where the student is",
+        "top": 240.21624071359997,
+        "bottom": 252.21623591359992,
+        "x0": 72.00003116457603,
+        "x1": 540.1052666792868
+      },
+      {
+        "n": 8,
+        "text": "studying is No. of students in the project batch / group plus two (one copy each to student(s), one",
+        "top": 260.9762324095999,
+        "bottom": 272.97622760959985,
+        "x0": 72.00003116457606,
+        "x1": 540.1645136472271
+      },
+      {
+        "n": 9,
+        "text": "copy each to the supervisor and department library). The Report shall also be submitted in soft",
+        "top": 281.6162241535999,
+        "bottom": 293.61621935359983,
+        "x0": 72.00003116457606,
+        "x1": 540.0937405403367
+      },
+      {
+        "n": 10,
+        "text": "copy to the Department.",
+        "top": 302.37621584959993,
+        "bottom": 314.3762110495999,
+        "x0": 72.00003116457609,
+        "x1": 187.91824068333483
+      },
+      {
+        "n": 11,
+        "text": "3. SIZE OF REPORT:",
+        "top": 343.8721992511999,
+        "bottom": 355.8721944511999,
+        "x0": 72.00003116457609,
+        "x1": 193.9536265959078
+      },
+      {
+        "n": 12,
+        "text": "The size of the project report should be sixty (60) pages (+/- 10%) of typed matter reckoned from",
+        "top": 364.41619103359983,
+        "bottom": 376.41618623359983,
+        "x0": 72.00006114686408,
+        "x1": 539.84992845597
+      },
+      {
+        "n": 13,
+        "text": "the first page of Chapter 1 to the last page including the list of References.",
+        "top": 385.1761827295999,
+        "bottom": 397.1761779295999,
+        "x0": 72.00006114686406,
+        "x1": 428.75805598963524
+      },
+      {
+        "n": 14,
+        "text": "4. ARRANGEMENT OF CONTENTS OF REPORT:",
+        "top": 427.5121657952,
+        "bottom": 439.5121609952,
+        "x0": 71.9999712,
+        "x1": 352.1134144798438
+      },
+      {
+        "n": 15,
+        "text": "The sequence in which the report material should be arranged and bound should be as follows:",
+        "top": 448.0561575776,
+        "bottom": 460.0561527776,
+        "x0": 72.000001182288,
+        "x1": 526.2935351995181
+      },
+      {
+        "n": 16,
+        "text": "1. Cover page & Title page",
+        "top": 468.8161492736,
+        "bottom": 480.8161444736,
+        "x0": 94.55967408841524,
+        "x1": 235.60450301339938
+      },
+      {
+        "n": 17,
+        "text": "2. Bonafide Certificate",
+        "top": 489.4561410176,
+        "bottom": 501.4561362176,
+        "x0": 94.55970407070323,
+        "x1": 214.60452683070713
+      },
+      {
+        "n": 18,
+        "text": "3. Abstract",
+        "top": 510.21613271359996,
+        "bottom": 522.2161279136,
+        "x0": 94.55973405299123,
+        "x1": 157.53373551345717
+      },
+      {
+        "n": 19,
+        "text": "4. Acknowledgement",
+        "top": 530.8561244575999,
+        "bottom": 542.8561196576,
+        "x0": 94.55976403527923,
+        "x1": 207.57378508713992
+      },
+      {
+        "n": 20,
+        "text": "5. Table of Contents",
+        "top": 551.6161161535999,
+        "bottom": 563.6161113536,
+        "x0": 94.55979401756723,
+        "x1": 202.90502646548765
+      },
+      {
+        "n": 21,
+        "text": "6. List of Tables",
+        "top": 572.2561078975999,
+        "bottom": 584.2561030975999,
+        "x0": 94.55982399985523,
+        "x1": 182.74503978422234
+      },
+      {
+        "n": 22,
+        "text": "7. List of Figures",
+        "top": 593.0160995936,
+        "bottom": 605.0160947935999,
+        "x0": 94.55985398214324,
+        "x1": 186.82507362218206
+      },
+      {
+        "n": 23,
+        "text": "8. List of Symbols, Abbreviations and Nomenclature",
+        "top": 613.6560913376,
+        "bottom": 625.6560865375999,
+        "x0": 94.55988396443124,
+        "x1": 358.1246523778213
+      },
+      {
+        "n": 24,
+        "text": "9. Chapters",
+        "top": 634.4160830335999,
+        "bottom": 646.4160782335999,
+        "x0": 94.55991394671923,
+        "x1": 159.5851307946861
+      },
+      {
+        "n": 25,
+        "text": "10. Appendices",
+        "top": 655.0560747775999,
+        "bottom": 667.0560699775999,
+        "x0": 94.55994392900723,
+        "x1": 173.50516915232453
+      },
+      {
+        "n": 26,
+        "text": "11. References",
+        "top": 675.8160664735999,
+        "bottom": 687.8160616735998,
+        "x0": 94.55996391719923,
+        "x1": 170.14516215156067
+      },
+      {
+        "n": 27,
+        "text": "The Tables and Figures shall be introduced in the appropriate places.",
+        "top": 713.7360513056,
+        "bottom": 725.7360465056,
+        "x0": 71.9999712,
+        "x1": 402.71812185075635
+      }
+    ],
+    "fonts": [
+      [
+        "EWBPRP+Times-Roman",
+        9.96
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        12.0
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        12.48
+      ],
+      [
+        "QEGMJO+Helvetica",
+        12.0
+      ],
+      [
+        "QEGMJO+Helvetica-Bold",
+        12.0
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        9.96
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        12.0
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        12.96
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        14.04
+      ]
+    ],
+    "images": 0
+  },
+  {
+    "page": 2,
+    "width": 595,
+    "height": 842,
+    "lines": [
+      {
+        "n": 1,
+        "text": "Guidelines for Preparation of B.E. / B.Tech. Project Report",
+        "top": 39.24704110131199,
+        "bottom": 50.28703668531193,
+        "x0": 71.9999712,
+        "x1": 334.7474130477918
+      },
+      {
+        "n": 2,
+        "text": "5. PAGE DIMENSIONS, MARGIN AND BINDING SPECIFICATIONS:",
+        "top": 66.91231003520011,
+        "bottom": 78.91230523520005,
+        "x0": 71.9999712,
+        "x1": 454.71342510517854
+      },
+      {
+        "n": 3,
+        "text": "The dimensions of the report should be in Standard A4 size (297mm (cid:1) 210mm).",
+        "top": 84.96030281599997,
+        "bottom": 99.57629696959998,
+        "x0": 71.99960141844792,
+        "x1": 461.27804510694926
+      },
+      {
+        "n": 4,
+        "text": "The Report (at the time of submission) should have the following page margins:",
+        "top": 108.21629351360002,
+        "bottom": 120.21628871359997,
+        "x0": 72.00022437989874,
+        "x1": 456.5737319011159
+      },
+      {
+        "n": 5,
+        "text": "Top edge : 35mm",
+        "top": 128.97628520960006,
+        "bottom": 140.9762804096,
+        "x0": 115.20026401947601,
+        "x1": 217.0506944662079
+      },
+      {
+        "n": 6,
+        "text": "Bottom edge : 35mm",
+        "top": 149.61627695360005,
+        "bottom": 161.6162721536,
+        "x0": 115.20026401947601,
+        "x1": 217.0507610748589
+      },
+      {
+        "n": 7,
+        "text": "Left side : 40 mm",
+        "top": 170.37626864959998,
+        "bottom": 182.37626384959992,
+        "x0": 115.20026401947601,
+        "x1": 220.05074958402176
+      },
+      {
+        "n": 8,
+        "text": "Right side : 35 mm",
+        "top": 191.01626039359996,
+        "bottom": 203.0162555935999,
+        "x0": 115.20026401947601,
+        "x1": 220.05075108313613
+      },
+      {
+        "n": 9,
+        "text": "The report should be prepared on good quality white paper preferably not lower than",
+        "top": 211.7762520896,
+        "bottom": 223.77624728959995,
+        "x0": 72.00022437989877,
+        "x1": 539.996135681729
+      },
+      {
+        "n": 10,
+        "text": "75 gsm.",
+        "top": 232.4162438336,
+        "bottom": 244.41623903359994,
+        "x0": 72.0002243798988,
+        "x1": 109.9184348883333
+      },
+      {
+        "n": 11,
+        "text": "Tables and figures should conform to the margin specifications. Large size figures should be",
+        "top": 253.17623552959992,
+        "bottom": 265.17623072959987,
+        "x0": 72.0002243798988,
+        "x1": 540.0447323373256
+      },
+      {
+        "n": 12,
+        "text": "photographically or otherwise reduced to the appropriate size before insertion.",
+        "top": 273.8162272735999,
+        "bottom": 285.81622247359985,
+        "x0": 72.0002243798988,
+        "x1": 447.8380446556177
+      },
+      {
+        "n": 13,
+        "text": "Binding Specifications: The Report should be bound using flexible cover of thick white art",
+        "top": 294.4562190175999,
+        "bottom": 306.45621421759984,
+        "x0": 72.00022437989877,
+        "x1": 539.8540325489474
+      },
+      {
+        "n": 14,
+        "text": "paper. The cover should be printed in black letters and the text for printing should be in black.",
+        "top": 315.21621071359993,
+        "bottom": 327.2162059135999,
+        "x0": 72.0002243798988,
+        "x1": 526.4379814495712
+      },
+      {
+        "n": 15,
+        "text": "6. MANUSCRIPT PREPARATION:",
+        "top": 362.71219171520005,
+        "bottom": 374.71218691520005,
+        "x0": 71.9999712,
+        "x1": 266.3135683738177
+      },
+      {
+        "n": 16,
+        "text": "The general text of the report shall be typed in font style Times New Roman and font size 13.",
+        "top": 383.37618344960003,
+        "bottom": 395.37617864960004,
+        "x0": 72.000001182288,
+        "x1": 540.1176854429204
+      },
+      {
+        "n": 17,
+        "text": "Same quality of paper should be used for the preparation of the entire report.",
+        "top": 404.0161751936,
+        "bottom": 416.0161703936,
+        "x0": 72.00000118228803,
+        "x1": 439.91759647536617
+      },
+      {
+        "n": 18,
+        "text": "The headings of all items 2 to 10 listed in section 4 should be typed in capital letters without",
+        "top": 424.7761668896,
+        "bottom": 436.7761620896,
+        "x0": 72.00000118228803,
+        "x1": 539.9733240561991
+      },
+      {
+        "n": 19,
+        "text": "punctuation and centered at the top of the page. The text should commence 2 spaces below this",
+        "top": 445.4161586336,
+        "bottom": 457.4161538336,
+        "x0": 72.00000118228803,
+        "x1": 540.1049432223687
+      },
+      {
+        "n": 20,
+        "text": "heading.",
+        "top": 466.1761503296,
+        "bottom": 478.1761455296,
+        "x0": 72.00000118228803,
+        "x1": 112.9182147832702
+      },
+      {
+        "n": 21,
+        "text": "6.1 Cover Page & Title Page - A specimen copy of the Cover page & Title page for the",
+        "top": 486.67214213119996,
+        "bottom": 498.81613727359996,
+        "x0": 72.00000118228803,
+        "x1": 538.604279529257
+      },
+      {
+        "n": 22,
+        "text": "report are given in Annexure I.",
+        "top": 507.57613376959995,
+        "bottom": 519.5761289696,
+        "x0": 106.55998492228896,
+        "x1": 254.87822056086318
+      },
+      {
+        "n": 23,
+        "text": "6.2 Bonafide Certificate\u2013 The Bonafide Certificate shall be in double line spacing using",
+        "top": 528.0721255711999,
+        "bottom": 540.2161207135999,
+        "x0": 72.00000118228799,
+        "x1": 535.5558222849288
+      },
+      {
+        "n": 24,
+        "text": "font style Times New Roman and Font size 14, as per the format shown in Annexure II.",
+        "top": 548.9761172095999,
+        "bottom": 560.9761124095999,
+        "x0": 106.55998492228896,
+        "x1": 527.6378938056321
+      },
+      {
+        "n": 25,
+        "text": "The certificate shall carry the supervisor\u2019s signature and shall be followed by the",
+        "top": 569.6161089535999,
+        "bottom": 581.6161041536,
+        "x0": 106.55998492228896,
+        "x1": 535.4844036713707
+      },
+      {
+        "n": 26,
+        "text": "supervisor\u2019s name, academic designation (not any other responsibilities of administrative",
+        "top": 590.3761006496,
+        "bottom": 602.3760958495999,
+        "x0": 106.55998492228893,
+        "x1": 535.6042841161727
+      },
+      {
+        "n": 27,
+        "text": "nature), department and full address of the institution where the supervisor has guided",
+        "top": 611.0160923935998,
+        "bottom": 623.0160875935999,
+        "x0": 106.55998492228896,
+        "x1": 535.4360176593367
+      },
+      {
+        "n": 28,
+        "text": "the student. The term \u2018SUPERVISOR\u2019 must be typed in capital letters between the",
+        "top": 631.7760840895999,
+        "bottom": 643.7760792895999,
+        "x0": 106.55998492228896,
+        "x1": 535.4841126033186
+      },
+      {
+        "n": 29,
+        "text": "supervisor\u2019s name and academic designation.",
+        "top": 652.4160758335998,
+        "bottom": 664.4160710335998,
+        "x0": 106.55998492228896,
+        "x1": 324.1181353261813
+      },
+      {
+        "n": 30,
+        "text": "If Joint Supervisor is involved, a third column may be added after the Supervisor with",
+        "top": 673.1760675295998,
+        "bottom": 685.1760627295998,
+        "x0": 106.55998492228896,
+        "x1": 535.5563429573423
+      },
+      {
+        "n": 31,
+        "text": "the details as similar to that of Supervisor.",
+        "top": 693.8160592735999,
+        "bottom": 705.8160544735998,
+        "x0": 106.55998492228893,
+        "x1": 309.118209366569
+      },
+      {
+        "n": 32,
+        "text": "6.3 Abstract- Abstract should be synopsis of the project report (not exceeding two pages),",
+        "top": 714.4320510271998,
+        "bottom": 726.5760461695999,
+        "x0": 72.00000118228796,
+        "x1": 535.6774065591961
+      },
+      {
+        "n": 33,
+        "text": "typed in double line spacing font style Times New Roman and Font size 14.",
+        "top": 735.2160427135998,
+        "bottom": 747.2160379135998,
+        "x0": 106.55928533556875,
+        "x1": 471.23695168794416
+      },
+      {
+        "n": 34,
+        "text": "6.4 Acknowledgement \u2013 The acknowledgement shall be brief and should not exceed one",
+        "top": 755.7120345151998,
+        "bottom": 767.8560296575998,
+        "x0": 71.99870194980761,
+        "x1": 535.483085913834
+      },
+      {
+        "n": 35,
+        "text": "Page 2 of 13",
+        "top": 794.514258994304,
+        "bottom": 805.686734525312,
+        "x0": 482.52016892385524,
+        "x1": 537.9567590375655
+      }
+    ],
+    "fonts": [
+      [
+        "EWBPRP+Times-Roman",
+        11.04
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        12.0
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        15.48
+      ],
+      [
+        "KPSHBO+Wingdings2",
+        12.0
+      ],
+      [
+        "QEGMJO+Helvetica-Bold",
+        12.0
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        11.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        12.0
+      ]
+    ],
+    "images": 0
+  },
+  {
+    "page": 3,
+    "width": 595,
+    "height": 842,
+    "lines": [
+      {
+        "n": 1,
+        "text": "Guidelines for Preparation of B.E. / B.Tech. Project Report",
+        "top": 39.24704110131199,
+        "bottom": 50.28703668531193,
+        "x0": 71.9999712,
+        "x1": 332.8274192547457
+      },
+      {
+        "n": 2,
+        "text": "page, typed in double spacing. The student\u2019s signature shall be made at the right bottom",
+        "top": 66.8163100736001,
+        "bottom": 78.81630527360005,
+        "x0": 106.559957376,
+        "x1": 535.530043179336
+      },
+      {
+        "n": 3,
+        "text": "above his / her name typed in capitals.",
+        "top": 87.57630176960004,
+        "bottom": 99.57629696959998,
+        "x0": 106.55995737600003,
+        "x1": 290.39816312002966
+      },
+      {
+        "n": 4,
+        "text": "6.5 Table of contents - The table of contents should list all material following it as well as",
+        "top": 108.07229357120002,
+        "bottom": 120.21628871359997,
+        "x0": 71.99997363599905,
+        "x1": 535.5449494374857
+      },
+      {
+        "n": 5,
+        "text": "any material which precedes it. The Title Page, Bonafide Certificate and",
+        "top": 128.97628520960006,
+        "bottom": 140.9762804096,
+        "x0": 106.559957376,
+        "x1": 535.4363309477002
+      },
+      {
+        "n": 6,
+        "text": "Acknowledgment will not find a place among the items listed in the Table of Contents",
+        "top": 149.61627695360005,
+        "bottom": 161.6162721536,
+        "x0": 106.559957376,
+        "x1": 535.6643600758252
+      },
+      {
+        "n": 7,
+        "text": "but the page numbers in lower case Roman letters are to be accounted for them. One and",
+        "top": 170.37626864959998,
+        "bottom": 182.37626384959992,
+        "x0": 106.559957376,
+        "x1": 535.4365500462678
+      },
+      {
+        "n": 8,
+        "text": "a half spacing should be adopted for typing the matter under this head. A specimen copy",
+        "top": 191.01626039359996,
+        "bottom": 203.0162555935999,
+        "x0": 106.55995737599997,
+        "x1": 535.7961641327707
+      },
+      {
+        "n": 9,
+        "text": "of the Table of Contents for report is given in Annexure III.",
+        "top": 211.7762520896,
+        "bottom": 223.77624728959995,
+        "x0": 106.55995737599997,
+        "x1": 392.99829484582415
+      },
+      {
+        "n": 10,
+        "text": "6.6 List of Table - The list should use exactly the same captions as they appear above the",
+        "top": 232.2722438912,
+        "bottom": 244.41623903359994,
+        "x0": 72.00037339983912,
+        "x1": 535.4846030670161
+      },
+      {
+        "n": 11,
+        "text": "tables in the text. One and a half spacing should be adopted for typing the matter under",
+        "top": 253.17623552959992,
+        "bottom": 265.17623072959987,
+        "x0": 106.56015725792,
+        "x1": 535.4731190471839
+      },
+      {
+        "n": 12,
+        "text": "this head.",
+        "top": 273.8162272735999,
+        "bottom": 285.81622247359985,
+        "x0": 106.56015725791997,
+        "x1": 152.51838829195293
+      },
+      {
+        "n": 13,
+        "text": "6.7 List of Figures - The list should use exactly the same captions as they appear below the",
+        "top": 294.3122190751999,
+        "bottom": 306.45621421759984,
+        "x0": 72.000173517919,
+        "x1": 535.48419627133
+      },
+      {
+        "n": 14,
+        "text": "figures in the text. One and a half spacing should be adopted for typing the matter under",
+        "top": 315.21621071359993,
+        "bottom": 327.2162059135999,
+        "x0": 106.55965755311983,
+        "x1": 535.4730960767536
+      },
+      {
+        "n": 15,
+        "text": "this head.",
+        "top": 335.8562024575999,
+        "bottom": 347.8561976575999,
+        "x0": 106.55965755311983,
+        "x1": 152.51789194516905
+      },
+      {
+        "n": 16,
+        "text": "6.8 List of Symbols, Abbreviations and Nomenclature- One and a half spacing should be",
+        "top": 356.4721942111999,
+        "bottom": 368.6161893535999,
+        "x0": 71.99967381311886,
+        "x1": 535.484453575328
+      },
+      {
+        "n": 17,
+        "text": "adopted for typing the matter under this head. Standard symbols, abbreviations etc.",
+        "top": 377.2561858975999,
+        "bottom": 389.2561810975999,
+        "x0": 106.55965755311983,
+        "x1": 535.4374187210996
+      },
+      {
+        "n": 18,
+        "text": "should be used.",
+        "top": 398.0161775935999,
+        "bottom": 410.0161727935999,
+        "x0": 106.55965755311983,
+        "x1": 180.83788997163114
+      },
+      {
+        "n": 19,
+        "text": "6.9 Chapters - The chapters may be broadly divided into 3 parts (i) Introductory chapter, (ii)",
+        "top": 418.51216939519986,
+        "bottom": 430.65616453759986,
+        "x0": 71.99967381311886,
+        "x1": 535.5929698255113
+      },
+      {
+        "n": 20,
+        "text": "Chapters developing the main theme of the project work (iii) and Conclusion.",
+        "top": 439.41616103359985,
+        "bottom": 451.41615623359985,
+        "x0": 106.5594576711998,
+        "x1": 479.1571812093417
+      },
+      {
+        "n": 21,
+        "text": "(cid:1) The main theme may be divided into several chapters and each chapter may be",
+        "top": 457.440153824,
+        "bottom": 472.0561479776,
+        "x0": 103.559958576,
+        "x1": 530.6842375749169
+      },
+      {
+        "n": 22,
+        "text": "further divided into several divisions and sub-divisions.",
+        "top": 480.8161444736,
+        "bottom": 492.8161396736,
+        "x0": 116.99995383829972,
+        "x1": 384.1177695381862
+      },
+      {
+        "n": 23,
+        "text": "(cid:1) Each chapter should be given an appropriate title.",
+        "top": 498.84013726399996,
+        "bottom": 513.4561314176,
+        "x0": 103.559958576,
+        "x1": 354.83811384808973
+      },
+      {
+        "n": 24,
+        "text": "(cid:1) Tables and figures in a chapter should be placed in the immediate vicinity of the",
+        "top": 519.60012896,
+        "bottom": 534.2161231136,
+        "x0": 103.559958576,
+        "x1": 530.6848269907204
+      },
+      {
+        "n": 25,
+        "text": "reference where they are cited.",
+        "top": 542.8561196576,
+        "bottom": 554.8561148576,
+        "x0": 116.99995383829972,
+        "x1": 264.4781788199446
+      },
+      {
+        "n": 26,
+        "text": "(cid:1) Footnotes should be used sparingly. They should be typed single space and placed",
+        "top": 561.0001124,
+        "bottom": 575.6161065536,
+        "x0": 103.559958576,
+        "x1": 530.6358005330286
+      },
+      {
+        "n": 27,
+        "text": "directly underneath in the very same page, which refers to the material they annotate.",
+        "top": 584.2561030976,
+        "bottom": 596.2560982976,
+        "x0": 116.99995383829972,
+        "x1": 525.7173449754772
+      },
+      {
+        "n": 28,
+        "text": "6.10 Appendices - Appendices are provided to give supplementary information, which if",
+        "top": 604.8720948512,
+        "bottom": 617.0160899936,
+        "x0": 69.35909760464985,
+        "x1": 537.3928610653724
+      },
+      {
+        "n": 29,
+        "text": "included in the main text may serve as a distraction and cloud the central theme under",
+        "top": 625.6560865376,
+        "bottom": 637.6560817376,
+        "x0": 105.35963034243099,
+        "x1": 537.3930681510367
+      },
+      {
+        "n": 30,
+        "text": "discussion.",
+        "top": 646.4160782335999,
+        "bottom": 658.4160734336,
+        "x0": 105.35963034243096,
+        "x1": 158.39785167851701
+      },
+      {
+        "n": 31,
+        "text": "(cid:1) Appendices should be numbered using Arabic numerals, e.g. Appendix-1, Appendix-",
+        "top": 664.440071024,
+        "bottom": 679.0560651776,
+        "x0": 103.559958576,
+        "x1": 530.793055718757
+      },
+      {
+        "n": 32,
+        "text": "2, etc.",
+        "top": 687.8160616736,
+        "bottom": 699.8160568736,
+        "x0": 116.99995383829972,
+        "x1": 145.918189033027
+      },
+      {
+        "n": 33,
+        "text": "(cid:1) Appendices, Tables and References appearing in Appendices should be numbered",
+        "top": 705.840054464,
+        "bottom": 720.4560486176,
+        "x0": 103.559958576,
+        "x1": 530.5162617304021
+      },
+      {
+        "n": 34,
+        "text": "and referred to at appropriate places just as in the case of chapters.",
+        "top": 729.2160451136,
+        "bottom": 741.2160403136,
+        "x0": 116.99995383829972,
+        "x1": 435.7177775446996
+      },
+      {
+        "n": 35,
+        "text": "(cid:1) Appendices shall carry the title of the work reported and the same title shall be made",
+        "top": 747.23983790408,
+        "bottom": 761.85583205768,
+        "x0": 103.559958576,
+        "x1": 530.804040885286
+      },
+      {
+        "n": 36,
+        "text": "in the contents page also.",
+        "top": 770.61582855368,
+        "bottom": 782.61582375368,
+        "x0": 116.99995383829972,
+        "x1": 237.83821013060142
+      },
+      {
+        "n": 37,
+        "text": "Page 3 of 13",
+        "top": 794.514258994304,
+        "bottom": 805.686734525312,
+        "x0": 482.52016892385524,
+        "x1": 537.9567590375655
+      }
+    ],
+    "fonts": [
+      [
+        "EWBPRP+Times-Roman",
+        11.04
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        12.0
+      ],
+      [
+        "KPSHBO+Wingdings",
+        12.0
+      ],
+      [
+        "QEGMJO+Helvetica",
+        12.0
+      ],
+      [
+        "QEGMJO+Helvetica-Bold",
+        12.0
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        11.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        12.0
+      ]
+    ],
+    "images": 0
+  },
+  {
+    "page": 4,
+    "width": 595,
+    "height": 842,
+    "lines": [
+      {
+        "n": 1,
+        "text": "Guidelines for Preparation of B.E. / B.Tech. Project Report",
+        "top": 39.24704110131199,
+        "bottom": 50.28703668531193,
+        "x0": 71.9999712,
+        "x1": 332.8274192547457
+      },
+      {
+        "n": 2,
+        "text": "(cid:1) The list of publications made by students during the period of research, shall be",
+        "top": 64.20031112000015,
+        "bottom": 78.81630527360005,
+        "x0": 103.679958528,
+        "x1": 530.565015267118
+      },
+      {
+        "n": 3,
+        "text": "brought in the Appendix titled, as List of Publications and the same shall be reported",
+        "top": 87.57630176960004,
+        "bottom": 99.57629696959998,
+        "x0": 117.3607415452846,
+        "x1": 530.5170283033468
+      },
+      {
+        "n": 4,
+        "text": "in the contents. The author(s) can refer the publications mentioned in the Appendix,",
+        "top": 108.21629351360002,
+        "bottom": 120.21628871359997,
+        "x0": 117.3607415452846,
+        "x1": 530.7584941057762
+      },
+      {
+        "n": 5,
+        "text": "in the text of the Report, by mentioning the author(s) name followed by Appendix",
+        "top": 128.97628520960006,
+        "bottom": 140.9762804096,
+        "x0": 117.36074154528457,
+        "x1": 530.6365357884742
+      },
+      {
+        "n": 6,
+        "text": "number and the year of publication, in brackets.",
+        "top": 149.61627695360005,
+        "bottom": 161.6162721536,
+        "x0": 117.3607415452846,
+        "x1": 346.79888035135167
+      },
+      {
+        "n": 7,
+        "text": "6.11 List of References \u2013 Any works of other researchers, if used either directly or indirectly,",
+        "top": 170.23226870719998,
+        "bottom": 182.37626384959992,
+        "x0": 69.36079744226993,
+        "x1": 537.2391188941326
+      },
+      {
+        "n": 8,
+        "text": "should be indicated at appropriate places in the report. The citation may assume any one",
+        "top": 191.01626039359996,
+        "bottom": 203.0162555935999,
+        "x0": 105.36143012101111,
+        "x1": 537.2856064516757
+      },
+      {
+        "n": 9,
+        "text": "of the following forms.",
+        "top": 211.7762520896,
+        "bottom": 223.77624728959995,
+        "x0": 105.36143012101111,
+        "x1": 216.59965054050588
+      },
+      {
+        "n": 10,
+        "text": "The authors\u2019 publications during the period of research should not be included in the",
+        "top": 232.4162438336,
+        "bottom": 244.41623903359994,
+        "x0": 108.00143054461051,
+        "x1": 537.7657359838547
+      },
+      {
+        "n": 11,
+        "text": "references and can be separately mentioned as in 6.10.",
+        "top": 253.17623552959992,
+        "bottom": 265.17623072959987,
+        "x0": 108.00143054461053,
+        "x1": 369.23919875397775
+      },
+      {
+        "n": 12,
+        "text": "Examples of citation",
+        "top": 291.1922203232,
+        "bottom": 303.19221552319993,
+        "x0": 107.99995679999999,
+        "x1": 212.58801093552972
+      },
+      {
+        "n": 13,
+        "text": "i. An improved algorithm has been adopted in literature (Tsychiya1980)",
+        "top": 311.7362121056,
+        "bottom": 323.7362073055999,
+        "x0": 115.1999534125002,
+        "x1": 473.5535399138259
+      },
+      {
+        "n": 14,
+        "text": "ii. Jankins and Walts (1968) have dealt at length this principle.",
+        "top": 332.4962038016,
+        "bottom": 344.4961990016,
+        "x0": 111.83978842506679,
+        "x1": 424.91779407376026
+      },
+      {
+        "n": 15,
+        "text": "iii. The problem of mechanical manipulators has been studied by Shin et al (1984) and",
+        "top": 353.1361955456,
+        "bottom": 365.1361907456,
+        "x0": 108.47961344353735,
+        "x1": 537.9557018465753
+      },
+      {
+        "n": 16,
+        "text": "certain limitations of the method used, has been pointed out by Shin et al (1984a).",
+        "top": 373.8961872416,
+        "bottom": 385.8961824416,
+        "x0": 137.03954170756145,
+        "x1": 530.1572324929743
+      },
+      {
+        "n": 17,
+        "text": "The listing of references should be typed 2 spaces below the heading \u201cREFERENCES\u201d",
+        "top": 411.8161720736,
+        "bottom": 423.8161672736,
+        "x0": 107.99995679999999,
+        "x1": 537.884907104466
+      },
+      {
+        "n": 18,
+        "text": "in alphabetical order in single spacing left \u2013 justified. The reference material should be",
+        "top": 432.4561638176,
+        "bottom": 444.4561590176,
+        "x0": 107.99995679999999,
+        "x1": 538.0044285053726
+      },
+      {
+        "n": 19,
+        "text": "listed in the alphabetical order of the first author. The name of the author/authors should",
+        "top": 453.2161555136,
+        "bottom": 465.2161507136,
+        "x0": 107.99995679999996,
+        "x1": 537.956497520532
+      },
+      {
+        "n": 20,
+        "text": "be immediately followed by the year and other details. A typical illustrative list given",
+        "top": 473.85614725759996,
+        "bottom": 485.85614245759996,
+        "x0": 107.99995679999996,
+        "x1": 537.8360228467699
+      },
+      {
+        "n": 21,
+        "text": "below relates to the citation example quoted above.",
+        "top": 494.61613895359994,
+        "bottom": 506.61613415359994,
+        "x0": 107.99995679999999,
+        "x1": 354.4781787897742
+      },
+      {
+        "n": 22,
+        "text": "REFERENCES",
+        "top": 536.0161223936,
+        "bottom": 548.0161175935999,
+        "x0": 106.55980756605994,
+        "x1": 181.86784844272626
+      },
+      {
+        "n": 23,
+        "text": "1. Ariponnammal S. and Natarajan S. (1994), \u2018Transport Phonomena of SmSe1-x Asx\u2019,",
+        "top": 556.6561141375998,
+        "bottom": 568.6561093375999,
+        "x0": 107.99980688855999,
+        "x1": 537.9574632340384
+      },
+      {
+        "n": 24,
+        "text": "Pramana \u2013 Journal of Physics, Vol. 42, No.5, pp.421-425.",
+        "top": 577.4161058335999,
+        "bottom": 589.4161010336,
+        "x0": 125.9997934227625,
+        "x1": 403.5578148063653
+      },
+      {
+        "n": 25,
+        "text": "2. Barnard R.W. and Kellogg C. (1980) \u2018Applications of Convolution operators to",
+        "top": 598.0560975775999,
+        "bottom": 610.0560927775999,
+        "x0": 107.99942711291193,
+        "x1": 537.8353227083757
+      },
+      {
+        "n": 26,
+        "text": "Problems in univalent function theory\u2019, Michigan Mach. Journal, Vol. 27, pp.1-94.",
+        "top": 618.8160892735999,
+        "bottom": 630.8160844735999,
+        "x0": 125.9994136471144,
+        "x1": 523.5577039908135
+      },
+      {
+        "n": 27,
+        "text": "3. Shin K.G. and Mckay N. D. (1984), \u2018Open loop minimum time control of",
+        "top": 639.4560810175999,
+        "bottom": 651.4560762175998,
+        "x0": 108.00004674686403,
+        "x1": 537.8731710015517
+      },
+      {
+        "n": 28,
+        "text": "mechanical manipulations and its applications\u2019, Proc. Amer. Contr. Conf., San",
+        "top": 660.2160727135998,
+        "bottom": 672.2160679135999,
+        "x0": 126.0000332810665,
+        "x1": 537.8363422300946
+      },
+      {
+        "n": 29,
+        "text": "Diego, CA, pp.1231-1236.",
+        "top": 680.8560644575998,
+        "bottom": 692.8560596575999,
+        "x0": 126.0000332810665,
+        "x1": 254.03829081913128
+      },
+      {
+        "n": 30,
+        "text": "6.12 Tables and Figures - By the word Table, is meant tabulated numerical data in the body",
+        "top": 701.4720562111999,
+        "bottom": 713.6160513535999,
+        "x0": 69.12003505707489,
+        "x1": 537.5961013160644
+      },
+      {
+        "n": 31,
+        "text": "of the project report as well as in the appendices. All other non-verbal material used in",
+        "top": 722.2560478975998,
+        "bottom": 734.2560430975998,
+        "x0": 105.12006809005597,
+        "x1": 537.3565860653495
+      },
+      {
+        "n": 32,
+        "text": "the body of the project report and appendices such as charts, graphs, maps, photographs",
+        "top": 743.0160395935998,
+        "bottom": 755.0160347935998,
+        "x0": 105.12006809005597,
+        "x1": 537.1049768071518
+      },
+      {
+        "n": 33,
+        "text": "and diagrams may be designated as figures.",
+        "top": 763.6560313375999,
+        "bottom": 775.6560265375998,
+        "x0": 105.12006809005597,
+        "x1": 314.278261704173
+      },
+      {
+        "n": 34,
+        "text": "Page 4 of 13",
+        "top": 794.514258994304,
+        "bottom": 805.686734525312,
+        "x0": 482.52016892385524,
+        "x1": 537.9567590375655
+      }
+    ],
+    "fonts": [
+      [
+        "EWBPRP+Times-Roman",
+        9.96
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        11.04
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        12.0
+      ],
+      [
+        "KPSHBO+Wingdings",
+        12.0
+      ],
+      [
+        "QEGMJO+Helvetica",
+        12.0
+      ],
+      [
+        "QEGMJO+Helvetica-Bold",
+        12.0
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        11.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        12.0
+      ]
+    ],
+    "images": 0
+  },
+  {
+    "page": 5,
+    "width": 595,
+    "height": 842,
+    "lines": [
+      {
+        "n": 1,
+        "text": "Guidelines for Preparation of B.E. / B.Tech. Project Report",
+        "top": 39.24704110131199,
+        "bottom": 50.28703668531193,
+        "x0": 71.9999712,
+        "x1": 334.7474130477918
+      },
+      {
+        "n": 2,
+        "text": "(cid:1) A table or figure including caption should be accommodated within the prescribed",
+        "top": 64.08031116799998,
+        "bottom": 78.6963053216,
+        "x0": 103.679958528,
+        "x1": 530.5158670013844
+      },
+      {
+        "n": 3,
+        "text": "margin limits and should appear on the page, where the first reference is made as far",
+        "top": 83.97630320960002,
+        "bottom": 95.97629840959996,
+        "x0": 117.35974213568446,
+        "x1": 530.6729262988334
+      },
+      {
+        "n": 4,
+        "text": "as possible.",
+        "top": 101.25629629759999,
+        "bottom": 113.25629149759993,
+        "x0": 117.35974213568446,
+        "x1": 172.67797373503223
+      },
+      {
+        "n": 5,
+        "text": "(cid:1) Tables and figures on half page or less in length may appear on the same page along",
+        "top": 115.80029048000006,
+        "bottom": 130.41628463359996,
+        "x0": 103.679958528,
+        "x1": 530.7565173215586
+      },
+      {
+        "n": 6,
+        "text": "with the text. However, they should be separated from the text both above and below",
+        "top": 135.69628252159998,
+        "bottom": 147.69627772159993,
+        "x0": 117.3607415452846,
+        "x1": 530.5397523631416
+      },
+      {
+        "n": 7,
+        "text": "by double spacing.",
+        "top": 152.97627560959995,
+        "bottom": 164.9762708095999,
+        "x0": 117.36074154528463,
+        "x1": 207.59899257007717
+      },
+      {
+        "n": 8,
+        "text": "(cid:1) Two or more small tables or figures may be grouped if necessary in a single page.",
+        "top": 167.64026974400008,
+        "bottom": 182.25626389759998,
+        "x0": 103.679958528,
+        "x1": 510.11830704618404
+      },
+      {
+        "n": 9,
+        "text": "(cid:1) Photographs if any, should be included as color print only. More than one photograph",
+        "top": 184.80026288,
+        "bottom": 199.4162570335999,
+        "x0": 103.679958528,
+        "x1": 530.6360654503259
+      },
+      {
+        "n": 10,
+        "text": "can be included in a page.",
+        "top": 204.69625492159992,
+        "bottom": 216.69625012159986,
+        "x0": 117.35974213568434,
+        "x1": 242.03800991080206
+      },
+      {
+        "n": 11,
+        "text": "(cid:1) Samples of Fabric, Leather, etc., if absolutely necessary may be attached evenly in a",
+        "top": 219.36024905599993,
+        "bottom": 233.97624320959994,
+        "x0": 103.679958528,
+        "x1": 530.684119410519
+      },
+      {
+        "n": 12,
+        "text": "page and fixed / pasted suitably and should be placed in Appendix only.",
+        "top": 239.25624109759997,
+        "bottom": 251.2562362975999,
+        "x0": 117.3597421356844,
+        "x1": 462.83764844230967
+      },
+      {
+        "n": 13,
+        "text": "The caption of figure should follow sentence case, center aligned and placed below the",
+        "top": 256.53623418559994,
+        "bottom": 268.5362293855999,
+        "x0": 105.11997276159406,
+        "x1": 539.9245580748525
+      },
+      {
+        "n": 14,
+        "text": "figure. The caption of table should be at the top of the table, left aligned and placed above",
+        "top": 277.2962258816,
+        "bottom": 289.2962210815999,
+        "x0": 105.11997276159406,
+        "x1": 540.0442578823656
+      },
+      {
+        "n": 15,
+        "text": "the table.",
+        "top": 297.93621762559997,
+        "bottom": 309.9362128255999,
+        "x0": 105.11997276159406,
+        "x1": 149.03820921944816
+      },
+      {
+        "n": 16,
+        "text": "7. TYPING INSTRUCTIONS",
+        "top": 339.43220102719994,
+        "bottom": 351.43219622719994,
+        "x0": 72.00003831457313,
+        "x1": 231.0680728891013
+      },
+      {
+        "n": 17,
+        "text": "7.1 General",
+        "top": 360.1921927231999,
+        "bottom": 372.1921879231999,
+        "x0": 83.04003645177208,
+        "x1": 142.29410253863557
+      },
+      {
+        "n": 18,
+        "text": "This section includes additional information for final typing of the project report. Some",
+        "top": 380.7361845055999,
+        "bottom": 392.7361797055999,
+        "x0": 82.8000482244674,
+        "x1": 537.1641653448326
+      },
+      {
+        "n": 19,
+        "text": "information given earlier under 'Manuscript preparation' shall also be referred. The",
+        "top": 401.4961762015999,
+        "bottom": 413.4961714015999,
+        "x0": 82.80004822446743,
+        "x1": 537.164984944655
+      },
+      {
+        "n": 20,
+        "text": "impressions on the typed/duplicated/printed copies should be black in colour. Corrections,",
+        "top": 422.1361679455999,
+        "bottom": 434.1361631455999,
+        "x0": 82.80004822446743,
+        "x1": 537.1179790133405
+      },
+      {
+        "n": 21,
+        "text": "interlineations and crossing out of letters or words will not be permitted in any of the copies of",
+        "top": 442.89615964159987,
+        "bottom": 454.89615484159987,
+        "x0": 82.80004822446743,
+        "x1": 537.15276565918
+      },
+      {
+        "n": 22,
+        "text": "the project report intended for submission. A sub-heading at the bottom of a page must have at",
+        "top": 463.53615138559985,
+        "bottom": 475.53614658559985,
+        "x0": 82.80004822446743,
+        "x1": 537.093775951264
+      },
+      {
+        "n": 23,
+        "text": "least two full lines below it or else it should be carried over to the next page. The last word of",
+        "top": 484.29614308159984,
+        "bottom": 496.29613828159984,
+        "x0": 82.80004822446746,
+        "x1": 537.2735880315399
+      },
+      {
+        "n": 24,
+        "text": "any page should not be split using a hyphen. One and a half spacing should be used for typing",
+        "top": 504.9361348255998,
+        "bottom": 516.9361300255998,
+        "x0": 82.80004822446749,
+        "x1": 537.2362073301348
+      },
+      {
+        "n": 25,
+        "text": "the general text. The general text shall be typed in Font style Times New Roman and Font",
+        "top": 525.6961265215998,
+        "bottom": 537.6961217215999,
+        "x0": 82.80004822446749,
+        "x1": 537.0931463791828
+      },
+      {
+        "n": 26,
+        "text": "size 13.",
+        "top": 546.3361182655998,
+        "bottom": 558.3361134655997,
+        "x0": 82.80004822446749,
+        "x1": 119.51826439180915
+      },
+      {
+        "n": 27,
+        "text": "Single spacing should be used for typing:",
+        "top": 567.0961099615997,
+        "bottom": 579.0961051615998,
+        "x0": 82.80004822446749,
+        "x1": 281.374053516402
+      },
+      {
+        "n": 28,
+        "text": "(i) Long Tables",
+        "top": 587.7361017055998,
+        "bottom": 599.7360969055998,
+        "x0": 172.92000998846837,
+        "x1": 262.18518570008325
+      },
+      {
+        "n": 29,
+        "text": "(ii) Long quotations",
+        "top": 608.4960934015998,
+        "bottom": 620.4960886015998,
+        "x0": 172.92000998846837,
+        "x1": 280.18517439301047
+      },
+      {
+        "n": 30,
+        "text": "(iii) Footnotes",
+        "top": 629.1360851455997,
+        "bottom": 641.1360803455998,
+        "x0": 172.92000998846837,
+        "x1": 249.2252179181522
+      },
+      {
+        "n": 31,
+        "text": "(iv) Multilane captions",
+        "top": 649.7760768895997,
+        "bottom": 661.7760720895998,
+        "x0": 172.92000998846837,
+        "x1": 291.5852789258813
+      },
+      {
+        "n": 32,
+        "text": "(v) References",
+        "top": 670.5360685855998,
+        "bottom": 682.5360637855997,
+        "x0": 172.9201099294284,
+        "x1": 255.10538917555638
+      },
+      {
+        "n": 33,
+        "text": "All quotations exceeding one line should be typed in an indented space, the indentation being",
+        "top": 691.1760603295997,
+        "bottom": 703.1760555295997,
+        "x0": 82.80054792926762,
+        "x1": 537.2369817766316
+      },
+      {
+        "n": 34,
+        "text": "15mm from either margin.",
+        "top": 711.9360520255998,
+        "bottom": 723.9360472255997,
+        "x0": 82.80054792926765,
+        "x1": 210.1187303426623
+      },
+      {
+        "n": 35,
+        "text": "Page 5 of 13",
+        "top": 794.514258994304,
+        "bottom": 805.686734525312,
+        "x0": 482.52016892385524,
+        "x1": 537.9567590375655
+      }
+    ],
+    "fonts": [
+      [
+        "EWBPRP+Times-Roman",
+        11.04
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        12.0
+      ],
+      [
+        "KPSHBO+Wingdings",
+        12.0
+      ],
+      [
+        "QEGMJO+Helvetica",
+        12.0
+      ],
+      [
+        "QEGMJO+Helvetica-Bold",
+        12.0
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        11.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        12.0
+      ]
+    ],
+    "images": 0
+  },
+  {
+    "page": 6,
+    "width": 595,
+    "height": 842,
+    "lines": [
+      {
+        "n": 1,
+        "text": "Guidelines for Preparation of B.E. / B.Tech. Project Report",
+        "top": 39.24704110131199,
+        "bottom": 50.28703668531193,
+        "x0": 71.9999712,
+        "x1": 334.7474130477918
+      },
+      {
+        "n": 2,
+        "text": "7.2 Chapters",
+        "top": 66.91231003520011,
+        "bottom": 78.91230523520005,
+        "x0": 83.039966784,
+        "x1": 148.30523419044948
+      },
+      {
+        "n": 3,
+        "text": "The format for typing chapter headings, division headings and sub division headings shall be",
+        "top": 87.57630176960004,
+        "bottom": 99.57629696959998,
+        "x0": 82.79997855669532,
+        "x1": 537.4048734459444
+      },
+      {
+        "n": 4,
+        "text": "same as given in Table of Contents.",
+        "top": 108.21629351360002,
+        "bottom": 120.21628871359997,
+        "x0": 82.7999785566953,
+        "x1": 254.39823675189115
+      },
+      {
+        "n": 5,
+        "text": "The word CHAPTER without punctuation should be centred 50mm down from the top of the",
+        "top": 128.97628520960006,
+        "bottom": 140.9762804096,
+        "x0": 82.7999785566953,
+        "x1": 537.2846815331417
+      },
+      {
+        "n": 6,
+        "text": "page. Two spaces below, the title of the chapter should be typed centrally in capital letters.",
+        "top": 149.61627695360005,
+        "bottom": 161.6162721536,
+        "x0": 82.7999785566953,
+        "x1": 537.2379684808092
+      },
+      {
+        "n": 7,
+        "text": "The text should commence 4 spaces below this title, the first letter of the text starting 20mm,",
+        "top": 170.37626864959998,
+        "bottom": 182.37626384959992,
+        "x0": 82.79997855669527,
+        "x1": 537.3574432692523
+      },
+      {
+        "n": 8,
+        "text": "inside from the left hand margin.",
+        "top": 191.01626039359996,
+        "bottom": 203.0162555935999,
+        "x0": 82.7999785566953,
+        "x1": 240.5981963456379
+      },
+      {
+        "n": 9,
+        "text": "The division and sub-division captions along with their numberings should be left-justified.",
+        "top": 211.7762520896,
+        "bottom": 223.77624728959995,
+        "x0": 82.7999785566953,
+        "x1": 537.3576883604651
+      },
+      {
+        "n": 10,
+        "text": "The captions should start at 20mm from left margin. The typed material directly below",
+        "top": 232.4162438336,
+        "bottom": 244.41623903359994,
+        "x0": 82.7999785566953,
+        "x1": 537.2585831147442
+      },
+      {
+        "n": 11,
+        "text": "division or sub-division heading should commence 2 spaces below it and should be offset",
+        "top": 253.17623552959992,
+        "bottom": 265.17623072959987,
+        "x0": 82.7999785566953,
+        "x1": 537.3332898978211
+      },
+      {
+        "n": 12,
+        "text": "20mm from the left hand margin. Within a division or sub-division paragraphs are permitted.",
+        "top": 273.8162272735999,
+        "bottom": 285.81622247359985,
+        "x0": 82.7999785566953,
+        "x1": 537.1182041753981
+      },
+      {
+        "n": 13,
+        "text": "The paragraph should commence 3 spaces below the last line of the preceding paragraph or",
+        "top": 294.4562190175999,
+        "bottom": 306.45621421759984,
+        "x0": 82.7999785566953,
+        "x1": 537.2736380370708
+      },
+      {
+        "n": 14,
+        "text": "caption, the first letter in the paragraph being offset from the left hand margin by 20mm.",
+        "top": 315.21621071359993,
+        "bottom": 327.2162059135999,
+        "x0": 82.7999785566953,
+        "x1": 507.71756358095723
+      },
+      {
+        "n": 15,
+        "text": "8. NUMBERING INSTRUCTIONS",
+        "top": 356.7121941151999,
+        "bottom": 368.7121893151999,
+        "x0": 71.99995865270502,
+        "x1": 260.34797432109804
+      },
+      {
+        "n": 16,
+        "text": "8.1 Page Numbering",
+        "top": 377.3521858591999,
+        "bottom": 389.3521810591999,
+        "x0": 83.87996055890234,
+        "x1": 188.27645785635488
+      },
+      {
+        "n": 17,
+        "text": "All pages numbers (whether it be in Roman or Arabic numbers) should be typed without",
+        "top": 398.0161775935999,
+        "bottom": 410.0161727935999,
+        "x0": 84.23998787329135,
+        "x1": 537.3338068764167
+      },
+      {
+        "n": 18,
+        "text": "punctuation on the upper right hand corner 20mm from top with the last digit in line with the",
+        "top": 418.65616933759986,
+        "bottom": 430.65616453759986,
+        "x0": 84.23998787329135,
+        "x1": 537.4042735363403
+      },
+      {
+        "n": 19,
+        "text": "right hand margin. The preliminary pages of the project report (such as Title page,",
+        "top": 439.41616103359985,
+        "bottom": 451.41615623359985,
+        "x0": 84.23998787329135,
+        "x1": 537.2374147519238
+      },
+      {
+        "n": 20,
+        "text": "Acknowledgement, Table of Contents etc.) should be numbered in lower case Roman",
+        "top": 460.05615277759983,
+        "bottom": 472.05614797759984,
+        "x0": 84.23998787329135,
+        "x1": 537.2364922728768
+      },
+      {
+        "n": 21,
+        "text": "numerals. The title page will be numbered as (i) but this should not be typed. The page",
+        "top": 480.8161444735998,
+        "bottom": 492.8161396735998,
+        "x0": 84.23998787329135,
+        "x1": 537.1646910613379
+      },
+      {
+        "n": 22,
+        "text": "immediately following the title page shall be numbered (ii) and it should appear at the top",
+        "top": 501.4561362175998,
+        "bottom": 513.4561314175999,
+        "x0": 84.23998787329135,
+        "x1": 537.2362293521968
+      },
+      {
+        "n": 23,
+        "text": "right hand corner as already specified. Pages of main text, starting with Chapter 1 should be",
+        "top": 522.2161279135998,
+        "bottom": 534.2161231135998,
+        "x0": 84.23998787329135,
+        "x1": 537.4040040115616
+      },
+      {
+        "n": 24,
+        "text": "consecutively numbered using Arabic numerals.",
+        "top": 542.8561196575997,
+        "bottom": 554.8561148575998,
+        "x0": 84.23998787329133,
+        "x1": 315.83818879381414
+      },
+      {
+        "n": 25,
+        "text": "8.2 Numbering of Chapters, Divisions and Sub-Divisions",
+        "top": 563.7121113151998,
+        "bottom": 575.7121065151998,
+        "x0": 86.87998829689073,
+        "x1": 375.82523028452664
+      },
+      {
+        "n": 26,
+        "text": "The numbering of chapters, divisions and sub-divisions should be done using Arabic",
+        "top": 584.2561030975999,
+        "bottom": 596.2560982975998,
+        "x0": 84.23998787329133,
+        "x1": 537.1643041179242
+      },
+      {
+        "n": 27,
+        "text": "numerals only and further decimal notation should be used for numbering the divisions and",
+        "top": 605.0160947935998,
+        "bottom": 617.0160899935997,
+        "x0": 84.2399878732913,
+        "x1": 537.1159305625315
+      },
+      {
+        "n": 28,
+        "text": "sub-divisions within a chapter. For example, division / sub-division 4 under division 3",
+        "top": 625.6560865375998,
+        "bottom": 637.6560817375998,
+        "x0": 84.2399878732913,
+        "x1": 537.2359155495753
+      },
+      {
+        "n": 29,
+        "text": "belonging to chapter 2 should be numbered as 2.3.4. The title for the division/sub-division",
+        "top": 646.4160782335998,
+        "bottom": 658.4160734335998,
+        "x0": 84.2399878732913,
+        "x1": 537.3557329875985
+      },
+      {
+        "n": 30,
+        "text": "shall start at 20mm from the left margin, following the number assigned to it.",
+        "top": 667.0560699775998,
+        "bottom": 679.0560651775997,
+        "x0": 84.2399878732913,
+        "x1": 455.27783822824154
+      },
+      {
+        "n": 31,
+        "text": "Every chapter beginning with the first chapter should be serially numbered using Arabic",
+        "top": 687.8160616735997,
+        "bottom": 699.8160568735998,
+        "x0": 84.23998787329127,
+        "x1": 537.164212272182
+      },
+      {
+        "n": 32,
+        "text": "numerals. Appendices included should also be numbered in an identical manner starting with",
+        "top": 708.4560534175998,
+        "bottom": 720.4560486175998,
+        "x0": 84.2399878732913,
+        "x1": 537.2365060287506
+      },
+      {
+        "n": 33,
+        "text": "Appendix 1.",
+        "top": 729.2160451135998,
+        "bottom": 741.2160403135997,
+        "x0": 84.2399878732913,
+        "x1": 143.6381975435431
+      },
+      {
+        "n": 34,
+        "text": "Page 6 of 13",
+        "top": 794.514258994304,
+        "bottom": 805.686734525312,
+        "x0": 482.52016892385524,
+        "x1": 537.9567590375655
+      }
+    ],
+    "fonts": [
+      [
+        "EWBPRP+Times-Roman",
+        11.04
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        12.0
+      ],
+      [
+        "QEGMJO+Helvetica-Bold",
+        12.0
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        11.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        12.0
+      ]
+    ],
+    "images": 0
+  },
+  {
+    "page": 7,
+    "width": 595,
+    "height": 842,
+    "lines": [
+      {
+        "n": 1,
+        "text": "Guidelines for Preparation of B.E. / B.Tech. Project Report",
+        "top": 39.24704110131199,
+        "bottom": 50.28703668531193,
+        "x0": 71.9999712,
+        "x1": 334.7474130477918
+      },
+      {
+        "n": 2,
+        "text": "8.3 Numbering of Tables and Figures",
+        "top": 66.91231003520011,
+        "bottom": 78.91230523520005,
+        "x0": 83.87996644799999,
+        "x1": 274.6652691446352
+      },
+      {
+        "n": 3,
+        "text": "Tables and Figures appearing anywhere in the project report should bear appropriate numbers.",
+        "top": 87.57630176960004,
+        "bottom": 99.57629696959998,
+        "x0": 84.239993762389,
+        "x1": 537.2378990623947
+      },
+      {
+        "n": 4,
+        "text": "The rule for assigning such numbers is illustrated through an example. Thus, if a figure in",
+        "top": 108.21629351360002,
+        "bottom": 120.21628871359997,
+        "x0": 84.23999376238898,
+        "x1": 537.236510650597
+      },
+      {
+        "n": 5,
+        "text": "Chapter 3, happens to be the fourth then assign 3.4 to that figure. Identical rules apply for",
+        "top": 128.97628520960006,
+        "bottom": 140.9762804096,
+        "x0": 84.239993762389,
+        "x1": 537.153646994181
+      },
+      {
+        "n": 6,
+        "text": "tables except that the word Figure is replaced by the word Table. If figures (or tables) appear",
+        "top": 149.61627695360005,
+        "bottom": 161.6162721536,
+        "x0": 84.239993762389,
+        "x1": 537.1528019254043
+      },
+      {
+        "n": 7,
+        "text": "in appendices then figure 3 in Appendix 2 will be designated as Figure A 2.3. If a table to be",
+        "top": 170.37626864959998,
+        "bottom": 182.37626384959992,
+        "x0": 84.239993762389,
+        "x1": 537.2841280366956
+      },
+      {
+        "n": 8,
+        "text": "continued into the next page this may be done, but no line should be drawn underneath an",
+        "top": 191.01626039359996,
+        "bottom": 203.0162555935999,
+        "x0": 84.23999376238903,
+        "x1": 537.236289409295
+      },
+      {
+        "n": 9,
+        "text": "unfinished table. A table continued into the next page should have a caption like, Table 2.1",
+        "top": 211.7762520896,
+        "bottom": 223.77624728959995,
+        "x0": 84.23999376238906,
+        "x1": 537.2360780581503
+      },
+      {
+        "n": 10,
+        "text": "(continued), placed centrally and underlined.",
+        "top": 232.4162438336,
+        "bottom": 244.41623903359994,
+        "x0": 84.23999376238903,
+        "x1": 299.39823977030375
+      },
+      {
+        "n": 11,
+        "text": "8.4 Numbering of Equations",
+        "top": 253.27223549119992,
+        "bottom": 265.27223069119987,
+        "x0": 83.87999443146883,
+        "x1": 228.70528570983043
+      },
+      {
+        "n": 12,
+        "text": "Equations appearing in each Chapter or Appendix should be numbered serially, the",
+        "top": 273.8162272735999,
+        "bottom": 285.81622247359985,
+        "x0": 84.24002174585786,
+        "x1": 537.1640912082769
+      },
+      {
+        "n": 13,
+        "text": "numbering shall commence freshly for each Chapter or Appendix. Thus for example, an",
+        "top": 294.4562190175999,
+        "bottom": 306.45621421759984,
+        "x0": 84.24002174585786,
+        "x1": 537.3559565640977
+      },
+      {
+        "n": 14,
+        "text": "equation appearing in Chapter 2, if it happens to be the eighth equation in that Chapter should",
+        "top": 315.21621071359993,
+        "bottom": 327.2162059135999,
+        "x0": 84.24002174585786,
+        "x1": 537.3560780883075
+      },
+      {
+        "n": 15,
+        "text": "be numbered (2.8), while referring to this equation in the body of the project report it",
+        "top": 335.8562024575999,
+        "bottom": 347.8561976575999,
+        "x0": 84.24002174585789,
+        "x1": 537.213195591934
+      },
+      {
+        "n": 16,
+        "text": "should be referred to as Equation (2.8).",
+        "top": 356.6161941535999,
+        "bottom": 368.6161893535999,
+        "x0": 84.24002174585789,
+        "x1": 272.1582165582949
+      },
+      {
+        "n": 17,
+        "text": "Page 7 of 13",
+        "top": 794.514258994304,
+        "bottom": 805.686734525312,
+        "x0": 482.52016892385524,
+        "x1": 537.9567590375655
+      }
+    ],
+    "fonts": [
+      [
+        "EWBPRP+Times-Roman",
+        11.04
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        12.0
+      ],
+      [
+        "QEGMJO+Helvetica-Bold",
+        12.0
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        11.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        12.0
+      ]
+    ],
+    "images": 0
+  },
+  {
+    "page": 8,
+    "width": 595,
+    "height": 842,
+    "lines": [
+      {
+        "n": 1,
+        "text": "Guidelines for Preparation of B.E. / B.Tech. Project Report",
+        "top": 39.24704110131199,
+        "bottom": 50.28703668531193,
+        "x0": 71.9999712,
+        "x1": 334.7474130477918
+      },
+      {
+        "n": 2,
+        "text": "ANNEXURE I A: (A typical Specimen of Cover Page & Title Page)",
+        "top": 66.60703015731201,
+        "bottom": 77.64702574131195,
+        "x0": 153.8399688419878,
+        "x1": 456.0741660689926
+      },
+      {
+        "n": 3,
+        "text": "<Font Style - Times New Roman - Bold>",
+        "top": 85.5670225733121,
+        "bottom": 96.60701815731204,
+        "x0": 220.79987605801415,
+        "x1": 404.0226043718431
+      },
+      {
+        "n": 4,
+        "text": "TITLE OF PROJECT REPORT",
+        "top": 126.34828626080002,
+        "bottom": 144.3482790608,
+        "x0": 186.239925504,
+        "x1": 438.7190731016729
+      },
+      {
+        "n": 5,
+        "text": "<Font Size 18><1.5-line spacing>",
+        "top": 156.366994253312,
+        "bottom": 167.40698983731193,
+        "x0": 237.119905152,
+        "x1": 387.9427452167795
+      },
+      {
+        "n": 6,
+        "text": "PHASE I REPORT",
+        "top": 196.45249821910397,
+        "bottom": 210.49249260310398,
+        "x0": 253.679898528,
+        "x1": 371.1593172485793
+      },
+      {
+        "n": 7,
+        "text": "<Font Size 14>",
+        "top": 220.2962486816,
+        "bottom": 232.29624388159993,
+        "x0": 275.27988988799996,
+        "x1": 349.4838624634053
+      },
+      {
+        "n": 8,
+        "text": "Submitted by",
+        "top": 265.55843057671996,
+        "bottom": 279.59842496071997,
+        "x0": 274.91988582880174,
+        "x1": 350.15012594554344
+      },
+      {
+        "n": 9,
+        "text": "<Font Size 14><Italic>",
+        "top": 289.2962210815999,
+        "bottom": 301.29621628159987,
+        "x0": 256.19989752,
+        "x1": 368.5638423874187
+      },
+      {
+        "n": 10,
+        "text": "NAME OF THE CANDIDATE(s)",
+        "top": 310.607972556896,
+        "bottom": 326.5679661728959,
+        "x0": 196.91992123199998,
+        "x1": 427.4715220030394
+      },
+      {
+        "n": 11,
+        "text": "<Font Size 16>",
+        "top": 337.65620173760004,
+        "bottom": 349.65619693760004,
+        "x0": 275.39988983999996,
+        "x1": 349.60386241540533
+      },
+      {
+        "n": 12,
+        "text": "in partial fulfillment for the award of the degree of",
+        "top": 379.43838502472,
+        "bottom": 393.47837940872,
+        "x0": 166.079933568,
+        "x1": 459.11276373848676
+      },
+      {
+        "n": 13,
+        "text": "<Font Size 14><1.5-line spacing><Italic>",
+        "top": 403.1761755296,
+        "bottom": 415.1761707296,
+        "x0": 211.07991556800002,
+        "x1": 413.5638479921826
+      },
+      {
+        "n": 14,
+        "text": "BACHELOR OF ENGINEERING /",
+        "top": 444.287919084896,
+        "bottom": 460.247912700896,
+        "x0": 180.83992766400002,
+        "x1": 426.71424507436114
+      },
+      {
+        "n": 15,
+        "text": "BACHELOR OF TECHNOLOGY /",
+        "top": 471.887908044896,
+        "bottom": 487.847901660896,
+        "x0": 180.35992730125224,
+        "x1": 427.0742186131475
+      },
+      {
+        "n": 16,
+        "text": "<Font Size 16>",
+        "top": 498.726857309312,
+        "bottom": 509.766852893312,
+        "x0": 278.519888592,
+        "x1": 346.66273939198396
+      },
+      {
+        "n": 17,
+        "text": "IN",
+        "top": 517.686849725312,
+        "bottom": 528.726845309312,
+        "x0": 306.71990360578945,
+        "x1": 318.2860129094502
+      },
+      {
+        "n": 18,
+        "text": "BRANCH OF STUDY",
+        "top": 537.132361947104,
+        "bottom": 551.172356331104,
+        "x0": 236.519905392,
+        "x1": 371.09112157672934
+      },
+      {
+        "n": 19,
+        "text": "<Font Size 16>",
+        "top": 560.766832493312,
+        "bottom": 571.8068280773119,
+        "x0": 278.519888592,
+        "x1": 346.66273939198396
+      },
+      {
+        "n": 20,
+        "text": "Name of the Department Offering the Programme",
+        "top": 649.367837052896,
+        "bottom": 665.327830668896,
+        "x0": 140.759943696,
+        "x1": 483.60217027966746
+      },
+      {
+        "n": 21,
+        "text": "Sri Sivasubramaniya Nadar College of Engineering",
+        "top": 676.967826012896,
+        "bottom": 692.927819628896,
+        "x0": 136.91994679049935,
+        "x1": 487.3754148305003
+      },
+      {
+        "n": 22,
+        "text": "(An Autonomous Institution, Affiliated to Anna University)",
+        "top": 704.1120551552,
+        "bottom": 716.1120503552,
+        "x0": 160.319935872,
+        "x1": 464.0733750307504
+      },
+      {
+        "n": 23,
+        "text": "<Font Size 16><1.5-line spacing>",
+        "top": 724.7760468896,
+        "bottom": 736.7760420896,
+        "x0": 230.03974899406361,
+        "x1": 394.3636827298265
+      },
+      {
+        "n": 24,
+        "text": "MONTH AND YEAR",
+        "top": 745.692078523184,
+        "bottom": 759.732072907184,
+        "x0": 246.719901312,
+        "x1": 378.1711346189844
+      },
+      {
+        "n": 25,
+        "text": "<Font Size 14>",
+        "top": 769.446549021392,
+        "bottom": 780.486544605392,
+        "x0": 278.519888592,
+        "x1": 346.66273939198396
+      },
+      {
+        "n": 26,
+        "text": "Page 8 of 13",
+        "top": 794.514258994304,
+        "bottom": 805.686734525312,
+        "x0": 482.52016892385524,
+        "x1": 537.9567590375655
+      }
+    ],
+    "fonts": [
+      [
+        "EWBPRP+Times-Roman",
+        9.96
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        10.56
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        11.04
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        11.52
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        12.0
+      ],
+      [
+        "OFSDHF+Times-BoldItalic",
+        14.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        11.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        12.0
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        14.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        15.96
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        18.0
+      ]
+    ],
+    "images": 1
+  },
+  {
+    "page": 9,
+    "width": 595,
+    "height": 842,
+    "lines": [
+      {
+        "n": 1,
+        "text": "Guidelines for Preparation of B.E. / B.Tech. Project Report",
+        "top": 39.24704110131199,
+        "bottom": 50.28703668531193,
+        "x0": 71.9999712,
+        "x1": 334.7474130477918
+      },
+      {
+        "n": 2,
+        "text": "ANNEXURE I B: (A typical Specimen of Cover Page & Title Page)",
+        "top": 66.60703015731201,
+        "bottom": 77.64702574131195,
+        "x0": 154.07982522604522,
+        "x1": 455.71338209130624
+      },
+      {
+        "n": 3,
+        "text": "<Font Style - Times New Roman - Bold>",
+        "top": 85.5670225733121,
+        "bottom": 96.60701815731204,
+        "x0": 220.79887665641397,
+        "x1": 404.02160497024295
+      },
+      {
+        "n": 4,
+        "text": "TITLE OF PROJECT REPORT",
+        "top": 126.34828626080002,
+        "bottom": 144.3482790608,
+        "x0": 186.239925504,
+        "x1": 438.7190731016729
+      },
+      {
+        "n": 5,
+        "text": "<Font Size 18><1.5-line spacing>",
+        "top": 156.366994253312,
+        "bottom": 167.40698983731193,
+        "x0": 237.119905152,
+        "x1": 387.9427452167795
+      },
+      {
+        "n": 6,
+        "text": "A PROJECT REPORT",
+        "top": 196.45249821910397,
+        "bottom": 210.49249260310398,
+        "x0": 242.159903136,
+        "x1": 382.9193481082341
+      },
+      {
+        "n": 7,
+        "text": "<Font Size 14>",
+        "top": 220.2962486816,
+        "bottom": 232.29624388159993,
+        "x0": 275.27988988799996,
+        "x1": 349.4838624634053
+      },
+      {
+        "n": 8,
+        "text": "Submitted by",
+        "top": 265.55843057671996,
+        "bottom": 279.59842496071997,
+        "x0": 274.91988582880174,
+        "x1": 350.15012594554344
+      },
+      {
+        "n": 9,
+        "text": "<Font Size 14><Italic>",
+        "top": 289.2962210815999,
+        "bottom": 301.29621628159987,
+        "x0": 256.19989752,
+        "x1": 368.5638423874187
+      },
+      {
+        "n": 10,
+        "text": "NAME OF THE CANDIDATE(s)",
+        "top": 310.607972556896,
+        "bottom": 326.5679661728959,
+        "x0": 196.91992123199998,
+        "x1": 427.4715220030394
+      },
+      {
+        "n": 11,
+        "text": "<Font Size 16>",
+        "top": 337.65620173760004,
+        "bottom": 349.65619693760004,
+        "x0": 275.39988983999996,
+        "x1": 349.60386241540533
+      },
+      {
+        "n": 12,
+        "text": "in partial fulfillment for the award of the degree of",
+        "top": 379.43838502472,
+        "bottom": 393.47837940872,
+        "x0": 166.079933568,
+        "x1": 459.11276373848676
+      },
+      {
+        "n": 13,
+        "text": "<Font Size 14><1.5-line spacing><Italic>",
+        "top": 403.1761755296,
+        "bottom": 415.1761707296,
+        "x0": 211.07991556800002,
+        "x1": 413.5638479921826
+      },
+      {
+        "n": 14,
+        "text": "BACHELOR OF ENGINEERING /",
+        "top": 444.287919084896,
+        "bottom": 460.247912700896,
+        "x0": 180.83992766400002,
+        "x1": 426.71424507436114
+      },
+      {
+        "n": 15,
+        "text": "BACHELOR OF TECHNOLOGY /",
+        "top": 471.887908044896,
+        "bottom": 487.847901660896,
+        "x0": 180.35992730125224,
+        "x1": 427.0742186131475
+      },
+      {
+        "n": 16,
+        "text": "<Font Size 16>",
+        "top": 498.726857309312,
+        "bottom": 509.766852893312,
+        "x0": 278.519888592,
+        "x1": 346.66273939198396
+      },
+      {
+        "n": 17,
+        "text": "IN",
+        "top": 517.686849725312,
+        "bottom": 528.726845309312,
+        "x0": 306.71990360578945,
+        "x1": 318.2860129094502
+      },
+      {
+        "n": 18,
+        "text": "BRANCH OF STUDY",
+        "top": 537.132361947104,
+        "bottom": 551.172356331104,
+        "x0": 236.519905392,
+        "x1": 371.09112157672934
+      },
+      {
+        "n": 19,
+        "text": "<Font Size 16>",
+        "top": 560.766832493312,
+        "bottom": 571.8068280773119,
+        "x0": 278.519888592,
+        "x1": 346.66273939198396
+      },
+      {
+        "n": 20,
+        "text": "Name of the Department Offering the Programme",
+        "top": 649.367837052896,
+        "bottom": 665.327830668896,
+        "x0": 140.759943696,
+        "x1": 483.60217027966746
+      },
+      {
+        "n": 21,
+        "text": "Sri Sivasubramaniya Nadar College of Engineering",
+        "top": 676.967826012896,
+        "bottom": 692.927819628896,
+        "x0": 136.91994679049935,
+        "x1": 487.3754148305003
+      },
+      {
+        "n": 22,
+        "text": "(An Autonomous Institution, Affiliated to Anna University)",
+        "top": 704.1120551552,
+        "bottom": 716.1120503552,
+        "x0": 160.319935872,
+        "x1": 464.0733750307504
+      },
+      {
+        "n": 23,
+        "text": "<Font Size 16><1.5-line spacing>",
+        "top": 724.7760468896,
+        "bottom": 736.7760420896,
+        "x0": 230.03974899406361,
+        "x1": 394.3636827298265
+      },
+      {
+        "n": 24,
+        "text": "MONTH AND YEAR",
+        "top": 745.692078523184,
+        "bottom": 759.732072907184,
+        "x0": 246.719901312,
+        "x1": 378.1711346189844
+      },
+      {
+        "n": 25,
+        "text": "<Font Size 14>",
+        "top": 769.446549021392,
+        "bottom": 780.486544605392,
+        "x0": 278.519888592,
+        "x1": 346.66273939198396
+      },
+      {
+        "n": 26,
+        "text": "Page 9 of 13",
+        "top": 794.514258994304,
+        "bottom": 805.686734525312,
+        "x0": 482.52016892385524,
+        "x1": 537.9567590375655
+      }
+    ],
+    "fonts": [
+      [
+        "EWBPRP+Times-Roman",
+        9.96
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        10.56
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        11.04
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        11.52
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        12.0
+      ],
+      [
+        "OFSDHF+Times-BoldItalic",
+        14.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        11.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        12.0
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        14.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        15.96
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        18.0
+      ]
+    ],
+    "images": 1
+  },
+  {
+    "page": 10,
+    "width": 595,
+    "height": 842,
+    "lines": [
+      {
+        "n": 1,
+        "text": "Guidelines for Preparation of B.E. / B.Tech. Project Report",
+        "top": 39.24704110131199,
+        "bottom": 50.28703668531193,
+        "x0": 71.9999712,
+        "x1": 334.7474130477918
+      },
+      {
+        "n": 2,
+        "text": "ANNEXURE I C: (Specimen - Cover Page & Title Page \u2013 Project report)",
+        "top": 66.60703015731201,
+        "bottom": 77.64702574131195,
+        "x0": 141.59959786273814,
+        "x1": 468.3133338525054
+      },
+      {
+        "n": 3,
+        "text": "ELECTRONIC VOTING MACHINE",
+        "top": 104.74829490080003,
+        "bottom": 122.7482877008,
+        "x0": 167.87993284799998,
+        "x1": 459.83905063825324
+      },
+      {
+        "n": 4,
+        "text": "WITH AUTO-VERIFICATION",
+        "top": 135.8282824688,
+        "bottom": 153.82827526879998,
+        "x0": 189.59997143748106,
+        "x1": 438.14854939454773
+      },
+      {
+        "n": 5,
+        "text": "A PROJECT REPORT",
+        "top": 190.45250061910406,
+        "bottom": 204.49249500310407,
+        "x0": 242.15985374321977,
+        "x1": 382.9192867881894
+      },
+      {
+        "n": 6,
+        "text": "Submitted by",
+        "top": 240.59844056071995,
+        "bottom": 254.63843494471996,
+        "x0": 275.039889984,
+        "x1": 350.27012462823217
+      },
+      {
+        "n": 7,
+        "text": "Srikanth P T (173002111)",
+        "top": 264.88799084489597,
+        "bottom": 280.8479844608959,
+        "x0": 131.519947392,
+        "x1": 478.35147448804895
+      },
+      {
+        "n": 8,
+        "text": "Vaishnavi S (173002122)",
+        "top": 286.48798220489607,
+        "bottom": 302.447975820896,
+        "x0": 131.519947392,
+        "x1": 478.35147448804895
+      },
+      {
+        "n": 9,
+        "text": "Vignesh Sabarinath K M (173002133)",
+        "top": 308.08797356489606,
+        "bottom": 324.04796718089597,
+        "x0": 131.519947392,
+        "x1": 478.35147448804895
+      },
+      {
+        "n": 10,
+        "text": "in partial fulfillment for the award of the degree of",
+        "top": 370.91838843271995,
+        "bottom": 384.95838281671996,
+        "x0": 158.39993664,
+        "x1": 451.43276681048667
+      },
+      {
+        "n": 11,
+        "text": "BACHELOR OF ENGINEERING",
+        "top": 421.127928348896,
+        "bottom": 437.087921964896,
+        "x0": 186.239925504,
+        "x1": 423.52956036309814
+      },
+      {
+        "n": 12,
+        "text": "in",
+        "top": 448.727917308896,
+        "bottom": 464.687910924896,
+        "x0": 298.2002334838589,
+        "x1": 311.5087810252355
+      },
+      {
+        "n": 13,
+        "text": "ELECTRONICS AND COMMUNICATION ENGINEERING",
+        "top": 476.3279062688961,
+        "bottom": 492.2878998848961,
+        "x0": 91.80033734985038,
+        "x1": 517.969962386875
+      },
+      {
+        "n": 14,
+        "text": "Department of",
+        "top": 607.247853900896,
+        "bottom": 623.207847516896,
+        "x0": 262.559894976,
+        "x1": 362.43152198045874
+      },
+      {
+        "n": 15,
+        "text": "Electronics and Communication Engineering",
+        "top": 634.847842860896,
+        "bottom": 650.807836476896,
+        "x0": 151.91981236205072,
+        "x1": 459.8952573930173
+      },
+      {
+        "n": 16,
+        "text": "Sri Sivasubramaniya Nadar College of Engineering",
+        "top": 662.447831820896,
+        "bottom": 678.407825436896,
+        "x0": 136.91981351885266,
+        "x1": 487.3752815588536
+      },
+      {
+        "n": 17,
+        "text": "(An Autonomous Institution, Affiliated to Anna University)",
+        "top": 689.5920609632001,
+        "bottom": 701.5920561632,
+        "x0": 160.319935872,
+        "x1": 464.0733750307504
+      },
+      {
+        "n": 18,
+        "text": "Rajiv Gandhi Salai (OMR), Kalavakkam \u2013 603 110",
+        "top": 710.532292587104,
+        "bottom": 724.572286971104,
+        "x0": 161.39993544,
+        "x1": 466.3759239501272
+      },
+      {
+        "n": 19,
+        "text": "APRIL 2021",
+        "top": 755.292074683184,
+        "bottom": 769.332069067184,
+        "x0": 275.039889984,
+        "x1": 350.21592032317807
+      },
+      {
+        "n": 20,
+        "text": "Page 10 of 13",
+        "top": 794.514258994304,
+        "bottom": 805.686734525312,
+        "x0": 476.9994744841339,
+        "x1": 537.9560594564454
+      }
+    ],
+    "fonts": [
+      [
+        "EWBPRP+Times-Roman",
+        9.96
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        10.56
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        11.04
+      ],
+      [
+        "OFSDHF+Times-BoldItalic",
+        14.04
+      ],
+      [
+        "OFSDHF+Times-BoldItalic",
+        15.0
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        9.96
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        11.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        12.0
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        14.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        15.0
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        15.96
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        18.0
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        24.0
+      ]
+    ],
+    "images": 1
+  },
+  {
+    "page": 11,
+    "width": 595,
+    "height": 842,
+    "lines": [
+      {
+        "n": 1,
+        "text": "Guidelines for Preparation of B.E. / B.Tech. Project Report",
+        "top": 39.24704110131199,
+        "bottom": 50.28703668531193,
+        "x0": 71.9999712,
+        "x1": 334.7474130477918
+      },
+      {
+        "n": 2,
+        "text": "ANNEXURE \u2013 II A: (A typical Specimen of Bonafide Certificate for Phase I Report)",
+        "top": 66.60703015731201,
+        "bottom": 77.64702574131195,
+        "x0": 116.63954289676413,
+        "x1": 493.27348219568904
+      },
+      {
+        "n": 3,
+        "text": "<Font Style - Times New Roman >",
+        "top": 85.5670225733121,
+        "bottom": 96.60701815731204,
+        "x0": 234.71984136662581,
+        "x1": 390.1026162089156
+      },
+      {
+        "n": 4,
+        "text": "Sri Sivasubramaniya Nadar College of Engineering",
+        "top": 126.04804638089604,
+        "bottom": 142.00803999689595,
+        "x0": 136.91994523199998,
+        "x1": 487.3754132720009
+      },
+      {
+        "n": 5,
+        "text": "(An Autonomous Institution, Affiliated to Anna University)",
+        "top": 153.1922755232,
+        "bottom": 165.19227072319995,
+        "x0": 160.439935824,
+        "x1": 464.1933749827504
+      },
+      {
+        "n": 6,
+        "text": "<Font Style Times New Roman \u2013 Size -16>",
+        "top": 173.526987389312,
+        "bottom": 184.56698297331195,
+        "x0": 216.119913552,
+        "x1": 408.82271602000367
+      },
+      {
+        "n": 7,
+        "text": "BONAFIDE CERTIFICATE",
+        "top": 214.00801119689595,
+        "bottom": 229.96800481289586,
+        "x0": 212.39991504,
+        "x1": 411.91903454865326
+      },
+      {
+        "n": 8,
+        "text": "<Font Style Times New Roman \u2013 Size -16>",
+        "top": 240.84696046131205,
+        "bottom": 251.886956045312,
+        "x0": 216.119913552,
+        "x1": 408.82271602000367
+      },
+      {
+        "n": 9,
+        "text": "<Font Style Times New Roman \u2013 Size -14>",
+        "top": 277.0869459653121,
+        "bottom": 288.12694154931205,
+        "x0": 216.119913552,
+        "x1": 408.82271602000367
+      },
+      {
+        "n": 10,
+        "text": "Certified that this Report titled \u201cTITLE OF THE PROJECT\u201d is the",
+        "top": 313.57245137110397,
+        "bottom": 327.78092568771194,
+        "x0": 98.99996039999999,
+        "x1": 539.9904390150672
+      },
+      {
+        "n": 11,
+        "text": "bonafide work of NAME OF THE CANDIDATE(s) (Register No......) who",
+        "top": 337.692441723104,
+        "bottom": 351.90091603971206,
+        "x0": 72.00020765990536,
+        "x1": 540.0566067104653
+      },
+      {
+        "n": 12,
+        "text": "carried out the work under my supervision.",
+        "top": 361.98091200771205,
+        "bottom": 376.02090639171206,
+        "x0": 72.00020765990541,
+        "x1": 313.46810042177
+      },
+      {
+        "n": 13,
+        "text": "Certified further that to the best of my knowledge the work reported herein",
+        "top": 386.10090235971205,
+        "bottom": 400.14089674371206,
+        "x0": 99.00016028712004,
+        "x1": 540.0561638236115
+      },
+      {
+        "n": 14,
+        "text": "does not form part of any other thesis or dissertation on the basis of which a degree",
+        "top": 410.34089266371205,
+        "bottom": 424.38088704771206,
+        "x0": 72.00040754702539,
+        "x1": 540.1109061646389
+      },
+      {
+        "n": 15,
+        "text": "or award was conferred on an earlier occasion on this or any other candidate.",
+        "top": 434.46088301571206,
+        "bottom": 448.50087739971207,
+        "x0": 72.00040754702539,
+        "x1": 502.94885990794967
+      },
+      {
+        "n": 16,
+        "text": "<<Signature of the HOD >> <<Signature of the Supervisor >>",
+        "top": 503.345415461888,
+        "bottom": 516.3054102778881,
+        "x0": 71.99997809699722,
+        "x1": 485.38506275751024
+      },
+      {
+        "n": 17,
+        "text": "<<Name of the HOD>> <<Name of the Supervisor>>",
+        "top": 525.785406485888,
+        "bottom": 538.745401301888,
+        "x0": 71.99997809699722,
+        "x1": 463.425097600366
+      },
+      {
+        "n": 18,
+        "text": "Head of the Department <<Academic Designation >>",
+        "top": 548.105397557888,
+        "bottom": 561.065392373888,
+        "x0": 71.99997809699722,
+        "x1": 461.6250303738223
+      },
+      {
+        "n": 19,
+        "text": "Name of the Department Name of the Department",
+        "top": 570.545388581888,
+        "bottom": 583.505383397888,
+        "x0": 71.99997809699722,
+        "x1": 439.2006603945246
+      },
+      {
+        "n": 20,
+        "text": "SSN College of Engineering SSN College of Engineering",
+        "top": 592.985379605888,
+        "bottom": 605.945374421888,
+        "x0": 71.99997809699722,
+        "x1": 458.636489373182
+      },
+      {
+        "n": 21,
+        "text": "Kalavakkam \u2013 603 110 Kalavakkam \u2013 603 110",
+        "top": 615.425370629888,
+        "bottom": 628.385365445888,
+        "x0": 71.99997809699722,
+        "x1": 431.1561251396039
+      },
+      {
+        "n": 22,
+        "text": "Submitted for Project Viva-Voce Examination held on....................................",
+        "top": 680.945344421888,
+        "bottom": 693.905339237888,
+        "x0": 71.9999712,
+        "x1": 472.67753345290964
+      },
+      {
+        "n": 23,
+        "text": "EXTERNAL EXAMINER INTERNAL EXAMINER",
+        "top": 748.265317493888,
+        "bottom": 761.225312309888,
+        "x0": 92.5199777387941,
+        "x1": 517.3189016681494
+      },
+      {
+        "n": 24,
+        "text": "Page 11 of 13",
+        "top": 794.514258994304,
+        "bottom": 805.686734525312,
+        "x0": 476.9994744841339,
+        "x1": 537.9560594564454
+      }
+    ],
+    "fonts": [
+      [
+        "EWBPRP+Times-Roman",
+        9.96
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        11.04
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        12.0
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        12.96
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        14.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        11.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        12.0
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        14.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        15.96
+      ]
+    ],
+    "images": 0
+  },
+  {
+    "page": 12,
+    "width": 595,
+    "height": 842,
+    "lines": [
+      {
+        "n": 1,
+        "text": "Guidelines for Preparation of B.E. / B.Tech. Project Report",
+        "top": 39.24704110131199,
+        "bottom": 50.28703668531193,
+        "x0": 71.9999712,
+        "x1": 334.7474130477918
+      },
+      {
+        "n": 2,
+        "text": "ANNEXURE \u2013 II B: (A Specimen - Bonafide Certificate for Phase I Report)",
+        "top": 66.60703015731201,
+        "bottom": 77.64702574131195,
+        "x0": 135.95997463258834,
+        "x1": 473.9536250113675
+      },
+      {
+        "n": 3,
+        "text": "Sri Sivasubramaniya Nadar College of Engineering",
+        "top": 114.22829110880002,
+        "bottom": 132.2282839088,
+        "x0": 93.119962752,
+        "x1": 487.67474959442785
+      },
+      {
+        "n": 4,
+        "text": "(An Autonomous Institution, Affiliated to Anna University)",
+        "top": 144.732518907104,
+        "bottom": 158.77251329110402,
+        "x0": 113.15995473599999,
+        "x1": 467.5130072518586
+      },
+      {
+        "n": 5,
+        "text": "BONAFIDE CERTIFICATE",
+        "top": 181.84802406089602,
+        "bottom": 197.80801767689593,
+        "x0": 190.559923776,
+        "x1": 390.07904328465327
+      },
+      {
+        "n": 6,
+        "text": "Certified that this project titled \u201cELECTRONIC VOTING MACHINE WITH",
+        "top": 236.53248218710394,
+        "bottom": 250.7409565037119,
+        "x0": 71.9999712,
+        "x1": 537.9564796260545
+      },
+      {
+        "n": 7,
+        "text": "AUTO-VERIFICATION\u201d is the bonafide work of \u201cSrikanth P T (173002111),",
+        "top": 268.69246932310386,
+        "bottom": 282.90094363971184,
+        "x0": 71.99997120000003,
+        "x1": 537.9884915149006
+      },
+      {
+        "n": 8,
+        "text": "Vaishnavi S (173002122) and Vignesh Sabarinath K M (173002133)\u201d, who",
+        "top": 300.8524564591039,
+        "bottom": 315.0609307757119,
+        "x0": 72.00007114356,
+        "x1": 537.8968255978598
+      },
+      {
+        "n": 9,
+        "text": "carried out the project work under my supervision.",
+        "top": 333.30092347971186,
+        "bottom": 347.34091786371187,
+        "x0": 72.00117052272023,
+        "x1": 355.82906464701625
+      },
+      {
+        "n": 10,
+        "text": "Certified further that to the best of my knowledge the work reported herein",
+        "top": 365.46091061571184,
+        "bottom": 379.50090499971185,
+        "x0": 99.36111985313612,
+        "x1": 540.0572534460429
+      },
+      {
+        "n": 11,
+        "text": "does not form part of any other thesis or dissertation on the basis of which a degree",
+        "top": 397.6208977517118,
+        "bottom": 411.66089213571183,
+        "x0": 72.00157029696028,
+        "x1": 540.1120396155994
+      },
+      {
+        "n": 12,
+        "text": "or award was conferred on an earlier occasion on this or any other candidate.",
+        "top": 429.78088488771175,
+        "bottom": 443.82087927171176,
+        "x0": 72.00157029696028,
+        "x1": 502.9490817360405
+      },
+      {
+        "n": 13,
+        "text": "<<Signature of the HOD >> <<Signature of the Supervisor >>",
+        "top": 494.105419157888,
+        "bottom": 507.065413973888,
+        "x0": 71.9999712,
+        "x1": 522.4647450546313
+      },
+      {
+        "n": 14,
+        "text": "SIGNATURE SIGNATURE",
+        "top": 520.2721286912,
+        "bottom": 532.2721238912,
+        "x0": 71.9999712,
+        "x1": 418.6390894896744
+      },
+      {
+        "n": 15,
+        "text": "<<Name of the HOD >> <<Name of the Supervisor >>",
+        "top": 538.145401541888,
+        "bottom": 551.1053963578879,
+        "x0": 71.9999712,
+        "x1": 503.7453752234354
+      },
+      {
+        "n": 16,
+        "text": "HEAD OF THE DEPARTMENT SUPERVISOR",
+        "top": 564.3121110751999,
+        "bottom": 576.3121062752,
+        "x0": 71.9999712,
+        "x1": 424.698711616739
+      },
+      {
+        "n": 17,
+        "text": "Head of the Department Academic Designation",
+        "top": 585.425382629888,
+        "bottom": 598.385377445888,
+        "x0": 71.9999712,
+        "x1": 456.9566236746076
+      },
+      {
+        "n": 18,
+        "text": "Department of Electronics and Department of Electronics and",
+        "top": 603.5760953696,
+        "bottom": 615.5760905696,
+        "x0": 71.99993006001651,
+        "x1": 494.2766208446994
+      },
+      {
+        "n": 19,
+        "text": "Communication Engineering Communication Engineering",
+        "top": 617.3760898496,
+        "bottom": 629.3760850496,
+        "x0": 71.99993006001651,
+        "x1": 486.356625546373
+      },
+      {
+        "n": 20,
+        "text": "SSN College of Engineering SSN College of Engineering",
+        "top": 635.0160827935999,
+        "bottom": 647.0160779936,
+        "x0": 71.99993006001651,
+        "x1": 484.4358311728483
+      },
+      {
+        "n": 21,
+        "text": "Kalavakkam \u2013 603110 Kalavakkam \u2013 603110",
+        "top": 656.6160741536,
+        "bottom": 668.6160693536,
+        "x0": 71.99993006001651,
+        "x1": 455.9962181407763
+      },
+      {
+        "n": 22,
+        "text": "Submitted for project viva-voce examination held on\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026.........",
+        "top": 702.0960559616,
+        "bottom": 714.0960511616,
+        "x0": 71.9999712,
+        "x1": 460.918150408753
+      },
+      {
+        "n": 23,
+        "text": "EXTERNAL EXAMINER INTERNAL EXAMINER",
+        "top": 753.79183528328,
+        "bottom": 765.79183048328,
+        "x0": 112.31995507199998,
+        "x1": 497.4186554363111
+      },
+      {
+        "n": 24,
+        "text": "Page 12 of 13",
+        "top": 794.514258994304,
+        "bottom": 805.686734525312,
+        "x0": 476.9994744841339,
+        "x1": 537.9560594564454
+      }
+    ],
+    "fonts": [
+      [
+        "EWBPRP+Times-Roman",
+        11.04
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        12.0
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        12.96
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        14.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        11.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        12.0
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        14.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        15.96
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        18.0
+      ]
+    ],
+    "images": 0
+  },
+  {
+    "page": 13,
+    "width": 595,
+    "height": 842,
+    "lines": [
+      {
+        "n": 1,
+        "text": "Guidelines for Preparation of B.E. / B.Tech. Project Report",
+        "top": 39.24704110131199,
+        "bottom": 50.28703668531193,
+        "x0": 71.9999712,
+        "x1": 332.8274192547457
+      },
+      {
+        "n": 2,
+        "text": "ANNEXURE \u2013 III: (A typical Specimen of Table of Contents)",
+        "top": 66.71455011430396,
+        "bottom": 77.75454569830401,
+        "x0": 160.43931742884735,
+        "x1": 449.3532383947514
+      },
+      {
+        "n": 3,
+        "text": "<Font Style Times New Roman, Font Size 14>",
+        "top": 85.77630248959997,
+        "bottom": 97.77629768959991,
+        "x0": 203.75991849599998,
+        "x1": 430.00380046463596
+      },
+      {
+        "n": 4,
+        "text": "TABLE OF CONTENTS",
+        "top": 107.01029399599997,
+        "bottom": 122.01028799599999,
+        "x0": 235.919905632,
+        "x1": 397.49490590376604
+      },
+      {
+        "n": 5,
+        "text": "CHAPTER PAGE",
+        "top": 159.0125131951039,
+        "bottom": 173.05250757910392,
+        "x0": 75.59996976,
+        "x1": 529.559354199765
+      },
+      {
+        "n": 6,
+        "text": "TITLE",
+        "top": 171.13250834710402,
+        "bottom": 185.17250273110403,
+        "x0": 293.5203061142306,
+        "x1": 336.4797309743788
+      },
+      {
+        "n": 7,
+        "text": "NO. NO.",
+        "top": 183.13250354710397,
+        "bottom": 197.17249793110398,
+        "x0": 97.55996854239697,
+        "x1": 522.3879876139563
+      },
+      {
+        "n": 8,
+        "text": "ABSTRACT",
+        "top": 207.78097368771193,
+        "bottom": 221.82096807171195,
+        "x0": 158.3999103866361,
+        "x1": 231.53348056355213
+      },
+      {
+        "n": 9,
+        "text": "LIST OF TABLES",
+        "top": 232.380963847712,
+        "bottom": 246.420958231712,
+        "x0": 158.3999103866361,
+        "x1": 265.681697109447
+      },
+      {
+        "n": 10,
+        "text": "LIST OF FIGURES",
+        "top": 257.100953959712,
+        "bottom": 271.140948343712,
+        "x0": 158.3999103866361,
+        "x1": 271.08172729049164
+      },
+      {
+        "n": 11,
+        "text": "LIST OF SYMBOLS, ABBREVIATIONS",
+        "top": 281.70094411971195,
+        "bottom": 295.74093850371196,
+        "x0": 158.3999103866361,
+        "x1": 398.6417833609657
+      },
+      {
+        "n": 12,
+        "text": "1 INTRODUCTION 1",
+        "top": 306.3009342797119,
+        "bottom": 320.3409286637119,
+        "x0": 106.319957472,
+        "x1": 513.6559273135468
+      },
+      {
+        "n": 13,
+        "text": "1.1 GENERAL 1",
+        "top": 331.020924391712,
+        "bottom": 345.060918775712,
+        "x0": 158.3999103866361,
+        "x1": 513.6558911615613
+      },
+      {
+        "n": 14,
+        "text": "1.2 NEED FOR THE STUDY 2",
+        "top": 355.620914551712,
+        "bottom": 369.66090893571203,
+        "x0": 158.3999103866361,
+        "x1": 513.655668155229
+      },
+      {
+        "n": 15,
+        "text": "1.3 OBJECTIVES OF THE STUDY 3",
+        "top": 380.340904663712,
+        "bottom": 394.38089904771203,
+        "x0": 158.3999103866361,
+        "x1": 513.6559315443084
+      },
+      {
+        "n": 16,
+        "text": "1.3.1 Objectives of the Study 3",
+        "top": 404.94089482371203,
+        "bottom": 418.98088920771204,
+        "x0": 189.83989884347088,
+        "x1": 513.656549323751
+      },
+      {
+        "n": 17,
+        "text": "1.4",
+        "top": 429.540884983712,
+        "bottom": 443.580879367712,
+        "x0": 158.3999103866361,
+        "x1": 175.9759378087698
+      },
+      {
+        "n": 18,
+        "text": "2 REVIEW OF LITERATURE",
+        "top": 454.26087509571204,
+        "bottom": 468.30086947971205,
+        "x0": 106.319957472,
+        "x1": 324.0535049303639
+      },
+      {
+        "n": 19,
+        "text": "Page 13 of 13",
+        "top": 794.514258994304,
+        "bottom": 805.686734525312,
+        "x0": 476.9994744841339,
+        "x1": 537.9560594564454
+      }
+    ],
+    "fonts": [
+      [
+        "EWBPRP+Times-Roman",
+        11.04
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        12.0
+      ],
+      [
+        "EWBPRP+Times-Roman",
+        14.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        11.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        14.04
+      ],
+      [
+        "RRFAZB+Times-Bold",
+        15.0
+      ]
+    ],
+    "images": 0
+  }
+]

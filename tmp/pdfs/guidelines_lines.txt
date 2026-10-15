@@ -1,0 +1,384 @@
+
+=== PDF PAGE 1 (595 x 842) ===
+01: Sri Sivasubramaniya Nadar College of Engineering
+02: (An Autonomous Institution Affiliated to Anna University, Chennai)
+03: Guidelines for Preparation of B.E. / B.Tech. Project Report
+04: 1. GENERAL:
+05: The broad guidelines to the preparation of B.E. / B.Tech. report are outlined below.
+06: 2. NUMBER OF COPIES TO BE SUBMITTED FOR EVALUATION:
+07: B.E. / B.Tech. Report: The number copies to be submitted to the Department where the student is
+08: studying is No. of students in the project batch / group plus two (one copy each to student(s), one
+09: copy each to the supervisor and department library). The Report shall also be submitted in soft
+10: copy to the Department.
+11: 3. SIZE OF REPORT:
+12: The size of the project report should be sixty (60) pages (+/- 10%) of typed matter reckoned from
+13: the first page of Chapter 1 to the last page including the list of References.
+14: 4. ARRANGEMENT OF CONTENTS OF REPORT:
+15: The sequence in which the report material should be arranged and bound should be as follows:
+16: 1. Cover page & Title page
+17: 2. Bonafide Certificate
+18: 3. Abstract
+19: 4. Acknowledgement
+20: 5. Table of Contents
+21: 6. List of Tables
+22: 7. List of Figures
+23: 8. List of Symbols, Abbreviations and Nomenclature
+24: 9. Chapters
+25: 10. Appendices
+26: 11. References
+27: The Tables and Figures shall be introduced in the appropriate places.
+
+=== PDF PAGE 2 (595 x 842) ===
+01: Guidelines for Preparation of B.E. / B.Tech. Project Report
+02: 5. PAGE DIMENSIONS, MARGIN AND BINDING SPECIFICATIONS:
+03: The dimensions of the report should be in Standard A4 size (297mm (cid:1) 210mm).
+04: The Report (at the time of submission) should have the following page margins:
+05: Top edge : 35mm
+06: Bottom edge : 35mm
+07: Left side : 40 mm
+08: Right side : 35 mm
+09: The report should be prepared on good quality white paper preferably not lower than
+10: 75 gsm.
+11: Tables and figures should conform to the margin specifications. Large size figures should be
+12: photographically or otherwise reduced to the appropriate size before insertion.
+13: Binding Specifications: The Report should be bound using flexible cover of thick white art
+14: paper. The cover should be printed in black letters and the text for printing should be in black.
+15: 6. MANUSCRIPT PREPARATION:
+16: The general text of the report shall be typed in font style Times New Roman and font size 13.
+17: Same quality of paper should be used for the preparation of the entire report.
+18: The headings of all items 2 to 10 listed in section 4 should be typed in capital letters without
+19: punctuation and centered at the top of the page. The text should commence 2 spaces below this
+20: heading.
+21: 6.1 Cover Page & Title Page - A specimen copy of the Cover page & Title page for the
+22: report are given in Annexure I.
+23: 6.2 Bonafide Certificate– The Bonafide Certificate shall be in double line spacing using
+24: font style Times New Roman and Font size 14, as per the format shown in Annexure II.
+25: The certificate shall carry the supervisor’s signature and shall be followed by the
+26: supervisor’s name, academic designation (not any other responsibilities of administrative
+27: nature), department and full address of the institution where the supervisor has guided
+28: the student. The term ‘SUPERVISOR’ must be typed in capital letters between the
+29: supervisor’s name and academic designation.
+30: If Joint Supervisor is involved, a third column may be added after the Supervisor with
+31: the details as similar to that of Supervisor.
+32: 6.3 Abstract- Abstract should be synopsis of the project report (not exceeding two pages),
+33: typed in double line spacing font style Times New Roman and Font size 14.
+34: 6.4 Acknowledgement – The acknowledgement shall be brief and should not exceed one
+35: Page 2 of 13
+
+=== PDF PAGE 3 (595 x 842) ===
+01: Guidelines for Preparation of B.E. / B.Tech. Project Report
+02: page, typed in double spacing. The student’s signature shall be made at the right bottom
+03: above his / her name typed in capitals.
+04: 6.5 Table of contents - The table of contents should list all material following it as well as
+05: any material which precedes it. The Title Page, Bonafide Certificate and
+06: Acknowledgment will not find a place among the items listed in the Table of Contents
+07: but the page numbers in lower case Roman letters are to be accounted for them. One and
+08: a half spacing should be adopted for typing the matter under this head. A specimen copy
+09: of the Table of Contents for report is given in Annexure III.
+10: 6.6 List of Table - The list should use exactly the same captions as they appear above the
+11: tables in the text. One and a half spacing should be adopted for typing the matter under
+12: this head.
+13: 6.7 List of Figures - The list should use exactly the same captions as they appear below the
+14: figures in the text. One and a half spacing should be adopted for typing the matter under
+15: this head.
+16: 6.8 List of Symbols, Abbreviations and Nomenclature- One and a half spacing should be
+17: adopted for typing the matter under this head. Standard symbols, abbreviations etc.
+18: should be used.
+19: 6.9 Chapters - The chapters may be broadly divided into 3 parts (i) Introductory chapter, (ii)
+20: Chapters developing the main theme of the project work (iii) and Conclusion.
+21: (cid:1) The main theme may be divided into several chapters and each chapter may be
+22: further divided into several divisions and sub-divisions.
+23: (cid:1) Each chapter should be given an appropriate title.
+24: (cid:1) Tables and figures in a chapter should be placed in the immediate vicinity of the
+25: reference where they are cited.
+26: (cid:1) Footnotes should be used sparingly. They should be typed single space and placed
+27: directly underneath in the very same page, which refers to the material they annotate.
+28: 6.10 Appendices - Appendices are provided to give supplementary information, which if
+29: included in the main text may serve as a distraction and cloud the central theme under
+30: discussion.
+31: (cid:1) Appendices should be numbered using Arabic numerals, e.g. Appendix-1, Appendix-
+32: 2, etc.
+33: (cid:1) Appendices, Tables and References appearing in Appendices should be numbered
+34: and referred to at appropriate places just as in the case of chapters.
+35: (cid:1) Appendices shall carry the title of the work reported and the same title shall be made
+36: in the contents page also.
+37: Page 3 of 13
+
+=== PDF PAGE 4 (595 x 842) ===
+01: Guidelines for Preparation of B.E. / B.Tech. Project Report
+02: (cid:1) The list of publications made by students during the period of research, shall be
+03: brought in the Appendix titled, as List of Publications and the same shall be reported
+04: in the contents. The author(s) can refer the publications mentioned in the Appendix,
+05: in the text of the Report, by mentioning the author(s) name followed by Appendix
+06: number and the year of publication, in brackets.
+07: 6.11 List of References – Any works of other researchers, if used either directly or indirectly,
+08: should be indicated at appropriate places in the report. The citation may assume any one
+09: of the following forms.
+10: The authors’ publications during the period of research should not be included in the
+11: references and can be separately mentioned as in 6.10.
+12: Examples of citation
+13: i. An improved algorithm has been adopted in literature (Tsychiya1980)
+14: ii. Jankins and Walts (1968) have dealt at length this principle.
+15: iii. The problem of mechanical manipulators has been studied by Shin et al (1984) and
+16: certain limitations of the method used, has been pointed out by Shin et al (1984a).
+17: The listing of references should be typed 2 spaces below the heading “REFERENCES”
+18: in alphabetical order in single spacing left – justified. The reference material should be
+19: listed in the alphabetical order of the first author. The name of the author/authors should
+20: be immediately followed by the year and other details. A typical illustrative list given
+21: below relates to the citation example quoted above.
+22: REFERENCES
+23: 1. Ariponnammal S. and Natarajan S. (1994), ‘Transport Phonomena of SmSe1-x Asx’,
+24: Pramana – Journal of Physics, Vol. 42, No.5, pp.421-425.
+25: 2. Barnard R.W. and Kellogg C. (1980) ‘Applications of Convolution operators to
+26: Problems in univalent function theory’, Michigan Mach. Journal, Vol. 27, pp.1-94.
+27: 3. Shin K.G. and Mckay N. D. (1984), ‘Open loop minimum time control of
+28: mechanical manipulations and its applications’, Proc. Amer. Contr. Conf., San
+29: Diego, CA, pp.1231-1236.
+30: 6.12 Tables and Figures - By the word Table, is meant tabulated numerical data in the body
+31: of the project report as well as in the appendices. All other non-verbal material used in
+32: the body of the project report and appendices such as charts, graphs, maps, photographs
+33: and diagrams may be designated as figures.
+34: Page 4 of 13
+
+=== PDF PAGE 5 (595 x 842) ===
+01: Guidelines for Preparation of B.E. / B.Tech. Project Report
+02: (cid:1) A table or figure including caption should be accommodated within the prescribed
+03: margin limits and should appear on the page, where the first reference is made as far
+04: as possible.
+05: (cid:1) Tables and figures on half page or less in length may appear on the same page along
+06: with the text. However, they should be separated from the text both above and below
+07: by double spacing.
+08: (cid:1) Two or more small tables or figures may be grouped if necessary in a single page.
+09: (cid:1) Photographs if any, should be included as color print only. More than one photograph
+10: can be included in a page.
+11: (cid:1) Samples of Fabric, Leather, etc., if absolutely necessary may be attached evenly in a
+12: page and fixed / pasted suitably and should be placed in Appendix only.
+13: The caption of figure should follow sentence case, center aligned and placed below the
+14: figure. The caption of table should be at the top of the table, left aligned and placed above
+15: the table.
+16: 7. TYPING INSTRUCTIONS
+17: 7.1 General
+18: This section includes additional information for final typing of the project report. Some
+19: information given earlier under 'Manuscript preparation' shall also be referred. The
+20: impressions on the typed/duplicated/printed copies should be black in colour. Corrections,
+21: interlineations and crossing out of letters or words will not be permitted in any of the copies of
+22: the project report intended for submission. A sub-heading at the bottom of a page must have at
+23: least two full lines below it or else it should be carried over to the next page. The last word of
+24: any page should not be split using a hyphen. One and a half spacing should be used for typing
+25: the general text. The general text shall be typed in Font style Times New Roman and Font
+26: size 13.
+27: Single spacing should be used for typing:
+28: (i) Long Tables
+29: (ii) Long quotations
+30: (iii) Footnotes
+31: (iv) Multilane captions
+32: (v) References
+33: All quotations exceeding one line should be typed in an indented space, the indentation being
+34: 15mm from either margin.
+35: Page 5 of 13
+
+=== PDF PAGE 6 (595 x 842) ===
+01: Guidelines for Preparation of B.E. / B.Tech. Project Report
+02: 7.2 Chapters
+03: The format for typing chapter headings, division headings and sub division headings shall be
+04: same as given in Table of Contents.
+05: The word CHAPTER without punctuation should be centred 50mm down from the top of the
+06: page. Two spaces below, the title of the chapter should be typed centrally in capital letters.
+07: The text should commence 4 spaces below this title, the first letter of the text starting 20mm,
+08: inside from the left hand margin.
+09: The division and sub-division captions along with their numberings should be left-justified.
+10: The captions should start at 20mm from left margin. The typed material directly below
+11: division or sub-division heading should commence 2 spaces below it and should be offset
+12: 20mm from the left hand margin. Within a division or sub-division paragraphs are permitted.
+13: The paragraph should commence 3 spaces below the last line of the preceding paragraph or
+14: caption, the first letter in the paragraph being offset from the left hand margin by 20mm.
+15: 8. NUMBERING INSTRUCTIONS
+16: 8.1 Page Numbering
+17: All pages numbers (whether it be in Roman or Arabic numbers) should be typed without
+18: punctuation on the upper right hand corner 20mm from top with the last digit in line with the
+19: right hand margin. The preliminary pages of the project report (such as Title page,
+20: Acknowledgement, Table of Contents etc.) should be numbered in lower case Roman
+21: numerals. The title page will be numbered as (i) but this should not be typed. The page
+22: immediately following the title page shall be numbered (ii) and it should appear at the top
+23: right hand corner as already specified. Pages of main text, starting with Chapter 1 should be
+24: consecutively numbered using Arabic numerals.
+25: 8.2 Numbering of Chapters, Divisions and Sub-Divisions
+26: The numbering of chapters, divisions and sub-divisions should be done using Arabic
+27: numerals only and further decimal notation should be used for numbering the divisions and
+28: sub-divisions within a chapter. For example, division / sub-division 4 under division 3
+29: belonging to chapter 2 should be numbered as 2.3.4. The title for the division/sub-division
+30: shall start at 20mm from the left margin, following the number assigned to it.
+31: Every chapter beginning with the first chapter should be serially numbered using Arabic
+32: numerals. Appendices included should also be numbered in an identical manner starting with
+33: Appendix 1.
+34: Page 6 of 13
+
+=== PDF PAGE 7 (595 x 842) ===
+01: Guidelines for Preparation of B.E. / B.Tech. Project Report
+02: 8.3 Numbering of Tables and Figures
+03: Tables and Figures appearing anywhere in the project report should bear appropriate numbers.
+04: The rule for assigning such numbers is illustrated through an example. Thus, if a figure in
+05: Chapter 3, happens to be the fourth then assign 3.4 to that figure. Identical rules apply for
+06: tables except that the word Figure is replaced by the word Table. If figures (or tables) appear
+07: in appendices then figure 3 in Appendix 2 will be designated as Figure A 2.3. If a table to be
+08: continued into the next page this may be done, but no line should be drawn underneath an
+09: unfinished table. A table continued into the next page should have a caption like, Table 2.1
+10: (continued), placed centrally and underlined.
+11: 8.4 Numbering of Equations
+12: Equations appearing in each Chapter or Appendix should be numbered serially, the
+13: numbering shall commence freshly for each Chapter or Appendix. Thus for example, an
+14: equation appearing in Chapter 2, if it happens to be the eighth equation in that Chapter should
+15: be numbered (2.8), while referring to this equation in the body of the project report it
+16: should be referred to as Equation (2.8).
+17: Page 7 of 13
+
+=== PDF PAGE 8 (595 x 842) ===
+01: Guidelines for Preparation of B.E. / B.Tech. Project Report
+02: ANNEXURE I A: (A typical Specimen of Cover Page & Title Page)
+03: <Font Style - Times New Roman - Bold>
+04: TITLE OF PROJECT REPORT
+05: <Font Size 18><1.5-line spacing>
+06: PHASE I REPORT
+07: <Font Size 14>
+08: Submitted by
+09: <Font Size 14><Italic>
+10: NAME OF THE CANDIDATE(s)
+11: <Font Size 16>
+12: in partial fulfillment for the award of the degree of
+13: <Font Size 14><1.5-line spacing><Italic>
+14: BACHELOR OF ENGINEERING /
+15: BACHELOR OF TECHNOLOGY /
+16: <Font Size 16>
+17: IN
+18: BRANCH OF STUDY
+19: <Font Size 16>
+20: Name of the Department Offering the Programme
+21: Sri Sivasubramaniya Nadar College of Engineering
+22: (An Autonomous Institution, Affiliated to Anna University)
+23: <Font Size 16><1.5-line spacing>
+24: MONTH AND YEAR
+25: <Font Size 14>
+26: Page 8 of 13
+
+=== PDF PAGE 9 (595 x 842) ===
+01: Guidelines for Preparation of B.E. / B.Tech. Project Report
+02: ANNEXURE I B: (A typical Specimen of Cover Page & Title Page)
+03: <Font Style - Times New Roman - Bold>
+04: TITLE OF PROJECT REPORT
+05: <Font Size 18><1.5-line spacing>
+06: A PROJECT REPORT
+07: <Font Size 14>
+08: Submitted by
+09: <Font Size 14><Italic>
+10: NAME OF THE CANDIDATE(s)
+11: <Font Size 16>
+12: in partial fulfillment for the award of the degree of
+13: <Font Size 14><1.5-line spacing><Italic>
+14: BACHELOR OF ENGINEERING /
+15: BACHELOR OF TECHNOLOGY /
+16: <Font Size 16>
+17: IN
+18: BRANCH OF STUDY
+19: <Font Size 16>
+20: Name of the Department Offering the Programme
+21: Sri Sivasubramaniya Nadar College of Engineering
+22: (An Autonomous Institution, Affiliated to Anna University)
+23: <Font Size 16><1.5-line spacing>
+24: MONTH AND YEAR
+25: <Font Size 14>
+26: Page 9 of 13
+
+=== PDF PAGE 10 (595 x 842) ===
+01: Guidelines for Preparation of B.E. / B.Tech. Project Report
+02: ANNEXURE I C: (Specimen - Cover Page & Title Page – Project report)
+03: ELECTRONIC VOTING MACHINE
+04: WITH AUTO-VERIFICATION
+05: A PROJECT REPORT
+06: Submitted by
+07: Srikanth P T (173002111)
+08: Vaishnavi S (173002122)
+09: Vignesh Sabarinath K M (173002133)
+10: in partial fulfillment for the award of the degree of
+11: BACHELOR OF ENGINEERING
+12: in
+13: ELECTRONICS AND COMMUNICATION ENGINEERING
+14: Department of
+15: Electronics and Communication Engineering
+16: Sri Sivasubramaniya Nadar College of Engineering
+17: (An Autonomous Institution, Affiliated to Anna University)
+18: Rajiv Gandhi Salai (OMR), Kalavakkam – 603 110
+19: APRIL 2021
+20: Page 10 of 13
+
+=== PDF PAGE 11 (595 x 842) ===
+01: Guidelines for Preparation of B.E. / B.Tech. Project Report
+02: ANNEXURE – II A: (A typical Specimen of Bonafide Certificate for Phase I Report)
+03: <Font Style - Times New Roman >
+04: Sri Sivasubramaniya Nadar College of Engineering
+05: (An Autonomous Institution, Affiliated to Anna University)
+06: <Font Style Times New Roman – Size -16>
+07: BONAFIDE CERTIFICATE
+08: <Font Style Times New Roman – Size -16>
+09: <Font Style Times New Roman – Size -14>
+10: Certified that this Report titled “TITLE OF THE PROJECT” is the
+11: bonafide work of NAME OF THE CANDIDATE(s) (Register No......) who
+12: carried out the work under my supervision.
+13: Certified further that to the best of my knowledge the work reported herein
+14: does not form part of any other thesis or dissertation on the basis of which a degree
+15: or award was conferred on an earlier occasion on this or any other candidate.
+16: <<Signature of the HOD >> <<Signature of the Supervisor >>
+17: <<Name of the HOD>> <<Name of the Supervisor>>
+18: Head of the Department <<Academic Designation >>
+19: Name of the Department Name of the Department
+20: SSN College of Engineering SSN College of Engineering
+21: Kalavakkam – 603 110 Kalavakkam – 603 110
+22: Submitted for Project Viva-Voce Examination held on....................................
+23: EXTERNAL EXAMINER INTERNAL EXAMINER
+24: Page 11 of 13
+
+=== PDF PAGE 12 (595 x 842) ===
+01: Guidelines for Preparation of B.E. / B.Tech. Project Report
+02: ANNEXURE – II B: (A Specimen - Bonafide Certificate for Phase I Report)
+03: Sri Sivasubramaniya Nadar College of Engineering
+04: (An Autonomous Institution, Affiliated to Anna University)
+05: BONAFIDE CERTIFICATE
+06: Certified that this project titled “ELECTRONIC VOTING MACHINE WITH
+07: AUTO-VERIFICATION” is the bonafide work of “Srikanth P T (173002111),
+08: Vaishnavi S (173002122) and Vignesh Sabarinath K M (173002133)”, who
+09: carried out the project work under my supervision.
+10: Certified further that to the best of my knowledge the work reported herein
+11: does not form part of any other thesis or dissertation on the basis of which a degree
+12: or award was conferred on an earlier occasion on this or any other candidate.
+13: <<Signature of the HOD >> <<Signature of the Supervisor >>
+14: SIGNATURE SIGNATURE
+15: <<Name of the HOD >> <<Name of the Supervisor >>
+16: HEAD OF THE DEPARTMENT SUPERVISOR
+17: Head of the Department Academic Designation
+18: Department of Electronics and Department of Electronics and
+19: Communication Engineering Communication Engineering
+20: SSN College of Engineering SSN College of Engineering
+21: Kalavakkam – 603110 Kalavakkam – 603110
+22: Submitted for project viva-voce examination held on……………………….........
+23: EXTERNAL EXAMINER INTERNAL EXAMINER
+24: Page 12 of 13
+
+=== PDF PAGE 13 (595 x 842) ===
+01: Guidelines for Preparation of B.E. / B.Tech. Project Report
+02: ANNEXURE – III: (A typical Specimen of Table of Contents)
+03: <Font Style Times New Roman, Font Size 14>
+04: TABLE OF CONTENTS
+05: CHAPTER PAGE
+06: TITLE
+07: NO. NO.
+08: ABSTRACT
+09: LIST OF TABLES
+10: LIST OF FIGURES
+11: LIST OF SYMBOLS, ABBREVIATIONS
+12: 1 INTRODUCTION 1
+13: 1.1 GENERAL 1
+14: 1.2 NEED FOR THE STUDY 2
+15: 1.3 OBJECTIVES OF THE STUDY 3
+16: 1.3.1 Objectives of the Study 3
+17: 1.4
+18: 2 REVIEW OF LITERATURE
+19: Page 13 of 13

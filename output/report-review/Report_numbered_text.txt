@@ -1,0 +1,2041 @@
+NUMBERED TEXT REFERENCE FOR THE PROJECT REPORT
+PDF page means the page position in the 82-page PDF. Printed page means the number shown in the report.
+L numbers identify nonempty extracted text lines, including headings and captions but excluding the standalone page number.
+Text inside images is not extracted. Equations and multi-column tables may be split or interleaved; use the named equation/table row and the original PDF for those items.
+This is a locator transcript, not a corrected copy; PDF extraction can distort mathematical symbols.
+
+=== Printed page unnumbered cover | PDF page 1 ===
+L01  REAL TIME COOPERATIVE
+L02  COLLISION DETECTION USING
+L03  V2V COMMUNICATION
+L04  PHASE I REPORT
+L05  Submitted by
+L06  VARSHA ANAND (3122233001121)
+L07  VENKATACHALAM S (3122233001123)
+L08  VIGNESH M (3122233001124)
+L09  in partial fulfillment for the award of the degree of
+L10  BACHELOR OF ENGINEERING
+L11  in
+L12  ELECTRICAL AND ELECTRONICS
+L13  ENGINEERING
+L14  Department of Electrical and Electronics Engineering
+L15  Sri Sivasubramaniya Nadar College of Engineering
+L16  (An Autonomous Institution, Affiliated to Anna University)
+L17  Rajiv Gandhi Salai (OMR), Kalavakkam – 603 110
+L18  NOVEMBER 2026
+
+=== Printed page ii | PDF page 2 ===
+L01  Sri Sivasubramaniya Nadar College of Engineering
+L02  (An Autonomous Institution, Affiliated to Anna University)
+L03  BONAFIDE CERTIFICATE
+L04  Certified that this Report titled “Real Time Cooperative Collision
+L05  Detection using V2V Communication” is the bonafide work of
+L06  Varsha Anand (3122233001121), Venkatachalam S
+L07  (3122233001123) and Vignesh M (3122233001124), who carried
+L08  out the work under my supervision.
+L09  Certified further that to the best of my knowledge the work reported
+L10  herein does not form part of any other thesis or dissertation on the
+L11  basis of which a degree or award was conferred on an earlier
+L12  occasion on this or any other candidate.
+L13  Dr. V Rajini Dr. M. Senthil Kumaran
+L14  HEAD OF THE DEPARTMENT SUPERVISOR
+L15  Department of Electrical and Associate Professor
+L16  Electronics Engineering Department of Electrical and
+L17  SSN College of Engineering Electronics Engineering
+L18  Kalavakkam – 603 110 SSN College of Engineering
+L19  Kalavakkam – 603 110
+L20  Submitted for Project Viva-Voce Examination held on…………………..
+L21  EXTERNAL EXAMINER INTERNAL EXAMINER
+
+=== Printed page iii | PDF page 3 ===
+L01  ABSTRACT
+L02  Many road collisions originate from safety-critical information that
+L03  exists in the traffic environment but does not reach the driver in
+L04  time: a stationary truck beyond a curve, an oncoming vehicle
+L05  occluded by the vehicle being overtaken, or a cascade of successive
+L06  braking events. This work investigates whether vehicle-to-vehicle
+L07  (V2V) communication, combined with a lightweight neural network
+L08  executed on the vehicle’s embedded hardware, can provide timely
+L09  and actionable warnings in four such scenarios.
+L10  The scenarios were modelled in SUMO using the Veins and
+L11  OMNeT++ co-simulation framework. With cooperative warning
+L12  enabled, three scenarios that resulted in collisions in the baseline
+L13  configuration were completed without contact, while the fourth
+L14  maintained larger inter-vehicle gaps. A synthetic dataset of 10,000
+L15  samples was generated and used to train an 11–16–16–2 fully
+L16  connected network (498 parameters) that jointly predicts collision
+L17  risk and recommended speed, achieving test errors of 0.039 (risk)
+L18  and 0.134 m/s (speed). The trained model was exported as C code
+L19  and deployed on an ESP32, with a mean inference time of 57 µs
+
+=== Printed page iv | PDF page 4 ===
+L01  and a maximum deviation of 3.3 × 10⁻⁶ from the reference
+L02  implementation across 1,215 inference requests. Two ESP32-S3
+L03  nodes now exchange vehicle state over ESP-NOW at 10 Hz.
+L04  In closed-loop braking tests, the proposed system reduced closing
+L05  speed at impact by roughly 93%, from 2.7 to 0.2 m/s, although a
+L06  collision was not entirely eliminated. This is attributed to the
+L07  independent estimation of risk and speed and to oscillation at close
+L08  range, both of which motivate a supervisory controller. Phase II will
+L09  add a supervisory controller, a custom PCB, a broadcast-beacon
+L10  link, and RC-vehicle validation.
+
+=== Printed page v | PDF page 5 ===
+L01  ACKNOWLEDGEMENT
+L02  We extend our gratitude to Padma Bhushan Dr. Shiv Nadar,
+L03  Chairman of SSN Institutions and the management for fostering a
+L04  research- oriented environment. We also thank Dr. S Radha,
+L05  Principal of SSNCE, for her ongoing support, and Dr. V. Rajini,
+L06  Head of the Department of Electrical and Electronics Engineering, for
+L07  her commitment towards academic excellence.
+L08  We also thank our project coordinators, Dr. N. B. Muthu Selvan, Dr.
+L09  R. Deepalaxmi, Dr. R. Leo, for their structured guidance and
+L10  expertise, which were essential in the development of this project.
+L11  We wish to especially acknowledge Dr. M. Senthil Kumaran,
+L12  Associate Professor in the Department of Electrical and Electronics
+L13  Engineering, for his guidance and critical insights. Each of these
+L14  contributors have significantly impacted the quality of this work.
+L15  VARSHA ANAND
+L16  VENKATACHALAM S
+L17  VIGNESH M
+
+=== Printed page vi | PDF page 6 ===
+L01  TABLE OF CONTENTS
+L02  CHAPTER PAGE
+L03  TITLE
+L04  NO NO
+L05  ABSTRACT iii
+L06  LIST OF TABLES xi
+L07  LIST OF FIGURES xiii
+L08  LIST OF SYMBOLS ABBREVIATIONS
+L09  xiv
+L10  AND NOMENCLATURE
+L11  1 INTRODUCTION 1
+L12  1.1 Background and motivation 1
+L13  1.2 Problem statement 2
+L14  1.3 Objectives 3
+L15  1.4 Project status and scope 4
+L16  1.5 Organisation of the report 6
+L17  2 REVIEW OF LITERATURE 8
+L18  2.1 Overview 8
+L19  2.2 Collision prediction from V2X data 8
+L20  2.3 Message dissemination and traffic
+L21  10
+L22  estimation
+L23  2.4 Simulation, communication and
+L24  11
+L25  embedded tools
+
+=== Printed page vii | PDF page 7 ===
+L01  TABLE OF CONTENTS CONTINUED
+L02  CHAPTER PAGE
+L03  TITLE
+L04  NO NO
+L05  2.5 Research gap and positioning 12
+L06  3 SYSTEM ARCHITECTURE 14
+L07  3.1 Overall architecture 14
+L08  3.2 Development workflow 15
+L09  3.3 Highway scale and bot scale 15
+L10  3.4 Vehicle information and model inputs 16
+L11  3.5 Risk estimation and speed advice 17
+L12  3.6 Communication standards and the ESP-
+L13  18
+L14  NOW prototype
+L15  SIMULATION AND DATASET
+L16  4 20
+L17  DEVELOPMENT
+L18  4.1 Simulation environment 20
+L19  4.2 Risk model used by the simulation
+L20  21
+L21  controllers
+L22  4.3 Scenario 1: blind bend 22
+L23  4.4 Scenario 2: overtaking on an undivided
+L24  23
+L25  road
+L26  4.5 Scenario 3: cooperative braking chain 24
+L27  4.6 Scenario 4: on-ramp merge and cut-in 24
+
+=== Printed page viii | PDF page 8 ===
+L01  TABLE OF CONTENTS CONTINUED
+L02  CHAPTER PAGE
+L03  TITLE
+L04  NO NO
+L05  4.7 Bot-scale dataset 25
+L06  5 TINYML MODEL DEVELOPMENT 27
+L07  5.1 Model selection and size trade-off 27
+L08  5.2 Network architecture and parameter
+L09  28
+L10  count
+L11  5.3 Feature preparation 29
+L12  5.4 Training targets and loss 29
+L13  5.5 Model evaluation 31
+L14  5.6 Floating-point deployment and
+L15  32
+L16  quantisation
+L17  EMBEDDED IMPLEMENTATION AND
+L18  6 34
+L19  V2V COMMUNICATION
+L20  6.1 Hardware platform 34
+L21  6.2 Bot A and Bot B firmware 35
+L22  6.3 Link-quality inputs 37
+L23  6.4 From point-to-point exchange to a
+L24  38
+L25  broadcast beacon
+L26  6.5 Laptop dashboard 39
+L27  6.6 Prototype hardware and the move to
+L28  40
+L29  Phase II
+
+=== Printed page ix | PDF page 9 ===
+L01  TABLE OF CONTENTS CONTINUED
+L02  CHAPTER PAGE
+L03  TITLE
+L04  NO NO
+L05  RESULTS AND PERFORMANCE
+L06  7 42
+L07  ANALYSIS
+L08  7.1 Overview of the evaluation 42
+L09  7.2 Highway scenarios with and without
+L10  42
+L11  V2V
+L12  7.3 Serial validation of the embedded model 44
+L13  7.4 Response to the inter-vehicle gap 46
+L14  7.5 Response to link degradation 47
+L15  7.6 Open-loop braking response 48
+L16  7.7 Closed-loop braking response 49
+L17  7.8 Dynamic operation and timing 51
+L18  7.9 Interpretation 52
+L19  8 DISCUSSION AND CONCLUSION 53
+L20  8.1 Engineering significance and limitations 53
+L21  8.2 Proposed supervisory controller 54
+L22  8.3 Plan for Phase II 55
+L23  8.4 Conclusion 56
+
+=== Printed page x | PDF page 10 ===
+L01  TABLE OF CONTENTS CONTINUED
+L02  CHAPTER PAGE
+L03  TITLE
+L04  NO NO
+L05  APPENDIX 1 MODEL AND DATASET
+L06  58
+L07  RECORD
+L08  A1.1 Network and export record 58
+L09  A1.2 Normalisation constants 59
+L10  A1.3 Dataset schema 59
+L11  APPENDIX 2 FIRMWARE AND
+L12  61
+L13  SIMULATION RECORD
+L14  A2.1 Simulation parameters 61
+L15  A2.2 Dashboard message format 62
+L16  A2.3 Differences between the dataset and the
+L17  62
+L18  firmware
+L19  APPENDIX 3 TEAM CONTRIBUTIONS
+L20  64
+L21  AND SOCIETAL CONTEXT
+L22  A3.1 Team contributions 64
+L23  A3.2 Societal context and financial
+L24  64
+L25  information
+L26  REFERENCES 66
+
+=== Printed page xi | PDF page 11 ===
+L01  LIST OF TABLES
+L02  Table 1.1 Project objectives and Phase I outcome ................................ 3
+L03  Table 1.2 Status of project work items at the end of Phase I ................ 5
+L04  Table 2.1 Reviewed studies and their relation to this project .............. 12
+L05  Table 3.1 Model inputs, ranges in the training data and source on
+L06  the boards .......................................................................... 16
+L07  Table 3.2 Standards used as design references .................................... 18
+L08  Table 5.1 Comparison of the two leading candidates .......................... 27
+L09  Table 5.2 Parameter and multiply–accumulate count ......................... 28
+L10  Table 5.3 Training configuration ......................................................... 30
+L11  Table 5.4 Test-set accuracy of the two outputs ................................... 31
+L12  Table 5.5 Risk MAE by scenario on the test set .................................. 32
+L13  Table 6.1 Hardware components and their status at the end of Phase
+L14  I ......................................................................................... 34
+L15  Table 6.2 Packet structure exchanged between the bots ..................... 36
+L16  Table 6.3 Main firmware settings (identical in both bots) .................. 36
+L17  Table 6.4 Values displayed in the dashboard example ........................ 40
+L18  Table 7.1 Baseline and V2V outcomes in the four highway
+L19  scenarios ........................................................................... 42
+
+=== Printed page xii | PDF page 12 ===
+L01  LIST OF TABLES CONTINUED
+L02  Table 7.2 Serial validation runs ........................................................... 45
+L03  Table 7.3 Inference time on the ESP32 in the serial runs .................... 45
+L04  Table 7.4 Annotated values from the gap sweep ................................. 47
+L05  Table 7.5 Open-loop and closed-loop braking comparison ................. 50
+L06  Table 8.1 Planned stages for the RC vehicle platform ........................ 55
+L07  Table A1.1 Deployed model record ..................................................... 58
+L08  Table A1.2 Mean and standard deviation of each input ...................... 59
+L09  Table A2.1 Parameters of the four highway scenario controllers ....... 61
+L10  Table A2.2 Known differences between training data and board
+L11  firmware ............................................................................ 63
+L12  Table A3.1 Team contributions ........................................................... 64
+L13  Table A3.2 Mapping to the Sustainable Development Goals ............. 65
+
+=== Printed page xiii | PDF page 13 ===
+L01  LIST OF FIGURES
+L02  Figure 3.1 Conceptual simulation and learning architecture ............... 14
+L03  Figure 3.2 Development workflow from simulation to hardware ....... 15
+L04  Figure 4.1 SUMO view of the blind-bend scenario ............................. 22
+L05  Figure 4.2 SUMO view of the overtaking in an undivided road
+L06  scenario ............................................................................. 25
+L07  Figure 4.3 SUMO view of the relay braking scenario ......................... 25
+L08  Figure 4.4 SUMO view of the on-ramp merge scenario ..................... 25
+L09  Figure 5.1 Comparison of C and Keras outputs for eight test vectors. 33
+L10  Figure 6.1 Laptop dashboard with an example input state .................. 39
+L11  Figure 6.2 Two ESP32 development boards and prototype console ... 40
+L12  Figure 7.1 Response of risk and advised speed to inter-vehicle gap ... 47
+L13  Figure 7.2 Response to a combined PDR and message-age sweep ..... 48
+L14  Figure 7.3 Open-loop run: ego speed (blue), lead speed (orange),
+L15  advised speed (green), gap (grey) and risk (purple) ......... 49
+L16  Figure 7.4 Closed-loop run with the colour coding of Figure Figure
+L17  7.3 ..................................................................................... 50
+
+=== Printed page xiv | PDF page 14 ===
+L01  LIST OF SYMBOLS ABBREVIATIONS AND
+L02  NOMENCLATURE
+L03  ADAS Advanced driver assistance systems
+L04  ANN Artificial neural network
+L05  BSM Basic Safety Message
+L06  EEBL Electronic emergency brake light
+L07  ESP-NOW Connectionless Wi-Fi protocol used between ESP32
+L08  boards
+L09  GPS Global Positioning System
+L10  IMU Inertial measurement unit
+L11  LSTM Long short-term memory network
+L12  MAC Multiply–accumulate operation
+L13  MAE Mean absolute error
+L14  MLP Multilayer perceptron
+L15  NLOS Non-line-of-sight
+L16  OMNeT++ Discrete-event network simulator
+L17  PCB Printed circuit board
+L18  PDR Packet delivery ratio
+L19  R² Coefficient of determination
+L20  RC Radio-controlled
+L21  ReLU Rectified linear unit
+L22  RTT Round-trip time
+L23  SUMO Simulation of Urban MObility
+L24  TinyML Machine learning for small embedded devices
+L25  ToF Time-of-flight range sensor
+L26  TraCI Traffic Control Interface of SUMO
+L27  TTC Time to collision
+L28  UDP User Datagram Protocol
+
+=== Printed page xv | PDF page 15 ===
+L01  UWB Ultra-wideband ranging
+L02  V2I Vehicle-to-infrastructure
+L03  V2V Vehicle-to-vehicle
+L04  V2X Vehicle-to-everything
+L05  Veins Vehicles in Network Simulation framework
+L06  VRU Vulnerable road user
+L07  WAVE Wireless Access in Vehicular Environments
+L08  a Deceleration required to avoid contact, m/s²
+L09  req
+L10  A Comfortable deceleration, 2.5 m/s²
+L11  COMFORT
+L12  A Reference deceleration of the logistic risk function, 4
+L13  REF
+L14  m/s²
+L15  d Gap between vehicles, m
+L16  D Minimum acceptable gap, 2 m
+L17  MIN
+L18  K Steepness of the logistic risk function
+L19  P Risk score of the closed-form model
+L20  q̂ Predicted speed fraction
+L21  r̂ Predicted model risk
+L22  v Closing speed, m/s
+L23  c
+L24  v Speed limit used to scale the speed output, m/s
+L25  limit
+L26  μ, σ Mean and standard deviation used for normalisation
+
+=== Printed page 1 | PDF page 16 ===
+L01  CHAPTER 1
+L02  INTRODUCTION
+L03  1.1 Background and motivation
+L04  Many serious road collisions come down to a driver learning
+L05  about a hazard too late. The hazard is usually easy to understand once it
+L06  has been seen: a truck stopped just beyond a bend, an oncoming car
+L07  hidden behind the lorry that a driver is trying to overtake, a line of cars
+L08  braking one after another on an open road. In every one of these cases
+L09  the information already exists somewhere on the road. It just is not in the
+L10  line of sight of the vehicle that needs it.
+L11  Vehicle-to-vehicle (V2V) communication is a way of passing
+L12  that information along. Each vehicle broadcasts its position, speed and
+L13  braking state, and nearby vehicles pick the message up directly, with no
+L14  cellular network in between. SAE J2735 defines the Basic Safety
+L15  Message used for this, while IEEE 802.11p and the IEEE 1609 family
+L16  cover the radio and networking layers (Kenney 2011). If a message
+L17  arrives while the hazard is still hidden, a following driver can gain
+L18  several seconds that a camera or radar could never give.
+L19  Receiving a message, though, does not tell the vehicle what to
+L20  do about it. It still has to turn the sender's state into a judgement of how
+L21  dangerous the situation is and how fast it should be going. That
+L22  judgement must be made on board, within a fraction of a control cycle,
+L23  and it must stay sensible when messages arrive late or not at all. Machine
+L24  learning suits the task, but most of the V2X learning work reviewed for
+
+=== Printed page 2 | PDF page 17 ===
+L01  this project runs on servers or workstations. The question here was how
+L02  small the estimator could be made, and whether it could still be trusted
+L03  once it was moved onto a microcontroller.
+L04  The project therefore brings together three pieces: highway
+L05  scenarios simulated with SUMO and Veins, a compact neural network
+L06  that returns a collision risk and a recommended speed, and an ESP32
+L07  prototype in which two boards exchange vehicle state over ESP-NOW
+L08  and run the network locally. By the end of Phase I the network, with 498
+L09  parameters and about 2 KB of weights, ran on the ESP32 in roughly 57
+L10  µs per inference, and two ESP32 boards could exchange state and close a
+L11  simple speed-control loop.
+L12  1.2 Problem statement
+L13  A vehicle receives a state message from another vehicle about
+L14  ten times a second. It combines that message with its own speed, the gap
+L15  to the other vehicle and some measure of how reliable the link is. From
+L16  these eleven quantities it must estimate the probability that the situation
+L17  ends in contact, and advise a speed that avoids it. The estimate has to be
+L18  produced on the vehicle itself, so that no decision depends on a remote
+L19  server.
+L20  The information is incomplete for two reasons. One is
+L21  geometry: a bend, a hillside or another vehicle can hide the hazard from
+L22  the on-board sensors. The other is the radio link, where messages can be
+L23  delayed, dropped or relayed through several hops, so the sender's state is
+L24  already out of date when it is used. For this reason the model receives the
+L25  packet delivery ratio, the age of the last message and a hop count
+
+=== Printed page 3 | PDF page 18 ===
+L01  alongside the kinematic quantities, and it is expected to grow more
+L02  cautious as the link gets worse.
+L03  Producing a number is only part of the job. The value must
+L04  mean the same thing in firmware as it did in training, it must arrive early
+L05  enough to be useful, and any speed command built from it must be one
+L06  that a real vehicle can follow. The oscillation at close range seen in the
+L07  closed-loop tests (Chapter 7) shows that a fast, numerically exact
+L08  inference is not enough by itself.
+L09  1.3 Objectives
+L10  The overall aim is to show cooperative collision detection that
+L11  is cheap enough to run on a small vehicle. Table 1.1 lists the six
+L12  objectives set at the start of the project, the deliverable for each, and how
+L13  far each had got when Phase I closed.
+L14  Table 1.1 Project objectives and Phase I outcome
+L15  Outcome at end of
+L16  Objective Deliverable
+L17  Phase I
+L18  Four non-line-of-sight
+L19  scenarios in SUMO,
+L20  Completed; baseline and
+L21  Model highway controlled through TraCI,
+L22  V2V runs compared
+L23  hazards with Veins/OMNeT++
+L24  (Chapter 7)
+L25  for the communication
+L26  side
+L27  Relay of vehicle state in Completed for ESP32
+L28  Exchange
+L29  simulation; ESP-NOW two boards; broadcast
+L30  cooperative
+L31  state exchange between beacon planned for Phase
+L32  information
+L33  two boards II
+
+=== Printed page 4 | PDF page 19 ===
+L01  Outcome at end of
+L02  Objective Deliverable
+L03  Phase I
+L04  Labelled dataset of
+L05  Construct kinematic, Completed; 10,000 rows,
+L06  learning data communication and risk 2,500 per scenario
+L07  fields
+L08  Dual-output TinyML Completed; 498
+L09  Estimate risk
+L10  model and a laptop parameters, running on
+L11  and speed
+L12  dashboard ESP32
+L13  Custom PCB with
+L14  Develop the
+L15  ESP32-S3, STM32, GPS, Planned for Phase II
+L16  target platform
+L17  IMU and motor driver
+L18  Two RC vehicles with
+L19  Validate on
+L20  sensing, communication Planned for Phase II
+L21  hardware
+L22  and speed control
+L23  The first four objectives made up the scope of Phase I. The
+L24  last two depend on hardware that has not been built yet, so they move to
+L25  Phase II and are not claimed as results here.
+L26  1.4 Project status and scope
+L27  The work was reviewed at three stages. Review 3, held on
+L28  08.10.26, marks the end of Phase I, and this report describes the project
+L29  as it stood on that day. Table 1.2 summarises what was finished and what
+L30  was not.
+
+=== Printed page 5 | PDF page 20 ===
+L01  Table 1.2 Status of project work items at the end of Phase I
+L02  Work item Status
+L03  Built in SUMO with Python (TraCI)
+L04  controllers for the baseline and V2V modes;
+L05  Four highway scenarios
+L06  OMNeT++ and Veins used on the
+L07  communication side
+L08  10,000 labelled rows from a Monte-Carlo
+L09  Bot-scale dataset generator, split 6,982 / 1,455 / 1,563 for
+L10  training, validation and test
+L11  Trained, evaluated and exported as a C
+L12  11–16–16–2 model
+L13  header (v2v_model.h)
+L14  Serial inference Seven runs, 1,215 requests, no timeouts or
+L15  validation serial errors
+L16  Two-board ESP-NOW Point-to-point exchange at 10 Hz with
+L17  exchange closed-loop speed adjustment on both boards
+L18  Tkinter application sending simulated states
+L19  Laptop dashboard
+L20  to the ESP32 over UDP
+L21  Custom PCB and RC
+L22  Not started; Phase II
+L23  vehicles
+L24  A note on terminology first. The first network output is called
+L25  model risk. Its training label is the fraction of 60 simulated roll-outs that
+L26  ended in contact, so the output estimates that fraction inside the bot-scale
+L27  simulator. It has not been compared with how often real vehicles collide,
+L28  so a dashboard reading of 80% should not be read as an 80% chance of a
+L29  real crash.
+L30  The prototype is a laboratory system. Speed, gap and
+L31  acceleration on the boards come from simple kinematics in the firmware,
+L32  and the boards pass these values to each other over ESP-NOW. GPS and
+
+=== Printed page 6 | PDF page 21 ===
+L01  inertial sensing, motor control, public-road operation and compliance
+L02  with automotive safety standards were all outside Phase I.
+L03  One more point on scope concerns the radio link. In the
+L04  present prototype the two boards talk point to point, each configured with
+L05  the other's MAC address. This was intentional. The goal for Phase I was
+L06  only to show that two ESP32 boards can exchange vehicle state and act
+L07  on it. In the final system a vehicle will broadcast a beacon instead, and
+L08  any boards within range will pick it up and respond. Chapter 6 describes
+L09  the current arrangement and Chapter 8 the planned change.
+L10  1.5 Organisation of the report
+L11  Chapter 2 reviews related work on collision prediction,
+L12  message dissemination and embedded learning, compares it in a table
+L13  and identifies the gap this project addresses.
+L14  Chapter 3 describes the system architecture and the eleven
+L15  inputs of the model.
+L16  Chapter 4 covers the four simulated scenarios in SUMO with
+L17  Veins and OMNeT++, and the construction of the dataset.
+L18  Chapter 5 deals with the MLP model: its structure, training,
+L19  accuracy and export to C.
+L20  Chapter 6 describes the ESP32 firmware, the ESP-NOW
+L21  exchange and the dashboard.
+L22  Chapter 7 presents the results obtained in Phase I.
+L23  Chapter 8 discusses those results and sets out the work
+L24  planned for Phase II. The appendices record the model and normalisation
+
+=== Printed page 7 | PDF page 22 ===
+L01  constants, the firmware and simulation parameters, and the contribution
+L02  of each team member.
+
+=== Printed page 8 | PDF page 23 ===
+L01  CHAPTER 2
+L02  REVIEW OF LITERATURE
+L03  2.1 Overview
+L04  The literature relevant to this project falls into four groups:
+L05  learning-based collision prediction from V2X data, message
+L06  dissemination and traffic-level estimation over V2V links, the simulation
+L07  and communication tools used to study them, and machine learning on
+L08  small embedded devices. Four papers were read in full, and the rest are
+L09  placed using their abstracts and bibliographic records.
+L10  2.2 Collision prediction from V2X data
+L11  Ribeiro et al. (2023) predict collisions involving a
+L12  motorcyclist, whom they treat as a vulnerable road user. Communication
+L13  data are generated with the Veins framework, which couples SUMO with
+L14  the ns-3 network simulator, and stacked unidirectional LSTM layers are
+L15  trained on the resulting sequences. In the first scenario the model
+L16  predicted 96% of the collisions with an average prediction time of 4.53 s;
+L17  in the second it predicted 95% with 4.44 s. The cost was a high number
+L18  of false positives (78 and 68 events), and the correct-decision percentage
+L19  stayed at 41% and 43%. The authors conclude that the output is good
+L20  enough to warn a rider but not to trigger automatic emergency braking.
+L21  Two points from that study influenced this project. The false
+L22  positives are a reminder that a predictor with high recall needs a plan for
+L23  the times it is wrong, which is why minimum gaps and contact outcomes
+
+=== Printed page 9 | PDF page 24 ===
+L01  are reported in simulation here, not just regression error. And an LSTM
+L02  that reads a time series is a heavier object than a feed-forward network
+L03  that reads a single state vector. The 4.5 s figure is also worth reading
+L04  carefully: it measures how far ahead of a collision the prediction was
+L05  made, not how long the computation took, so it cannot be set against the
+L06  microsecond inference times reported later.
+L07  Zou et al. (2023) consider an automated vehicle approaching a
+L08  pedestrian who is completely hidden by vehicles in the adjacent lane. A
+L09  baseline strategy is compared with one that uses V2V messages from the
+L10  neighbouring vehicles. Without V2V, the time to collision is close to
+L11  zero when the pedestrian is detected, and the vehicle brakes hard but still
+L12  hits the pedestrian. With V2V it can brake in proportion to the hazard,
+L13  the time to collision stays larger and the pedestrian crosses safely. The
+L14  experimental design, a baseline run and a V2V run from identical starting
+L15  conditions, is the one followed in Chapter 7.
+L16  Other recent work approaches the same family of problems
+L17  from different directions. Ben-Mosbah et al. (2024) study the electronic
+L18  emergency brake light application over 5G NR V2V, the same situation
+L19  as the braking-chain scenario here but with a cellular sidelink radio.
+L20  Farhat et al. (2024) propose a cooperative collision-avoidance system for
+L21  vehicular communication based on deep learning. Park et al. (2025)
+L22  combine C-V2X with camera-based object detection in a client–server
+L23  arrangement and report a mean broadcast latency of 9.24 ms for obstacle
+L24  information on a test track. None of these runs its model on a
+L25  microcontroller, which is the gap this project tries to fill.
+
+=== Printed page 10 | PDF page 25 ===
+L01  2.3 Message dissemination and traffic estimation
+L02  Li et al. (2022) look at the load that safety messages place on
+L03  the network. Their end–edge–cloud architecture lets edge nodes predict
+L04  future vehicle trajectories and the density of vehicles along them. A
+L05  warning is then sent only to vehicles expected to pass through the
+L06  affected area, and the system switches between V2V and V2I delivery
+L07  depending on connectivity. On a real-world VANET mobility dataset it
+L08  outperformed schemes that ignore the predicted trajectory density. That
+L09  work is about who should receive a message, whereas this project is
+L10  about what the receiver does with it. The two fit together, since an
+L11  estimator can only act on state that is still fresh.
+L12  Wang et al. (2019) detect road congestion with V2V
+L13  messages. A fuzzy controller built on vehicle speed and traffic density
+L14  grades the local congestion level, neighbouring vehicles are asked for
+L15  theirs, and a hypothesis test over a large sub-sample gives a regional
+L16  estimate. In simulation the detection accuracy was 5.5% higher than a
+L17  geomagnetic-coil method and 7.5% higher than the CoTEC method,
+L18  while the V2V network overhead was 90.8% lower than CoTEC.
+L19  Congestion and imminent collision are different targets, since a slow,
+L20  dense queue need not contain any conflict and a collision can arise on an
+L21  empty road. What carries over from this paper is the idea of computing a
+L22  compact local estimate on each vehicle and exchanging only what
+L23  neighbours need.
+L24  Zardosht et al. (2017) use V2V messages for another purpose,
+L25  deciding when a driver should be rerouted after an accident. Their
+L26  module estimates the accident duration, takes traffic congestion and the
+L27  type of area into account, and was evaluated in city and highway
+
+=== Printed page 11 | PDF page 26 ===
+L01  simulations with different proportions of V2V-equipped vehicles. It
+L02  reduced waiting and travel times. The time scale is minutes rather than
+L03  seconds, so it does not compete with this work, but it shows the same
+L04  pattern: a small decision module on each vehicle, fed by neighbour data.
+L05  2.4 Simulation, communication and embedded tools
+L06  The simulation side of the project rests on a well-established
+L07  tool chain. SUMO is an open-source microscopic traffic simulator in
+L08  which each vehicle follows a car-following model on a defined road
+L09  network (Lopez et al. 2018). Its TraCI interface lets an external program
+L10  read vehicle state and issue commands at every simulation step (Wegener
+L11  et al. 2008), which is how the four scenario controllers are written.
+L12  OMNeT++ is a discrete-event network simulator (Varga and Hornig
+L13  2008), and Veins couples it to SUMO so that vehicle motion and
+L14  wireless events influence each other (Sommer et al. 2011).
+L15  For the communication layer the project borrows ideas from
+L16  the U.S. DSRC family. IEEE 802.11p provides the radio, IEEE 1609 the
+L17  networking services, and SAE J2735 and J2945/1 define the message set
+L18  and its performance requirements (Kenney 2011). The prototype does not
+L19  implement these stacks. It uses ESP-NOW, a connectionless protocol
+L20  from Espressif that sends short frames directly between ESP32 boards
+L21  without an access point (Espressif Systems n.d.). The choice was a
+L22  practical one, not a standards-based one, and Chapter 3 explains how
+L23  closely the prototype follows the standards.
+L24  On the embedded side, TensorFlow Lite for Microcontrollers
+L25  shows that neural-network inference can fit in tens of kilobytes (David et
+L26  al. 2021), and Pohuliai et al. (2026) compare several TinyML models for
+
+=== Printed page 12 | PDF page 27 ===
+L01  sensor classification on the ESP32. No runtime library was used here. A
+L02  network with two hidden layers of this size is simple enough to export as
+L03  plain C arrays and a few loops, which keeps the firmware transparent and
+L04  makes it easy to check against the training framework.
+L05  2.5 Research gap and positioning
+L06  Table 2.1 places the reviewed work next to this project. None
+L07  of the studies combines everything needed here: several highway
+L08  situations, communication-quality inputs, a risk output and a speed
+L09  output, and a model small enough to run on an ESP32 at the vehicle's
+L10  update rate.
+L11  Table 2.1 Related studies and their relation to this project
+L12  Relation to this
+L13  Study Focus and method
+L14  project
+L15  LSTM collision prediction Sequence model with
+L16  Ribeiro et al.
+L17  for motorcyclists on Veins false positives; no
+L18  (2023)
+L19  data embedded target
+L20  Same baseline-versus-
+L21  Zou et al. V2V-based braking strategy
+L22  V2V comparison; one
+L23  (2023) for occluded pedestrians
+L24  scenario
+L25  Addresses who receives
+L26  Li et al. Trajectory-based selective
+L27  a warning, not the
+L28  (2022) message dissemination
+L29  response
+L30  Cooperative local
+L31  Wang et al. Fuzzy V2V congestion
+L32  estimation; different
+L33  (2019) detection
+L34  target
+L35  Zardosht et Accident-duration estimate Minute-scale decision;
+L36  al. (2017) for rerouting same V2V data idea
+
+=== Printed page 13 | PDF page 28 ===
+L01  Relation to this
+L02  Study Focus and method
+L03  project
+L04  C-V2X with camera Latency measured on a
+L05  Park et al.
+L06  detection and client–server test track; relies on
+L07  (2025)
+L08  offloading offloading
+L09  Local risk and speed
+L10  Four NLOS scenarios; 498-
+L11  This project estimate with link-
+L12  parameter MLP on ESP32
+L13  quality inputs
+L14  The comparison is qualitative on purpose. The studies differ
+L15  in sensing assumptions, radios, prediction targets and test conditions, so
+L16  their accuracy figures cannot be set side by side, and for the same reason
+L17  no claim is made that this project does better than any of them. Its
+L18  contribution is the chain that links the pieces. Scenario generation
+L19  supplies training data, a small network turns the data into two outputs,
+L20  and an exact copy of that network runs on a microcontroller, where its
+L21  timing and its numerical agreement with the training framework are
+L22  measured.
+
+=== Printed page 14 | PDF page 29 ===
+L01  CHAPTER 3
+L02  SYSTEM ARCHITECTURE
+L03  3.1 Overall architecture
+L04  The system has two layers built around one idea. The first is a
+L05  simulation layer, in which cars drive through four hazardous situations
+L06  on a highway and exchange messages. The second is a hardware layer at
+L07  the scale of small bots, in which two ESP32 boards run the same kind of
+L08  estimator. Figure 3.1 shows how the stages connect.
+L09  Figure 3.1 Conceptual simulation and learning architecture
+L10  SUMO moves the vehicles, and TraCI lets a Python controller
+L11  read their state and give commands at every 0.1 s step. OMNeT++
+L12  models the wireless side and Veins couples the two simulators. The
+L13  scenario runs and the Monte-Carlo generator described in Chapter 4
+L14  produce labelled data, which are cleaned and normalised before training.
+L15  The trained network is exported as a C header, flashed onto an ESP32
+L16  and exercised from a laptop dashboard or from a second board. The
+
+=== Printed page 15 | PDF page 30 ===
+L01  sensing and vehicle stages of the planned RC platform come after the
+L02  blocks in the figure and are not part of Phase I.
+L03  3.2 Development workflow
+L04  Figure 3.2 Development workflow from simulation to hardware
+L05  Figure 3.2 puts evaluation before deployment, and
+L06  deployment before V2V integration and system testing. The project
+L07  followed the same order. The network was first judged on held-out data,
+L08  then copied into C and compared with the training framework, and only
+L09  then connected to a second board. Every step ends in a measurable
+L10  check: test error, maximum difference between outputs, inference time
+L11  and, for the closed-loop tests, minimum gap.
+L12  3.3 Highway scale and bot scale
+L13  The project works at two scales, and it helps to keep them
+L14  apart. The SUMO scenarios use highway-scale numbers: vehicles
+L15  travelling at 14 to 30 m/s, gaps of hundreds of metres and radio ranges of
+
+=== Printed page 16 | PDF page 31 ===
+L01  300 to 500 m. The dataset and the ESP32 boards use bot-scale numbers
+L02  chosen for the small RC vehicles of Phase II: speeds of at most 5 m/s,
+L03  gaps below 25 m and a time-of-flight sensor range of 4 m. The network
+L04  is trained on bot-scale data only. The highway runs show what
+L05  cooperative warning achieves in realistic conditions, while the bot-scale
+L06  model is the one that actually runs on the board.
+L07  Braking differs as well: 6 to 9 m/s² in the highway runs,
+L08  against 1.5 to 3.0 m/s² for the bots. Carrying the highway risk formula
+L09  over to the bots would have given thresholds that do not match their
+L10  stopping ability, which is why a separate dataset was generated.
+L11  3.4 Vehicle information and model inputs
+L12  Position, speed, acceleration, heading and braking state are
+L13  what a vehicle needs to share. The network, however, does not take raw
+L14  positions. It takes eleven inputs that are either received in a packet or
+L15  computed from one. Table 3.1 lists them with the range seen in the
+L16  training data and the way each can be obtained on the boards.
+L17  Table 3.1 Model inputs, ranges in the training data and source on
+L18  the boards
+L19  Input Unit Range Source on the bots
+L20  2.4 to Own state (wheel encoder in
+L21  ego_speed m/s
+L22  5.0 Phase II)
+L23  target_speed m/s 0 to 5.3 Received in the V2V packet
+L24  −0.5 to Ego minus target; ego plus
+L25  relative_speed m/s
+L26  10 target when head-on
+L27  0.15 to ToF sensor, or UWB when the
+L28  gap m
+L29  25 target is hidden
+
+=== Printed page 17 | PDF page 32 ===
+L01  Input Unit Range Source on the bots
+L02  0.05 to Gap divided by closing speed,
+L03  ttc s
+L04  10 clipped at 10 s
+L05  −3.5 to
+L06  target_accel m/s² Received in the V2V packet
+L07  0.5
+L08  message_age_m 5 to Time since the last packet was
+L09  ms
+L10  s 250 received
+L11  Packets received over packets
+L12  pdr – 0.2 to 1
+L13  expected (sequence numbers)
+L14  hop_count – 1 to 3 Incremented at each relay
+L15  Target reported by V2V but not
+L16  occlusion_flag 0/1 0 or 1
+L17  seen by the ToF
+L18  speed_limit m/s 3 to 5 Configuration constant
+L19  The scenario number is deliberately not an input. A vehicle on
+L20  the road does not know which of the four situations it is in, so a model
+L21  that relied on this number could not be deployed. For the same reason the
+L22  scenario-specific quantities in the dataset, such as the oncoming gap or
+L23  the position in a braking chain, are left out of the common feature set.
+L24  The price of that decision shows up in the Scenario 3 error in Chapter 5.
+L25  3.5 Risk estimation and speed advice
+L26  The network has two sigmoid outputs. The first is the risk, a
+L27  number between 0 and 1. The second is a fraction of the speed limit,
+L28  which is multiplied by the limit to give the advised speed in m/s. Both
+L29  are bounded, but nothing in the structure ties them together, so a high
+L30  risk does not guarantee that the advised speed falls below the current
+L31  speed.
+
+=== Printed page 18 | PDF page 33 ===
+L01  The dashboard example in Table 6.4 shows this clearly. The
+L02  ego vehicle travels at 3.00 m/s behind a target at 1.50 m/s with a gap of
+L03  1.50 m, so the time to conflict is 1.00 s. The network reports a risk of
+L04  64.7%, yet the advised speed is 3.425 m/s, which is 0.425 m/s above the
+L05  current speed. The dashboard itself labels the advice as not a safety
+L06  command. The behaviour belongs to the trained model and is not a bug
+L07  in the interface, and Chapter 7 shows how it affects closed-loop
+L08  behaviour.
+L09  In this report, recommended speed always means the model
+L10  output. Whether that speed is safe has to be checked by running it in a
+L11  loop, as the braking tests do. A supervisory rule that checks the advice
+L12  against physical limits is proposed in Chapter 8 and has not been
+L13  implemented.
+L14  3.6 Communication standards and the ESP-NOW
+L15  prototype
+L16  Table 3.2 lists the standards that informed the design. They
+L17  shaped the message and the update rate, but none of them was
+L18  implemented.
+L19  Table 3.2 Standards used as design references
+L20  Identifier How it is used in the project
+L21  WAVE architecture, referred to for the broadcast and
+L22  IEEE 1609
+L23  relay design
+L24  IEEE Radio behaviour that the Veins channel model
+L25  802.11p represents
+L26  Basic Safety Message field set, used as a template for
+L27  SAE J2735
+L28  position, speed and heading
+
+=== Printed page 19 | PDF page 34 ===
+L01  Identifier How it is used in the project
+L02  Reference for the 10 Hz broadcast rate and
+L03  SAE J2945/1
+L04  performance requirements
+L05  The boards communicate through ESP-NOW, which is not
+L06  part of any of these standards. The 26-byte packet described in Chapter 6
+L07  carries a handful of BSM-like fields at the 10 Hz rate of J2945/1, but it
+L08  does not follow the J2735 encoding, and the link has none of the 802.11p
+L09  medium-access behaviour. The system is best described as a prototype
+L10  informed by vehicular standards, not as a compliant implementation.
+L11  This also matters when reading the results. Veins-level radio
+L12  behaviour, the USB serial tests and the ESP-NOW exchange are three
+L13  different paths, and a latency or delivery figure measured on one cannot
+L14  be carried over to another without a separate check.
+
+=== Printed page 20 | PDF page 35 ===
+L01  CHAPTER 4
+L02  SIMULATION AND DATASET DEVELOPMENT
+L03  4.1 Simulation environment
+L04  The scenarios were built in SUMO and driven through its
+L05  TraCI interface from Python, and OMNeT++ with Veins was used on the
+L06  communication side of the co-simulation. The controllers described in
+L07  this chapter are the ones behind the baseline-versus-V2V results in
+L08  Chapter 7. In them the radio is reduced to a communication range and a
+L09  fixed latency, which makes every run deterministic and easy to repeat.
+L10  The Veins and OMNeT++ configuration files are not reproduced in this
+L11  report, so no packet-level figures such as propagation loss or collision
+L12  rate are quoted.
+L13  All four scenarios share one configuration style: a simulation
+L14  step of 0.1 s, collisions reported as warnings so that a run continues after
+L15  contact and can be inspected, minimum-gap scaling set to zero so that
+L16  vehicles can be placed at the intended spacing, teleporting disabled and
+L17  driver imperfection (sigma) set to zero. Each scenario has a script that
+L18  takes a mode, baseline or v2v, and a seed, and writes one CSV row per
+L19  vehicle per step. Seed 42 was used throughout, and the runs reported here
+L20  used SUMO 1.28 with the TraCI Python package.
+L21  Baseline mode stands for a driver without cooperative
+L22  information, who reacts only to what can be seen, after a reaction time of
+L23  1.0 s. V2V mode adds messages that arrive within the radio range after a
+
+=== Printed page 21 | PDF page 36 ===
+L01  configured latency of 0.2 s. That 0.2 s is a constant chosen for the
+L02  simulation and not a radio measurement, and Chapter 7 treats it as such.
+L03  4.2 Risk model used by the simulation controllers
+L04  The V2V controllers need a risk score and a speed
+L05  recommendation that do not depend on the neural network, so that the
+L06  benefit of the warning can be separated from the quality of the estimator.
+L07  The shared module therefore uses a closed-form model. If the gap is d
+L08  and the closing speed v , the constant deceleration needed to avoid
+L09  c
+L10  contact with a minimum gap D is
+L11  MIN
+L12  𝑎 =
+L13  𝑣c 2
+L14  (4.1)
+L15  req
+L16  2(𝑑 − 𝐷MIN)
+L17  and the risk score is a logistic function of how close that
+L18  deceleration is to a reference value A :
+L19  REF
+L20  1
+L21  𝑃 = (4.2)
+L22  1 + exp[−K(𝑎req − 𝐴REF)]
+L23  The recommended speed is the highest speed from which a
+L24  comfortable deceleration A still stops the vehicle at a distance
+L25  COMFORT
+L26  D from the target:
+L27  MIN
+L28  𝑣 = 𝑚𝑖𝑛[𝑣 ,𝑣 + √2𝐴 (𝑑 − 𝐷 )] (4.3)
+L29  rec limit target COMFORT MIN
+L30  The constants are D = 2 m, A = 4 m/s², K = 1.1 and
+L31  MIN REF
+L32  A = 2.5 m/s². With these values a required deceleration of 4 m/s²
+L33  COMFORT
+L34  gives a risk of 0.5, and the score approaches 1 as the requirement nears
+L35  the 8 m/s² that dry asphalt can provide. When the gap is opening the
+L36  requirement is zero and the risk is close to zero. The same module holds
+L37  the geometry helpers that decide whether the straight line between two
+
+=== Printed page 22 | PDF page 37 ===
+L01  vehicles is blocked by a polygon, which is how a hillside or a truck hides
+L02  a hazard.
+L03  4.3 Scenario 1: blind bend
+L04  The blind bend puts a hazard where the driver cannot see it. A
+L05  400 m straight approach leads into a quarter-circle bend of 80 m radius
+L06  and then a 500 m straight. A hillside polygon on the inside of the bend
+L07  blocks the sight line, and a 12 m truck is stopped 45 m beyond the bend.
+L08  The ego car arrives at 30 m/s (108 km/h). A second car, oncoming at 25
+L09  m/s, leaves at t = 7 s and matters when the ego car has to decide whether
+L10  it can pass the truck. Figure 4.1 shows the layout in SUMO.
+L11  Figure 4.1 SUMO view of the blind-bend scenario
+L12  In the baseline, the driver sees the truck only when the sight
+L13  line clears, at 16.1 s with the truck about 76 m away, and then reacts after
+L14  1.0 s. In V2V mode the truck broadcasts its position and the ego car
+L15  hears it from 300 m away. The controller slows down, holds a gap of 8 m
+L16  behind the truck, waits until the oncoming car has passed and then goes
+L17  round with a margin of 45 m. The parameters are collected in Appendix
+L18  2.
+
+=== Printed page 23 | PDF page 38 ===
+L01  4.4 Scenario 2: overtaking on an undivided road
+L02  On a 1,600 m two-way road, car A approaches a 12 m truck
+L03  travelling at 15 m/s and wants to overtake at up to 27.8 m/s (100 km/h).
+L04  The truck blocks its view of the opposing lane. Car C comes the other
+L05  way at 25 m/s from the 1,150 m mark. In V2V mode, car C's state
+L06  reaches car A through the truck, which acts as a relay within 500 m.
+L07  Figure 4.2 SUMO view of the overtaking on an undivided road
+L08  scenario
+L09  Before pulling out, car A works out the distance it needs,
+L10  d = (27.78 + v ) t + 120 m, where v is the oncoming speed,
+L11  required c overtake c
+L12  t the time needed to complete the pass and 120 m a safety margin.
+L13  overtake
+L14  It commits only if the distance available is greater. The baseline driver
+L15  knows nothing about car C and commits blind after being stuck behind
+L16  the truck for 5 s. That is a rule in the script meant to mimic an impatient
+L17  driver, and it is the weakest assumption in the scenario.
+
+=== Printed page 24 | PDF page 39 ===
+L01  4.5 Scenario 3: cooperative braking chain
+L02  Figure 4.3 SUMO view of the relay braking scenario
+L03  Four cars travel at 25 m/s with 30 m between bumpers. The
+L04  lead brakes at 8 m/s² at about 10 s, and the followers can brake at up to 6
+L05  m/s². In the baseline each follower reacts to the brake lights ahead, so the
+L06  delay grows along the chain: a 1.0 s reaction time plus the time taken to
+L07  notice the deceleration (detected above 2 m/s²). In V2V mode the lead
+L08  broadcasts its braking and every follower starts after the 0.2 s latency.
+L09  4.6 Scenario 4: on-ramp merge and cut-in
+L10  A two-lane mainline carries a truck at 18 m/s and the ego car,
+L11  carM, at 24 m/s. A ramp with a 22.2 m/s limit joins the mainline at x =
+L12  700 m, and a ramp car, carR, accelerates from 14 to 20 m/s towards the
+L13  merge. A third car, carL, in the left lane cuts in front of carM at t = 24 s
+L14  and slows to 14 m/s, announcing the manoeuvre 1.5 s earlier. In V2V
+L15  mode carM uses the advisory, with a 300 m range and a target headway
+L16  of 1.2 s, and can brake at up to 6 m/s². Figure 4.2 shows the merge in
+L17  SUMO.
+
+=== Printed page 25 | PDF page 40 ===
+L01  Figure 4.4 SUMO view of the on-ramp merge scenario
+L02  This scenario is less dramatic than the others, because the
+L03  baseline driver, who sees the ramp car at 10.6 s and the cut-in when it
+L04  starts, also survives. What the V2V advisory changes is the margin. Its
+L05  purpose here is to keep the minimum gaps comfortable, not to prevent a
+L06  crash.
+L07  4.7 Bot-scale dataset
+L08  The training data come from a separate generator at bot scale,
+L09  which simulates the four situations with small kinematic roll-outs. Its
+L10  design assumptions were fixed by the team and not measured on
+L11  hardware: vehicle lengths of 0.22 m (car) and 0.40 m (truck), a standstill
+L12  gap of 0.10 m, braking of 1.5 to 3.0 m/s² (2.0 m/s² when comfortable), an
+L13  actuation lag of 60 to 120 ms, a 100 ms beacon interval, a ToF sensor
+L14  with 4.0 m range and 40 ms read lag, and roll-outs with a 30 ms step
+L15  over a 3.6 s horizon.
+L16  For each sampled state the generator runs 60 randomised roll-
+L17  outs, varying quantities such as actuation lag and braking capability, and
+L18  counts how many end in contact. The risk label is that fraction:
+L19  𝑦 = 1 ∑60 1[contact in roll−out i] (4.4)
+L20  i = 1
+L21  60
+
+=== Printed page 26 | PDF page 41 ===
+L01  The recommended-speed label is the highest speed from
+L02  which the vehicle can still recover, given the information delay. Because
+L03  the labels are Monte-Carlo estimates, they carry sampling noise of their
+L04  own. With n = 60 roll-outs, the standard deviation of a label with true
+L05  value p is √(p(1 − p)/60), and averaging this over the test labels gives a
+L06  noise floor of 0.016. A risk error of 0.04 is therefore within a factor of
+L07  about 2.5 of the best any model could do on this data, and pushing it
+L08  lower would only mean fitting the noise.
+L09  The dataset has 10,000 rows, 2,500 for each scenario. It was
+L10  divided at random into 70% training, 15% validation and 15% test,
+L11  giving 6,982, 1,455 and 1,563 rows, and the test partition holds 380, 379,
+L12  387 and 417 rows for Scenarios 1 to 4. The split is made row by row and
+L13  not by roll-out or scenario run, so rows that are close neighbours in state
+L14  space can end up on both sides of it. The test error therefore estimates
+L15  how well the model interpolates within the sampled state space, and
+L16  nothing is claimed about states outside it.
+L17  Across the whole dataset the mean risk label is 0.41, and
+L18  39.7% of rows have a label above 0.5, so the training data are not
+L19  dominated by safe states. Scenario 4 has the highest mean risk (0.54) and
+L20  Scenario 3 the lowest (0.26). Of all rows, 67.8% are flagged as occluded
+L21  and 59.9% have a single hop. Appendix 1 lists the columns and their
+L22  ranges.
+
+=== Printed page 27 | PDF page 42 ===
+L01  CHAPTER 5
+L02  TINYML MODEL DEVELOPMENT
+L03  5.1 Model selection and size trade-off
+L04  Four model families were tried on the bot-scale dataset: linear
+L05  regression, a decision tree, gradient boosting and a multilayer perceptron
+L06  (MLP). Only two of them produced scores that could be reported, and
+L07  these appear in Table 5.1. Linear regression and the decision tree were
+L08  run as well, but their scores were not kept in the material available for
+L09  this report, so they are left out rather than reconstructed from memory.
+L10  Table 5.1 Comparison of the two leading candidates
+L11  R² on test
+L12  Candidate Size information
+L13  set
+L14  MLP 11–16–16–2 0.970 About 2 KB of float32 parameters
+L15  Gradient boosting 0.963 MLP is about 1/150 of its size
+L16  The MLP was slightly more accurate and far smaller, and it
+L17  was therefore selected. It also produces both outputs from a single set of
+L18  weights, which suits a device that must deliver a risk and a speed at
+L19  every tick. Hidden-layer widths of 8 × 8 and 24 × 16 were tried too, and
+L20  the 16 × 16 network was kept as a compromise between accuracy and the
+L21  cost of storing and evaluating it. The individual errors for the other
+L22  widths were not kept, so no ranking is given here.
+
+=== Printed page 28 | PDF page 43 ===
+L01  5.2 Network architecture and parameter count
+L02  The network takes 11 inputs and passes them through two
+L03  hidden layers of 16 units each with ReLU activation, ending in two
+L04  outputs. One output goes through a sigmoid to give the risk. The other
+L05  goes through a second sigmoid to give the speed as a fraction of the
+L06  limit. Table 5.2 lists the weights and biases layer by layer.
+L07  Table 5.2 Parameter and multiply–accumulate count
+L08  Layer Weights Biases Parameters
+L09  11 to 16 176 16 192
+L10  16 to 16 256 16 272
+L11  16 to 2 32 2 34
+L12  Total 464 34 498
+L13  𝑁 = 192 + 272 + 34 = 498 (5.1)
+L14  The network has 464 weights, so one forward pass needs 464
+L15  multiply–accumulate operations. Bias additions, the 32 ReLU
+L16  comparisons and the two sigmoid evaluations come on top of these, and
+L17  the sigmoids are the only places where the exponential function is called.
+L18  𝑆 = 498 × 4 = 1992 𝑏𝑦𝑡𝑒𝑠 (5.2)
+L19  With every parameter stored as a 32-bit float, Equation (5.2)
+L20  gives 1,992 bytes, or about 1.95 KiB, which agrees with the roughly 2
+L21  KB figure quoted earlier. The eleven means and eleven standard
+L22  deviations used for normalisation add another 88 bytes, bringing the
+L23  constants in the header to 2,080 bytes. This is not the memory footprint
+L24  of the whole firmware, since the code, buffers, the ESP-NOW and Wi-Fi
+L25  stacks and the stack space needed during inference are all separate.
+
+=== Printed page 29 | PDF page 44 ===
+L01  5.3 Feature preparation
+L02  All eleven inputs are standardised before they enter the
+L03  network. Each one is shifted by its mean and divided by its standard
+L04  deviation, both computed on the 6,982 training rows alone, so that
+L05  nothing from the validation or test rows leaks into the scaling:
+L06  𝑥 − 𝜇
+L07  𝑥 = (5.3)
+L08  norm
+L09  𝜎
+L10  The means and standard deviations are stored in the exported
+L11  header, and the firmware applies them to the live inputs before the first
+L12  layer. They are listed in Appendix 1. The conventions that fix the value
+L13  of each input matter as much as the scaling itself, because the training
+L14  script, the dashboard and the boards must all compute them in exactly the
+L15  same way:
+L16  Relative speed is the ego speed minus the target speed for
+L17  vehicles travelling in the same direction, and the ego speed plus the
+L18  target speed in the head-on overtaking scenario, so it is always the
+L19  closing rate. The time to collision is the gap divided by the closing rate,
+L20  clipped at 10 s, and it is set to 10 s when the vehicles are not closing.
+L21  Message age is given in milliseconds and gaps in metres. The occlusion
+L22  flag is 1 when the other vehicle is known through V2V but is not seen by
+L23  the on-board range sensor. The scenario number is excluded.
+L24  5.4 Training targets and loss
+L25  The risk target is the Monte-Carlo fraction described in
+L26  Chapter 4, which lies between 0 and 1. The speed target is the
+L27  recommended speed divided by the speed limit of that row, so it also lies
+L28  between 0 and 1. The advised speed in m/s is recovered by multiplying
+L29  the second output by the limit:
+
+=== Printed page 30 | PDF page 45 ===
+L01  𝑣 = 𝑞̂ 𝑣 (5.4)
+L02  limit
+L03  Both heads end in a sigmoid. The risk head is trained with
+L04  binary cross-entropy, which accepts soft targets between 0 and 1, while
+L05  the speed head is trained with squared error:
+L06  𝐿 = −[𝑦 𝑙𝑛(𝑟̂ ) + (1 − 𝑦) 𝑙𝑛(1 − 𝑟̂ )] (5.5)
+L07  risk
+L08  𝐿 = (𝑞̂ − 𝑞̂) 2 (5.6)
+L09  speed
+L10  Here y and r̂ are the target and predicted risk, and q and q̂ the
+L11  target and predicted speed fraction. The total loss gives the speed term
+L12  twice the weight of the risk term, so that the speed head is not neglected.
+L13  The remaining training settings are in Table 5.3.
+L14  Table 5.3 Training configuration
+L15  Setting Value
+L16  Keras (TensorFlow), run in Google
+L17  Framework
+L18  Colab
+L19  Hidden activation ReLU
+L20  Output activation Sigmoid on both heads
+L21  1.0 (risk, cross-entropy) and 2.0 (speed,
+L22  Loss weights
+L23  squared error)
+L24  Optimiser Adam, initial learning rate 0.001
+L25  Batch size and epochs 64 and at most 600
+L26  Patience 40 epochs, best weights
+L27  Early stopping
+L28  restored
+L29  Halved after 15 stalled epochs,
+L30  Learning-rate schedule
+L31  minimum 0.00001
+L32  Random seed 42
+
+=== Printed page 31 | PDF page 46 ===
+L01  Setting Value
+L02  Rows used 6,982 train, 1,455 validation, 1,563 test
+L03  The optimiser follows Kingma and Ba (2015). Early stopping
+L04  and the learning-rate schedule both watch the validation loss, and the test
+L05  partition is used only once, for the numbers in the next section.
+L06  5.5 Model evaluation
+L07  Table 5.4 gives the mean absolute error (MAE) and the
+L08  coefficient of determination (R²) of the exported weights, which are the
+L09  ones flashed on the boards, on the 1,563 test rows. The figures were
+L10  obtained by loading the weights from v2v_model.h and evaluating them
+L11  with the same normalisation as the firmware.
+L12  Table 5.4 Test-set accuracy of the two outputs
+L13  Output MAE MAE unit R²
+L14  Risk 0.0385 – 0.9654
+L15  Recommended speed 0.1336 m/s 0.9707
+L16  Training is stochastic, and earlier runs of the same network
+L17  gave slightly different figures: a risk MAE of 0.0341 in the Review 3
+L18  evaluation and 0.0323 in a later notebook run, with a speed MAE of
+L19  0.0989 and 0.1067 m/s respectively. The exported weights are the ones
+L20  reported here because they are the model that actually runs on the boards,
+L21  and every board test in Chapter 7 uses them. The risk error is within a
+L22  factor of 2.5 of the 0.016 noise floor from Chapter 4, and the speed error
+L23  is under 0.14 m/s on a scale of 3 to 5 m/s.
+
+=== Printed page 32 | PDF page 47 ===
+L01  Table 5.5 breaks the risk error down by scenario, and the
+L02  braking chain has the largest error. This is expected. The true risk in a
+L03  chain depends on the car's position in the chain and on the delay added at
+L04  each hop, and neither is part of the common feature set. That choice was
+L05  deliberate, so that the model could be deployed without knowing the
+L06  scenario. A dedicated chain model would be a possible later step.
+L07  Table 5.5 Risk MAE by scenario on the test set
+L08  Scenario Rows Risk MAE
+L09  1 Blind bend 380 0.0301
+L10  2 Overtaking 379 0.0134
+L11  3 Braking chain 387 0.0803
+L12  4 Merge and cut-in 417 0.0301
+L13  Weighting the four scenario errors by their row counts gives
+L14  0.0385, the same as the overall figure. MAE and R² describe agreement
+L15  with the labels. They say nothing about how often a hazard is missed at a
+L16  particular threshold, and no confusion matrix or calibration curve was
+L17  computed in Phase I.
+L18  5.6 Floating-point deployment and quantisation
+L19  An INT8 quantisation was also tried, but it cost about 40% in
+L20  accuracy, so the network stayed in floating point. With a parameter block
+L21  of about 2 KB, smaller integers offer little gain on a device that has
+L22  hundreds of kilobytes of RAM.
+L23  With float32 retained, the main risk is a transcription error
+L24  between the framework and the firmware. The export script writes the
+
+=== Printed page 33 | PDF page 48 ===
+L01  weights into a plain C header, and the firmware evaluates the network
+L02  with straightforward loops. As a check, eight input vectors were
+L03  evaluated both in Keras and in the C code on the laptop, and Figure 5.1
+L04  shows the two sets of outputs side by side. The largest difference
+L05  between them is 1.01 × 10−6. A later test on the board itself, over 1,215
+L06  requests, gave 3.30 × 10−6. The two numbers come from different test
+L07  sets and should not be read as a single measurement.
+L08  Figure 5.1 Comparison of C and Keras outputs for eight test vectors
+
+=== Printed page 34 | PDF page 49 ===
+L01  CHAPTER 6
+L02  EMBEDDED IMPLEMENTATION AND V2V
+L03  COMMUNICATION
+L04  6.1 Hardware platform
+L05  The final vehicles are meant to carry a custom board with an
+L06  ESP32-S3 for inference and communication, an STM32 for low-level
+L07  control, a GPS receiver, an MPU6050 inertial unit and a motor driver.
+L08  Phase I, however, was carried out on off-the-shelf ESP32 development
+L09  boards. Table 6.1 separates what exists from what is planned.
+L10  Table 6.1 Hardware components and their status at the end of Phase
+L11  I
+L12  Component Role Status
+L13  ESP32 Inference, ESP-NOW, Wi- In use for all Phase I
+L14  DevKitC (two) Fi tests
+L15  Target inference and Planned for the custom
+L16  ESP32-S3
+L17  communication device PCB
+L18  STM32 Motor and sensor control Planned
+L19  Planned; model not
+L20  GPS module Position
+L21  selected
+L22  MPU6050 Acceleration and heading Planned
+L23  ToF and UWB Assumed in dataset; not
+L24  Gap to the vehicle ahead
+L25  ranging yet fitted
+L26  Motor driver
+L27  Speed control Planned
+L28  and RC chassis
+
+=== Printed page 35 | PDF page 50 ===
+L01  Component Role Status
+L02  Custom PCB Integration of the above Phase II
+L03  The serial-validation printout names the board as an ESP32
+L04  DevKitC, and the Arduino IDE target was ESP32 Dev Module. All
+L05  timing figures in this report therefore belong to that board and not to the
+L06  ESP32-S3, which has a different core and may give different numbers.
+L07  6.2 Bot A and Bot B firmware
+L08  The two-board test uses one program for each bot. Bot A is
+L09  the fast vehicle, starting at 4.2 m/s with a gap of 1.8 m to the other bot
+L10  and zero acceleration. Bot B is the slow vehicle ahead, starting at 1.5 m/s
+L11  with the same 1.8 m gap and braking at 0.5 m/s². Both programs run at
+L12  10 Hz and carry out the same seven steps in every cycle: send own state,
+L13  read the last received state of the other bot, compute the eleven inputs,
+L14  run the network, move own speed towards the advised speed, update the
+L15  gap by simple kinematics, and print a status line over the serial port.
+L16  The state is exchanged as a packed 26-byte structure, a look-
+L17  alike of the Basic Safety Message, shown in Table 6.2. The program
+L18  sends it with ESP-NOW to a single peer whose MAC address is written
+L19  into the source file. Flashing therefore has to follow a fixed order: Bot B
+L20  first, to read its address, and then Bot A with that address.
+
+=== Printed page 36 | PDF page 51 ===
+L01  Table 6.2 Packet structure exchanged between the bots
+L02  Field Type Bytes Content
+L03  Sender identity (0 for Bot A,
+L04  bot_id uint8 1
+L05  1 for Bot B)
+L06  speed float 4 Sender speed, m/s
+L07  accel float 4 Sender acceleration, m/s²
+L08  gap float 4 Sender's own gap, m
+L09  collision_prob float 4 Reserved; transmitted as 0
+L10  Hop count, 1 for a direct
+L11  hops uint8 1
+L12  message
+L13  Sequence number,
+L14  seq uint32 4
+L15  increments every message
+L16  Sender clock in ms; not used
+L17  ts uint32 4
+L18  by the receiver
+L19  Total 26
+L20  After inference, each bot moves its speed a fraction of the way
+L21  towards the advised speed. The step is limited, so a vehicle cannot
+L22  change speed by more than 0.08 m/s in a 0.1 s tick, which corresponds to
+L23  0.8 m/s². The settings are given in Table 6.3. A status of SAFE,
+L24  CAUTION or DANGER is printed from the risk using the 0.30 and 0.60
+L25  thresholds. These bands only label the output and do not alter the speed.
+L26  Table 6.3 Main firmware settings (identical in both bots)
+L27  Setting Value
+L28  Speed limit passed to the
+L29  4.0 m/s
+L30  model
+L31  Loop rate 10 Hz (100 ms)
+
+=== Printed page 37 | PDF page 52 ===
+L01  Setting Value
+L02  TTC cap 10 s
+L03  Response rate 0.15 of the speed error per tick
+L04  Maximum speed change
+L05  0.08 m/s (about 0.8 m/s²)
+L06  per tick
+L07  CAUTION and DANGER
+L08  Risk of 0.30 and 0.60
+L09  thresholds
+L10  Packet received within the last 2,000
+L11  Peer considered alive
+L12  ms
+L13  Start-up wait for first
+L14  Up to 5,000 ms, then run regardless
+L15  packet
+L16  6.3 Link-quality inputs
+L17  Three of the model inputs describe the link, and the firmware
+L18  derives them from the packets themselves. The packet delivery ratio is
+L19  the number of packets received divided by the number expected, where
+L20  the expected count grows by the jump in sequence number each time a
+L21  packet arrives. Message age is the time since the last packet was
+L22  received. Hop count is read from the packet and is always 1 in the two-
+L23  board set-up. If nothing has been heard for 2 s, the bot treats the other as
+L24  silent and substitutes a zero speed, zero acceleration, an age of 250 ms
+L25  and a single hop.
+L26  These definitions are adequate for a first demonstration, but
+L27  they differ from the training data in three ways that will matter in Phase
+L28  II. First, the firmware PDR is cumulative since start-up, whereas the
+L29  dataset used a sliding window, so one early loss lowers it for a long time.
+L30  Second, message age is measured from reception and not from the
+L31  sender's timestamp, so it leaves out the time the packet spent in transit.
+
+=== Printed page 38 | PDF page 53 ===
+L01  Third, a bot is considered alive during the first 2 s after boot even though
+L02  no packet has been received, so for that interval the model is fed
+L03  placeholder values for the other vehicle.
+L04  The occlusion flag is a heuristic. It is set when the other bot is
+L05  moving faster than 0.3 m/s and the gap is more than 4.5 m. The ToF
+L06  sensor assumed in the dataset reaches 4.0 m, so a gap beyond 4.5 m
+L07  means that the sensor could not have seen the other vehicle while the
+L08  V2V link could. In the present tests the gap is itself simulated, so the flag
+L09  shows how the input would be set and does not represent a real sensing
+L10  event.
+L11  6.4 From point-to-point exchange to a broadcast beacon
+L12  Pairing two boards by MAC address was a conscious
+L13  simplification. The goal at the end of Phase I was to show that two
+L14  ESP32 boards could exchange vehicle state over ESP-NOW and use it in
+L15  the model, and that goal was met: both bots ran the loop for the full
+L16  duration of the tests and responded to each other's state.
+L17  A road is not a pair of vehicles, however, and the planned
+L18  arrangement is different. Each vehicle will broadcast a beacon, and any
+L19  vehicles within range will receive it and respond. ESP-NOW supports a
+L20  broadcast address, so the radio itself needs no change, but the firmware
+L21  will have to be reorganised around it. It will need a table of nearby
+L22  senders keyed by identity, with PDR and message age kept separately for
+L23  each; a rule for choosing which neighbour to treat as the conflict vehicle;
+L24  and filtering by signal strength or distance, so that distant vehicles do not
+L25  clutter the table. These points are listed as Phase II work in Chapter 8.
+
+=== Printed page 39 | PDF page 54 ===
+L01  6.5 Laptop dashboard
+L02  To test the model on the board without moving vehicles, a
+L03  laptop dashboard was written in Python with Tkinter. It simulates two
+L04  cars, one ahead of the other, using preset scenarios or manual inputs, and
+L05  sends the eleven inputs to the ESP32 as a UDP text message of the form
+L06  V1, sequence number and eleven values. The ESP32, running as a Wi-Fi
+L07  access point at 192.168.4.1 on port 3333, evaluates the network and
+L08  answers with R1, the sequence number, the risk, the advised speed and
+L09  the inference time in microseconds. The dashboard displays the replies
+L10  and can export them to a CSV file.
+L11  Figure 6.1 Laptop dashboard with an example input state
+L12  The inputs are simulated, but the Wi-Fi exchange and the
+L13  inference are real. The laptop does not compute the network and has no
+L14  fallback if the board fails to reply. The PDR and message-age sliders
+L15  only change the numbers sent to the board and do not cause any real
+L16  packet loss or delay. Table 6.4 gives the values for the state shown in
+L17  Figure 6.1.
+
+=== Printed page 40 | PDF page 55 ===
+L01  Table 6.4 Values displayed in the dashboard example
+L02  Displayed quantity Value
+L03  Risk and advised speed 64.7% and 3.425 m/s
+L04  Ego and target speed 3.00 and 1.50 m/s
+L05  Gap and time to conflict 1.50 m and 1.00 s
+L06  Board inference time and round-
+L07  248 µs and 31.8 ms
+L08  trip time
+L09  The round-trip time covers the whole UDP exchange and is
+L10  separate from message age, which describes how old the other vehicle's
+L11  data is. The dashboard states on screen that its advice is not a safety
+L12  command, and it does not drive any motors.
+L13  6.6 Prototype hardware and the move to Phase II
+L14  Figure 6.2 Two ESP32 development boards and prototype console
+L15  Figure 6.2 shows the two boards next to a laptop running the
+L16  serial monitor, which is the whole physical set-up of Phase I. It shows
+L17  that the firmware runs and that the boards talk to each other, but there is
+
+=== Printed page 41 | PDF page 56 ===
+L01  no custom PCB, no motor, no GPS or inertial sensor and no measured
+L02  vehicle response. Speed in the loop is a variable updated by the
+L03  firmware, and nothing yet ties it to a wheel.
+L04  The work that follows is therefore sequential. The hardware
+L05  configuration has to be fixed first (board, sensors, motor driver and
+L06  battery). The vehicle response to a speed command must then be
+L07  measured, and only after that does it make sense to close the loop on a
+L08  vehicle that can crash. Chapter 8 sets out the stages.
+
+=== Printed page 42 | PDF page 57 ===
+L01  CHAPTER 7
+L02  RESULTS AND PERFORMANCE ANALYSIS
+L03  7.1 Overview of the evaluation
+L04  The results are grouped by what they test. Section 7.2
+L05  compares each highway scenario with and without cooperative warning.
+L06  The model's accuracy on held-out data was given in Chapter 5, so this
+L07  chapter turns to the board: Section 7.3 reports the serial validation of the
+L08  embedded model, Sections 7.4 and 7.5 the response of the model to gap
+L09  and link quality, and Sections 7.6 to 7.8 the open-loop and closed-loop
+L10  braking tests.
+L11  7.2 Highway scenarios with and without V2V
+L12  Each scenario was run twice from the same initial conditions
+L13  and the same seed, once in baseline mode and once in V2V mode. Table
+L14  7.1 summarises the outcomes, and all values come from the logged CSV
+L15  files of the runs.
+L16  Table 7.1 Baseline and V2V outcomes in the four highway scenarios
+L17  Scenario Baseline V2V
+L18  Truck seen at 16.1 s; Truck heard at 6.9 s;
+L19  1 Blind bend contact at 19.1 s at 18.0 passed with closest gap
+L20  m/s (65 km/h) 9.66 m; no contact
+L21  Pulls out blind at 5.1 s; Waits; commits at 10.4 s;
+L22  2 Overtaking head-on at 9.3 s, closing pass complete at 16.6 s;
+L23  at 34.8 m/s (125 km/h) no contact
+
+=== Printed page 43 | PDF page 58 ===
+L01  Scenario Baseline V2V
+L02  Followers brake at 11.2, All followers brake at
+L03  3 Braking 12.4 and 13.6 s; all three 10.3 s; closest gaps 11.98,
+L04  chain hit at 12.4, 11.8 and 11.2 30.0 and 30.0 m; no
+L05  m/s contact
+L06  No contact; closest gaps No contact; closest gaps
+L07  4 Merge and
+L08  14.76 m (carR) and 13.39 19.51 m (carR) and 17.26
+L09  cut-in
+L10  m (carL) m (carL)
+L11  In the blind bend, the cooperative message reaches the ego car
+L12  about 10 s before the hill lets it see the truck. This is what allows the
+L13  controller to slow down, hold 8 m behind the truck, wait for the
+L14  oncoming car and then pass. Without the message, the driver sees the
+L15  truck 76 m ahead while travelling at 30 m/s (108 km/h) and reacts after
+L16  1.0 s, when only 46 m remain. Even braking at 6 m/s² cannot stop the car
+L17  in that distance, and it hits the truck at 18.0 m/s.
+L18  The overtaking baseline fails for a different reason. The driver
+L19  is not blind to the truck but to the opposing lane, and after 5 s behind a
+L20  slow truck the script lets the driver pull out regardless. Car C braked at
+L21  9.0 m/s² and still met car A at a closing speed of 34.8 m/s. In V2V mode
+L22  car A knows where car C is. At t = 0.4 s it needed 371.9 m for the pass
+L23  but only 369.0 m was available, so it stayed put. It committed at 10.4 s,
+L24  when car C had already gone past (the logged oncoming gap is −31.0 m,
+L25  the sign showing that car C was behind car A's position), and the two
+L26  vehicles never shared a lane.
+L27  The braking chain shows the benefit of removing the relay of
+L28  reactions. In the baseline, each follower reacts to the brake lights ahead,
+L29  so its onset comes 1.1, 2.3 and 3.5 s after the lead's. The delay builds up
+L30  from car to car, and every follower runs into the one in front. When the
+
+=== Printed page 44 | PDF page 59 ===
+L01  lead broadcasts its braking, all three followers start 0.2 s after the lead, at
+L02  10.3 s, and the closest approach is 11.98 m for the first follower. The 0.2
+L03  s is the configured latency and not a measured radio delay, so it is an
+L04  input to this experiment and not a result of it.
+L05  The merge scenario is the least dramatic. The baseline driver
+L06  also avoids contact, with closest gaps of 14.76 m and 13.39 m. With the
+L07  advisory these rise to 19.51 m and 17.26 m, an improvement of 4.8 m
+L08  and 3.9 m. In both modes the ego car brakes as hard as 6.0 m/s² at some
+L09  point. Here V2V does not remove a crash; it provides margin.
+L10  These results should be read with their limits in mind. They
+L11  are single deterministic runs with one seed. The baseline failures depend
+L12  on the scripted driver model (a 1.0 s reaction and, in the overtaking case,
+L13  a decision to commit blind), and a different driver model would give a
+L14  different baseline. What the runs do show is that, in each of the four
+L15  situations, the V2V information arrives early enough to change the
+L16  outcome or the margin, which is exactly what the later model has to
+L17  exploit at bot scale.
+L18  7.3 Serial validation of the embedded model
+L19  To check the network on the board, a Python program sent
+L20  requests to the ESP32 over USB serial and compared the replies with a
+L21  laptop reference running the same 11–16–16–2 network in float32 with
+L22  the weights from v2v_model.h. Table 7.2 lists the seven runs. In open-
+L23  loop runs the input states are prescribed, whereas in closed-loop runs the
+L24  advised speed changes the simulated motion and therefore alters the next
+L25  request.
+
+=== Printed page 45 | PDF page 60 ===
+L01  Table 7.2 Serial validation runs
+L02  Run Mode Requests
+L03  Approach Open loop 120
+L04  Overtake Open loop 50
+L05  Gap sweep Open loop 80
+L06  Radio sweep Open loop 200
+L07  Approach Closed loop 120
+L08  Overtake Closed loop 45
+L09  Dynamic drive, 60 s Closed loop 600
+L10  Total Seven runs 1,215
+L11  There were no timeouts and no serial errors in the 1,215
+L12  requests. This shows that the request–reply path works under the test
+L13  conditions, but it says nothing about wireless loss, sensor errors or
+L14  contact.
+L15  Table 7.3 Inference time on the ESP32 in the serial runs
+L16  Run and mode Mean (µs) Maximum (µs)
+L17  Approach, open loop 57.9 135
+L18  Overtake, open loop 57.6 63
+L19  Gap sweep, open loop 57.1 60
+L20  Radio sweep, open loop 57.3 61
+L21  Approach, closed loop 57.9 134
+L22  Overtake, closed loop 57.3 61
+L23  Dynamic drive, closed loop 57.2 61
+
+=== Printed page 46 | PDF page 61 ===
+L01  Run and mode Mean (µs) Maximum (µs)
+L02  All runs 57.4 135
+L03  The two largest times, 135 and 134 µs, belong to the first
+L04  requests of the two approach runs, which points to a cold start. All other
+L05  readings lie between 56 and 63 µs. Weighting the seven per-run means
+L06  by their request counts gives 57.37 µs, which agrees with the reported
+L07  overall mean of 57.4 µs. At 10 Hz the update period is
+L08  𝑇 = 1/10 = 0.1 𝑠 = 100 000 µ𝑠 (7.1)
+L09  cycle
+L10  𝑈 = (57.4 / 100 000) × 100 = 0.0574 % (7.2)
+L11  mean
+L12  so, by Equation (7.2), the mean inference occupies 0.057% of
+L13  the cycle and the 135 µs worst case 0.135%. These percentages cover
+L14  model execution only. Reading sensors, forming the features, radio
+L15  transmission, queueing and the actuator are not included.
+L16  The largest difference in each run lay between 7.78 × 10−7 and
+L17  3.30 × 10−6, the maximum coming from the dynamic-drive run. The pass
+L18  threshold was set at 1 × 10−4, so the worst-case difference of 3.30 × 10−6
+L19  is about 30 times smaller. The comparison shows that the board
+L20  computes the same function as the reference. It does not show that the
+L21  function is right about the world, which is a question for the labels and
+L22  the closed-loop tests. The separate eight-row C-versus-Keras check in
+L23  Chapter 5 gave a smaller maximum of 1.01 × 10−6, but the sets of inputs
+L24  differ and the two maxima cannot be compared directly.
+L25  7.4 Response to the inter-vehicle gap
+L26  In the gap sweep, the separation grows from 0.3 m to 4.0 m
+L27  over 8 s with the ego speed fixed at 3.0 m/s, the lead speed at 1.5 m/s, a
+
+=== Printed page 47 | PDF page 62 ===
+L01  braking lead, a PDR of 0.8 and a message age of 120 ms. Figure 7.1
+L02  shows how risk and advised speed respond, and Table 7.4 gives the
+L03  annotated points.
+L04  Figure 7.1 Response of risk and advised speed to inter-vehicle gap
+L05  Table 7.4 Annotated values from the gap sweep
+L06  Gap (m) Risk Advised speed (m/s)
+L07  0.30 1.000 0.53
+L08  About 1.72 0.5 Not annotated
+L09  4.00 0.002 3.98
+L10  Risk falls and advised speed rises as the gap widens, which is
+L11  the expected direction. The risk crosses 0.5 near a gap of 1.72 m, where
+L12  the time to collision is about 1.1 s. That point belongs to this particular
+L13  set of speeds and link settings and is not a general safe distance.
+L14  7.5 Response to link degradation
+L15  The radio sweep fixes the gap at 1.5 m, the ego speed at 3.0
+L16  m/s and the lead speed at 1.5 m/s. PDR falls from 0.95 to 0.30 and then
+L17  recovers, while message age rises from 20 ms to 240 ms and comes back.
+L18  Figure 7.2 shows the result.
+
+=== Printed page 48 | PDF page 63 ===
+L01  Figure 7.2 Response to a combined PDR and message-age sweep
+L02  Over the sweep the risk rises from 0.392 to 0.987 and the
+L03  advised speed falls from 3.67 m/s to 2.13 m/s. The return leg follows
+L04  nearly the same curve, so there is no visible hysteresis. These are
+L05  responses to controlled input values and not measurements of radio range
+L06  or loss. Because PDR and age move together, the figure cannot show
+L07  how much each contributes. A sweep of each input on its own would
+L08  answer that, and it is listed for Phase II.
+L09  7.6 Open-loop braking response
+L10  In the open-loop run the ego speed is prescribed by the script,
+L11  and the model computes advice that is displayed but not applied. The
+L12  lead vehicle starts to brake at t = 3 s. Figure 7.3 shows the speeds, gap,
+L13  advice and risk.
+
+=== Printed page 49 | PDF page 64 ===
+L01  Figure 7.3 Open-loop run: ego speed (blue), lead speed (orange),
+L02  advised speed (green), gap (grey) and risk (purple)
+L03  Risk first rises above 0.5 at about 4.6 s, when the gap is 2.12
+L04  m and the time to collision 0.96 s. Contact takes place at t = 5.5 s with a
+L05  closing speed of 2.7 m/s. The advice falls in time, but since it does not
+L06  affect the ego vehicle, it cannot prevent the contact.
+L07  7.7 Closed-loop braking response
+L08  In the closed-loop run the simulated ego vehicle follows the
+L09  speed advised by the ESP32, and everything else is unchanged. Figure
+L10  7.4 shows the result, using the same colours as Figure 7.3.
+
+=== Printed page 50 | PDF page 65 ===
+L01  Figure 7.4 Closed-loop run with the colour coding of Figure 7.3
+L02  At first the risk output stays close to zero and the ego vehicle
+L03  accelerates towards about 4 m/s. Risk passes 0.5 at about 3.1 s, when the
+L04  gap is 1.54 m and the time to collision 0.95 s. Contact occurs at t = 5.0 s
+L05  with a closing speed of 0.2 m/s. Applying the advice therefore cut the
+L06  closing speed at contact from 2.7 to 0.2 m/s, yet contact still happened,
+L07  and half a second sooner, because the ego vehicle had been allowed to
+L08  speed up early on. Table 7.5 puts the two runs side by side.
+L09  Table 7.5 Open-loop and closed-loop braking comparison
+L10  Quantity Open loop Closed loop
+L11  Contact time 5.5 s 5.0 s
+L12  Closing speed at contact 2.7 m/s 0.2 m/s
+
+=== Printed page 51 | PDF page 66 ===
+L01  Quantity Open loop Closed loop
+L02  Risk first exceeds 0.5 About 4.6 s About 3.1 s
+L03  Gap when risk exceeds 0.5 2.12 m 1.54 m
+L04  Time to collision at that
+L05  0.96 s 0.95 s
+L06  moment
+L07  The rounded closing speeds give a reduction of 2.5 m/s, or
+L08  about 92.6%. This is a change in closing speed in one comparison. It is
+L09  not a reduction in the number of collisions or in injury risk, and the
+L10  closed-loop vehicle still touched the lead.
+L11  7.8 Dynamic operation and timing
+L12  A 60 s dynamic-drive run produced 600 requests, with a mean
+L13  inference time of 57.2 µs and a maximum of 61 µs. The speed trace in
+L14  the closed-loop braking figure shows repeated fluctuations once the
+L15  vehicles are close. The controller internals needed to explain this were
+L16  not logged. The advised speed depends on a noisy-looking function of
+L17  gap and closing speed, and a controller that follows it with a fixed gain
+L18  can end up chasing it. This is a hypothesis, not a result.
+L19  The dashboard example reports 248 µs for inference and 31.8
+L20  ms for the round trip, and the 248 µs is higher than the serial figures. The
+L21  measurement boundaries differ, and the dashboard figure comes from a
+L22  single request with Wi-Fi traffic active on the board, so the larger
+L23  number may include cache and radio effects. This has not been
+L24  investigated further, and the two sets of values should not be compared
+L25  directly.
+
+=== Printed page 52 | PDF page 67 ===
+L01  7.9 Interpretation
+L02  Three findings stand out. First, the model is small and fast:
+L03  498 parameters, about 2 KB, and roughly 57 µs per inference, which is a
+L04  tiny share of a 100 ms cycle. Second, the board reproduces the reference
+L05  network to about 3 × 10−6, so the deployed model is the trained model.
+L06  Third, in the sweeps the outputs move in the right direction for both gap
+L07  and link quality.
+L08  Against that, the closed-loop braking test shows that a fast and
+L09  accurate estimator is not yet a safe controller. The risk was low while the
+L10  ego vehicle accelerated, contact still occurred, and the speed oscillated at
+L11  close range. The dashboard example showed the same problem in a static
+L12  form, with a risk of 64.7% and an advised speed above the current one.
+L13  These are read as consequences of using two independent heads without
+L14  a rule that links them, a point taken up in the next chapter.
+L15  The evidence has limits. The risk label comes from a
+L16  simulation with assumed parameters, the held-out error is measured on
+L17  randomly split rows from the same generator, and the highway runs use a
+L18  scripted baseline driver. None of it is a measurement on real vehicles.
+
+=== Printed page 53 | PDF page 68 ===
+L01  CHAPTER 8
+L02  DISCUSSION AND CONCLUSION
+L03  8.1 Engineering significance and limitations
+L04  The project joins a compact model to an embedded
+L05  cooperative prototype and checks it at each junction. In simulation,
+L06  cooperative warning changed three of the four outcomes from contact to
+L07  no contact and widened the margin in the fourth. On the board, the
+L08  network runs in under a tenth of a millisecond and matches its training-
+L09  framework reference to about 3 × 10−6. The rest of the chain, from
+L10  sensing to actuation, has not been profiled.
+L11  The sweeps are useful checks of behaviour. A wider gap
+L12  lowers the risk and raises the advised speed, and worse link quality
+L13  makes the outputs more cautious. They cover only the chosen input
+L14  conditions, however, and do not establish behaviour over every
+L15  combination of inputs the network may meet.
+L16  The control side needs work. The braking comparison still
+L17  ends in contact, the speed oscillates at close range, and the dashboard
+L18  example shows the two outputs disagreeing. One contributor in the two-
+L19  board firmware may be the rate limit: a speed change of at most 0.08 m/s
+L20  per 100 ms tick allows a deceleration of only 0.8 m/s², while the dataset
+L21  assumes braking of 1.5 to 3.0 m/s². A controller that cannot brake as hard
+L22  as the labels assume will under-react to a high risk. This is an
+L23  observation from the code and has not yet been tested.
+
+=== Printed page 54 | PDF page 69 ===
+L01  The prototype does not establish GPS or IMU accuracy, motor
+L02  response, radio performance on moving vehicles, or the transfer of
+L03  highway-scale behaviour to RC-scale motion. Safer roads remain the
+L04  intended application and not something this study measured.
+L05  8.2 Proposed supervisory controller
+L06  A supervisory layer between the model and the actuator is the
+L07  most direct response to these findings. It would check the learned advice
+L08  against simple physical and link-quality rules before the vehicle acts on
+L09  it. This layer has not been implemented.
+L10  The first rule concerns stale or missing information. The
+L11  present firmware proceeds without a first beacon, and for the first 2 s
+L12  after start-up it feeds placeholder values to the model. A supervisor
+L13  should define a safe state for that situation, such as a speed cap until a
+L14  valid packet arrives, and a message age beyond which the other vehicle
+L15  is treated as unknown. The age limit should come from vehicle dynamics
+L16  and be tested.
+L17  The second rule links the two outputs: if the risk exceeds a
+L18  threshold, the commanded speed should not exceed the current speed,
+L19  whatever the second head says. The third is a limit on acceleration while
+L20  a hazard is flagged, and the fourth a rate limit that matches the vehicle's
+L21  real braking capability. Smoothing or hysteresis on the advice could be
+L22  added to reduce oscillation, though each adds delay and so has to be tried
+L23  against minimum gap and stopping time.
+L24  To judge any of this, the existing controller stays as the
+L25  baseline, and the experiment is repeated from the same initial conditions,
+L26  communication trace and model weights. Only then can a change in
+
+=== Printed page 55 | PDF page 70 ===
+L01  outcome be attributed to the new policy, and no improvement is claimed
+L02  until that has been done.
+L03  8.3 Plan for Phase II
+L04  Phase II moves from boards on a bench to vehicles on a track.
+L05  Table 8.1 lists the stages in order, along with the measurements that each
+L06  one has to produce.
+L07  Table 8.1 Planned stages for the RC vehicle platform
+L08  Stage Record required
+L09  Replace the MAC-paired link with a broadcast
+L10  Beacon
+L11  beacon; neighbour table with per-sender PDR and
+L12  broadcast
+L13  message age
+L14  Hardware Board and sensor choice, wiring, power supply,
+L15  integration firmware build
+L16  Motion Commanded speed against measured speed; braking
+L17  calibration limits with an independent reference
+L18  Wireless
+L19  Sent and received sequence numbers, timestamps,
+L20  characterisatio
+L21  range and obstruction conditions
+L22  n
+L23  Model Identical feature vectors evaluated on the laptop and
+L24  consistency on the vehicle firmware
+L25  Controlled Initial gap and speed, minimum gap, contact, delay
+L26  feedback tests and oscillation, with and without the supervisor
+L27  Beacon broadcast comes first because everything else depends
+L28  on it. Next comes the custom PCB with the ESP32-S3, together with a
+L29  check of whether the timing in this report carries over to the new chip.
+L30  Packet delivery and message age have to be measured over the real radio
+L31  path, since the zero errors in the serial test say nothing about wireless
+
+=== Printed page 56 | PDF page 71 ===
+L01  performance, and vehicle motion needs an independent reference,
+L02  because a displayed model speed is not a measured wheel speed.
+L03  Acceptance limits will be agreed with the supervisor before
+L04  the final measurements are made. The 1 × 10−4 threshold applies to
+L05  numerical agreement only. It does not define acceptable stopping
+L06  distance, contact avoidance, response to stale data or oscillation, and
+L07  those limits are still to be set for the physical system.
+L08  8.4 Conclusion
+L09  This work built a complete, if small, chain for cooperative
+L10  collision estimation. Four highway situations were modelled in SUMO
+L11  with Veins and OMNeT++, and in three of them the baseline driver
+L12  collided while the driver with V2V information did not. A bot-scale
+L13  dataset of 10,000 rows was generated, and an 11–16–16–2 network with
+L14  498 parameters was trained on it, reaching test errors of 0.039 for risk
+L15  and 0.134 m/s for speed.
+L16  The network was exported as C code and run on an ESP32 at
+L17  about 57 µs per inference, with a worst-case difference of 3.30 × 10−6
+L18  from its reference over 1,215 requests and no communication errors.
+L19  Two boards exchanged state over ESP-NOW at 10 Hz and adjusted their
+L20  speeds, and a laptop dashboard exercised the model over Wi-Fi.
+L21  The braking tests set the limit on what can be concluded.
+L22  Closing speed at contact dropped from 2.7 to 0.2 m/s, but contact still
+L23  occurred, and earlier than in the open-loop run. Collision avoidance has
+L24  therefore not been shown, and the independent outputs and the close-
+L25  range oscillation are the first control issues for Phase II. The next steps
+L26  are the broadcast beacon, a supervisory controller, and measurements on
+
+=== Printed page 57 | PDF page 72 ===
+L01  an RC platform whose speed, gap and radio performance are recorded
+L02  independently.
+
+=== Printed page 58 | PDF page 73 ===
+L01  APPENDIX 1 MODEL AND DATASET RECORD
+L02  A1.1 Network and export record
+L03  Table A1.1 records what is needed to rebuild the deployed
+L04  model from the supplied files. The weights themselves are in the header
+L05  v2v_model.h, which holds the arrays V2V_MU, V2V_SD, V2V_W0,
+L06  V2V_B0, V2V_W1, V2V_B1, V2V_WR, V2V_BR, V2V_WS and
+L07  V2V_BS, together with the inline function v2v_infer.
+L08  Table A1.1 Deployed model record
+L09  Item Entry
+L10  ego_speed, target_speed, relative_speed,
+L11  Input order gap, ttc, target_accel, message_age_ms, pdr,
+L12  hop_count, occlusion_flag, speed_limit
+L13  11 inputs, 16 ReLU, 16 ReLU, two sigmoid
+L14  Layers
+L15  outputs (risk, speed fraction)
+L16  498 (464 weights, 34 biases); 464 MACs per
+L17  Parameters
+L18  inference
+L19  1,992 bytes of weights; 2,080 bytes with
+L20  Stored size
+L21  normalisation constants (float32)
+L22  Advised speed = second output ×
+L23  Output scaling
+L24  speed_limit
+L25  Export format Plain C header, no runtime library
+L26  8 vectors, C against Keras, maximum
+L27  Parity check
+L28  difference 1.01 × 10-6
+L29  1,215 requests, maximum difference 3.30 ×
+L30  Board check
+L31  10-6
+
+=== Printed page 59 | PDF page 74 ===
+L01  A1.2 Normalisation constants
+L02  The constants in Table A1.2 were fitted on the 6,982 training
+L03  rows and are applied to every input before the first layer.
+L04  Table A1.2 Mean and standard deviation of each input
+L05  Standard
+L06  Input Mean (μ)
+L07  deviation (σ)
+L08  ego_speed 3.601 0.778
+L09  target_speed 2.381 1.591
+L10  relative_speed 3.051 2.884
+L11  gap 5.198 6.116
+L12  ttc 3.504 3.639
+L13  target_accel −1.123 1.110
+L14  message_age_ms 128.511 70.646
+L15  pdr 0.599 0.230
+L16  hop_count 1.471 0.611
+L17  occlusion_flag 0.676 0.468
+L18  speed_limit 4.001 0.823
+L19  A1.3 Dataset schema
+L20  The dataset workbook has one sheet with the common
+L21  columns used for training (scenario_id, the eleven inputs,
+L22  collision_probability, recommended_speed and split) and one sheet per
+L23  scenario. The scenario sheets add columns that the deployed model does
+L24  not use: the oncoming gap, oncoming speed and truck length (Scenarios
+L25  1 and 2); the gap to the truck ahead and the truck speed (Scenario 2);
+
+=== Printed page 60 | PDF page 75 ===
+L01  chain position, per-hop delay and lead brake intensity (Scenario 3); and
+L02  the merge-zone distance and the front and rear lane gaps (Scenario 4).
+L03  Units are metres, seconds, m/s and m/s², and the split column holds train,
+L04  val or test (70/15/15, random).
+
+=== Printed page 61 | PDF page 76 ===
+L01  APPENDIX 2 FIRMWARE AND SIMULATION
+L02  RECORD
+L03  A2.1 Simulation parameters
+L04  Table A2.1 collects the constants set in the four scenario
+L05  controllers. A dash means that the controller has no such constant.
+L06  Table A2.1 Parameters of the four highway scenario controllers
+L07  Parameter Scenario 1 Scenario 2 Scenario 3 Scenario 4
+L08  400 m Two-lane
+L09  1,600 m Straight
+L10  approach, 80 main road,
+L11  Layout two-way road, four
+L12  m bend, 500 ramp at x =
+L13  road cars
+L14  m exit 700 m
+L15  15 to 27.78
+L16  Ego speed 30 m/s 25 m/s 24 m/s
+L17  m/s
+L18  Stopped 12 Truck at 15 Truck 18 m/s;
+L19  Other m truck; m/s; Lead brakes ramp car to
+L20  vehicles oncoming at oncoming at at 8 m/s² 20 m/s; cut-in
+L21  25 m/s 25 m/s car to 14 m/s
+L22  V2V range 300 m 500 m – 300 m
+L23  Radio
+L24  0.2 s – 0.2 s –
+L25  latency
+L26  Driver
+L27  1.0 s – 1.0 s –
+L28  reaction
+L29  Braking 6 m/s² 6 m/s²
+L30  – 6 m/s²
+L31  limit (panic) (followers)
+
+=== Printed page 62 | PDF page 77 ===
+L01  Parameter Scenario 1 Scenario 2 Scenario 3 Scenario 4
+L02  Margin 120
+L03  Hold gap 8 m; Headway 1.2
+L04  Brake lights
+L05  Other m; margin clearance 8 s; cut-in at 24
+L06  seen above
+L07  settings 45 m; pass at m; blind s, announced
+L08  2 m/s²
+L09  14 m/s commit 1.5 s ahead
+L10  after 5 s
+L11  All four use a 0.1 s step, seed 42, and the common risk model
+L12  of Chapter 4 with D = 2 m, A = 4 m/s², K = 1.1 and A =
+L13  MIN REF COMFORT
+L14  2.5 m/s². Each run writes one CSV row per vehicle per step, with 24
+L15  columns that include time, speeds, positions, gap, relative speed, time to
+L16  collision, line-of-sight and warning flags, risk, recommended speed and a
+L17  collision flag.
+L18  A2.2 Dashboard message format
+L19  The dashboard sends the ESP32 (access point at 192.168.4.1,
+L20  UDP port 3333) a text request made up of V1, a sequence number and
+L21  the eleven inputs in model order. The reply consists of R1, the sequence
+L22  number, the risk, the advised speed in m/s and the inference time in
+L23  microseconds.
+L24  A2.3 Differences between the dataset and the firmware
+L25  Table A2.2 lists the places where the quantities computed on
+L26  the boards do not yet match their definition in the dataset. They affect
+L27  how far the board results can be carried over to a vehicle, and each is a
+L28  Phase II item.
+
+=== Printed page 63 | PDF page 78 ===
+L01  Table A2.2 Known differences between training data and board
+L02  firmware
+L03  Input or setting Dataset definition Firmware behaviour
+L04  Cumulative since start-
+L05  pdr Sliding window
+L06  up, from sequence gaps
+L07  Time since last
+L08  Age of newest
+L09  message_age_ms reception; 250 ms when
+L10  message, 5 to 250 ms
+L11  silent
+L12  hop_count 1 to 3 Always 1 (direct link)
+L13  Reported by V2V but Set when target speed >
+L14  occlusion_flag
+L15  not seen by ToF 0.3 m/s and gap > 4.5 m
+L16  Simulated by kinematics
+L17  Gap and speeds Measured quantities
+L18  in firmware
+L19  Peer treated as alive for
+L20  Start-up Not applicable 2 s after boot with
+L21  placeholder values
+L22  Initial speed of 4.2 m/s against a 4.0 m/s
+L23  Up to speed_limit
+L24  Bot A limit
+L25  Braking of 1.5 to 3.0 Change capped at about
+L26  Speed rate limit
+L27  m/s² 0.8 m/s²
+
+=== Printed page 64 | PDF page 79 ===
+L01  APPENDIX 3 TEAM CONTRIBUTIONS AND
+L02  SOCIETAL CONTEXT
+L03  A3.1 Team contributions
+L04  Batch B18 carried out the project under Dr. M. Senthil
+L05  Kumaran, Associate Professor in the Department of Electrical and
+L06  Electronics Engineering. Table A3.1 records how the work was divided.
+L07  Table A3.1 Team contributions
+L08  Team member Contribution
+L09  V2V data preprocessing, feature engineering
+L10  Varsha Anand
+L11  and normalisation; ANN training and
+L12  3122213001121
+L13  validation; gap-sweep and closed-loop analysis
+L14  ANN performance and response evaluation;
+L15  Venkatachalam S
+L16  approach, overtaking, Communication
+L17  3122213001123
+L18  establishment via ESP NOW
+L19  498-parameter ANN deployment; Python–
+L20  Vignesh M
+L21  ESP32 feedback integration; timing and
+L22  3122213001124
+L23  numerical parity profiling
+L24  A3.2 Societal context and financial information
+L25  The application relates to road safety and intelligent
+L26  transportation, and the project maps to three of the UN Sustainable
+L27  Development Goals, shown in Table A3.2. These describe the direction
+L28  of the work and not measured outcomes.
+
+=== Printed page 65 | PDF page 80 ===
+L01  Table A3.2 Mapping to the Sustainable Development Goals
+L02  SDG Project connection
+L03  3 Good Health and Well- Early hazard awareness and road-safety
+L04  being assistance
+L05  9 Industry, Innovation and Cooperative communication, TinyML
+L06  Infrastructure and embedded systems brought together
+L07  11 Sustainable Cities and
+L08  Safer, connected transportation
+L09  Communities
+L10  Running the estimator on the vehicle and exchanging state
+L11  directly between vehicles is meant to reduce dependence on roadside or
+L12  cloud services, and the low cost of the hardware could help affordability
+L13  and scale. No cost comparison or deployment study exists that would put
+L14  numbers on either. The financial plan for Phase I is not applicable, so no
+L15  project cost is reported. A budget for the physical platform will be drawn
+L16  from the actual bill of materials in Phase II.
+L17  The braking results here come from simulation and bench
+L18  tests and do not show a reduction in injuries or road collisions.
+
+=== Printed page 66 | PDF page 81 ===
+L01  REFERENCES
+L02  1. Ben-Mosbah A., Sun Y., Gamboa S., Garey W. and Liu C. (2024),
+L03  ‘5G NR V2V Communications for Enhanced Collision Avoidance:
+L04  The EEBL Application Case’, Proceedings of the IEEE 35th
+L05  International Symposium on Personal, Indoor and Mobile Radio
+L06  Communications (PIMRC), DOI:
+L07  10.1109/PIMRC59610.2024.10817465.
+L08  2. David R., Duke J., Jain A., Reddi V. J., et al. (2021), ‘TensorFlow Lite
+L09  Micro: Embedded Machine Learning for TinyML Systems’,
+L10  Proceedings of Machine Learning and Systems (MLSys), Vol. 3, pp.
+L11  800-811.
+L12  3. Espressif Systems (n.d.), ‘ESP-NOW’, ESP-IDF Programming Guide,
+L13  https://docs.espressif.com.
+L14  4. Farhat W., Ben Rhaiem O., Faiedh H. and Souani C. (2024), ‘A novel
+L15  cooperative collision avoidance system for vehicular communication
+L16  based on deep learning’, International Journal of Information
+L17  Technology, Vol. 16, pp. 1661-1675, DOI: 10.1007/s41870-023-
+L18  01574-3.
+L19  5. Kenney J. B. (2011), ‘Dedicated Short-Range Communications
+L20  (DSRC) Standards in the United States’, Proceedings of the IEEE,
+L21  Vol. 99, No. 7, pp. 1162-1182, DOI: 10.1109/JPROC.2011.2132790.
+L22  6. Kingma D. P. and Ba J. (2015), ‘Adam: A Method for Stochastic
+L23  Optimization’, International Conference on Learning Representations
+L24  (ICLR), arXiv:1412.6980.
+L25  7. Li H., Liu F., Zhao Z. and Karimzadeh M. (2022), ‘Effective Safety
+L26  Message Dissemination with Vehicle Trajectory Predictions in V2X
+L27  Networks’, Sensors, Vol. 22, No. 7, article 2686, DOI:
+L28  10.3390/s22072686.
+L29  8. Lopez P. A., Behrisch M., Bieker-Walz L., Erdmann J., Flotterod Y.-
+L30  P., Hilbrich R., Lucken L., Rummel J., Wagner P. and Wiessner E.
+L31  (2018), ‘Microscopic Traffic Simulation using SUMO’, Proceedings
+L32  of the 21st IEEE International Conference on Intelligent
+L33  Transportation Systems (ITSC), pp. 2575-2582, DOI:
+L34  10.1109/ITSC.2018.8569938.
+L35  9. Park J., Kavathekar V., Bhuduri S., Amin M. H. and Devaraj S. S.
+L36  (2025), ‘A Co-Operative Perception System for Collision Avoidance
+L37  Using C-V2X and Client-Server-Based Object Detection’, Sensors,
+L38  Vol. 25, No. 17, article 5544, DOI: 10.3390/s25175544.
+
+=== Printed page 67 | PDF page 82 ===
+L01  10. Pohuliai D., Holubnychyi D. and Yesina M. (2026), ‘Comparative
+L02  analysis of the effectiveness of TinyML models for sensor data
+L03  classification tasks on the ESP32 platform’, Radiotekhnika, No. 224,
+L04  pp. 96-105, DOI: 10.30837/rt.2026.1.224.08.
+L05  11. Ribeiro B., Nicolau M. J. and Santos A. (2023), ‘Using Machine
+L06  Learning on V2X Communications Data for VRU Collision
+L07  Prediction’, Sensors, Vol. 23, No. 3, article 1260, DOI:
+L08  10.3390/s23031260.
+L09  12. Sommer C., German R. and Dressler F. (2011), ‘Bidirectionally
+L10  Coupled Network and Road Traffic Simulation for Improved IVC
+L11  Analysis’, IEEE Transactions on Mobile Computing, Vol. 10, No. 1,
+L12  pp. 3-15, DOI: 10.1109/TMC.2010.133.
+L13  13. Varga A. and Hornig R. (2008), ‘An overview of the OMNeT++
+L14  simulation environment’, Proceedings of the 1st International
+L15  Conference on Simulation Tools and Techniques for
+L16  Communications, Networks and Systems (SIMUTools), DOI:
+L17  10.4108/ICST.SIMUTOOLS2008.3027.
+L18  14. Wang R., Xu Z., Zhao X. and Hu J. (2019), ‘V2V-based method for
+L19  the detection of road traffic congestion’, IET Intelligent Transport
+L20  Systems, Vol. 13, No. 5, pp. 880-885, DOI: 10.1049/iet-
+L21  its.2018.5177.
+L22  15. Wegener A., Piorkowski M., Raya M., Hellbruck H., Fischer S. and
+L23  Hubaux J.-P. (2008), ‘TraCI: An Interface for Coupling Road Traffic
+L24  and Network Simulators’, Proceedings of the 11th Communications
+L25  and Networking Simulation Symposium (CNS), pp. 155-163.
+L26  16. Zardosht B., Beauchemin S. S. and Bauer M. A. (2017), ‘A
+L27  predictive accident-duration based decision-making module for
+L28  rerouting in environments with V2V communication’, Journal of
+L29  Traffic and Transportation Engineering (English Edition), Vol. 4, No.
+L30  6, pp. 535-544.
+L31  17. Zou F., Deng H.-W., Iunn T.-U., Ogle J. H. and Jin W. (2023),
+L32  ‘V2V-based Collision-avoidance Decision Strategy for Autonomous
+L33  Vehicles Interacting with Fully Occluded Pedestrians at Midblock on
+L34  Multilane Roadways’, arXiv:2303.13032, DOI:
+L35  10.48550/arXiv.2303.13032.
