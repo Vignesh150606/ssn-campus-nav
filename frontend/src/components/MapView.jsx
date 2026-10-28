@@ -818,7 +818,7 @@ function PreviewRouteLine({ positions }) {
     <Polyline
       ref={layerRef}
       positions={positions}
-      pathOptions={{ color: '#6D28D9', weight: 6, opacity: 0.95, dashArray: '7, 9', lineCap: 'round', lineJoin: 'round' }}
+      pathOptions={{ color: '#0D4BA0', weight: 6, opacity: 0.95, dashArray: '7, 9', lineCap: 'round', lineJoin: 'round' }}
     />
   )
 }

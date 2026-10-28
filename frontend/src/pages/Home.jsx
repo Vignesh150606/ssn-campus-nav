@@ -40,6 +40,7 @@ import VenueMenuCard from '../components/VenueMenuCard'
 import VenueMenuInline from '../components/VenueMenuInline'
 import RouteFeedbackDialog from '../components/RouteFeedbackDialog'
 import { track } from '../analytics/analyticsClient'
+import UIIcon from '../components/UIIcon'
 
 const SHEET_HEIGHT = 38
 // Must match --header-h in index.css — used to keep the browse sheet's
@@ -52,12 +53,12 @@ const ARRIVED_DIST_M = 20
 // ── Turn display helpers ────────────────────────────────────────────────────
 function turnIcon(dir) {
   switch (dir) {
-    case 'slight left':  return '↖'
-    case 'slight right': return '↗'
-    case 'left':         return '↰'
-    case 'right':        return '↱'
-    case 'u-turn':       return '↩'
-    default:             return '↑'
+    case 'slight left':
+    case 'left':         return <UIIcon name="left" size={25} />
+    case 'slight right':
+    case 'right':        return <UIIcon name="right" size={25} />
+    case 'u-turn':       return <UIIcon name="uturn" size={25} />
+    default:             return <UIIcon name="straight" size={25} />
   }
 }
 
@@ -244,7 +245,7 @@ export default function Home() {
       ? Math.max(240, viewportH - turnCardBottom - TURN_CARD_GAP)
       : Math.round(viewportH * 0.86)
     return {
-      collapsed: 128,
+      collapsed: 174,
       half: Math.round(viewportH * 0.44),
       full: Math.min(Math.round(viewportH * 0.86), maxFullBeforeCollision),
     }
@@ -277,14 +278,11 @@ export default function Home() {
   // needs a binary collapsed/expanded state, not three distinct tiers —
   // that keeps this a plain reuse of useDraggableSheet with zero changes
   // to the hook itself (Bug 3 says not to rebuild the draggable sheet).
-  // Priority 3 (Phase 4.2.3): collapsed peek bumped 132 → 160px — the old
-  // height was cramped even before Priority 9 added the inline food-menu
-  // line to this row; 160px gives both the dest/ETA/menu text stack and
-  // the Start Navigation button comfortable breathing room. Keep this in
-  // sync with the matching `calc(70vh - 160px)` fallback in index.css
-  // (.results-sheet.preview-mode) if it's ever changed again.
+  // The collapsed preview needs room for destination, route metrics and
+  // both actions. Keep this in sync with the CSS fallback before the drag
+  // hook writes its measured height.
   const previewSheetPeeks = useMemo(() => ({
-    collapsed: 160,
+    collapsed: Math.min(296, Math.round(viewportH * 0.47)),
     half: Math.round(viewportH * 0.7),
     full: Math.round(viewportH * 0.7),
   }), [viewportH])
@@ -324,7 +322,7 @@ export default function Home() {
   // empty BROWSE list (nothing loaded yet / category filters out
   // everything, searchResults still null) should collapse the sheet and
   // hand the screen to the map.
-  const sheetEmpty = !previewActive && !loadError && listItems.length === 0 && searchResults === null
+  const sheetEmpty = !previewActive && !loadError && !gpsPermissionDenied && listItems.length === 0 && searchResults === null
 
   // Priority X.1 (Phase 4.2.7) — the "Campus Locations" panel on the Home
   // screen used to be a plain static div fixed at 38% height (SHEET_HEIGHT
@@ -775,6 +773,11 @@ export default function Home() {
       setRoutePath(r.path)
       setRouteDist(r.distance_m)
       setRouteEta(r.eta_minutes)
+      // With a live GPS point, MapView follows the user by default. Frame
+      // the whole path once when the route preview opens so both endpoints
+      // are visible; the existing Preview route action still recenters it
+      // after a manual pan.
+      if (!usedFallback) setPreviewTrigger(t => t + 1)
       if (r.warning) setRouteWarning(r.warning)
     } catch (e) {
       if (previewRequestIdRef.current !== requestId) return // superseded — discard
@@ -1069,7 +1072,7 @@ export default function Home() {
             // (useDraggableSheet) keeps the map's visible area exactly
             // matched to the sheet's real height at all times.
             : previewActive
-              ? 'var(--sheet-h, 160px)'
+              ? 'var(--sheet-h, min(296px, 47dvh))'
               : sheetEmpty ? 0 : `var(--sheet-h, ${SHEET_HEIGHT}%)`
         }}
       >
@@ -1128,8 +1131,19 @@ export default function Home() {
       {!navMode && (
         <>
           <div className="search-overlay">
-            <SearchBar value={query} onChange={setQuery} onSubmit={handleSearchSubmit} />
-            {searchResults === null && <CategoryChips active={category} onChange={setCategory} />}
+            {previewActive ? (
+              <div className="preview-top-bar">
+                <button onClick={handleCancelPreview} aria-label="Back to campus search">
+                  <UIIcon name="back" size={20} />
+                </button>
+                <span>Walking route to {previewLoc ? displayLocationName(previewLoc) : 'destination'}</span>
+              </div>
+            ) : (
+              <>
+                <SearchBar value={query} onChange={setQuery} onSubmit={handleSearchSubmit} />
+                {searchResults === null && <CategoryChips active={category} onChange={setCategory} />}
+              </>
+            )}
           </div>
 
           {/* Priority 11 (Phase 4.2.7) — the only feedback a user got
@@ -1138,30 +1152,19 @@ export default function Home() {
               the nav-mode status bar, which never renders in browse mode
               with no route yet. This is the missing "clear prompt +
               retry" the requirement asks for. */}
-          {gpsPermissionDenied && (
-            <div className="location-permission-banner">
-              <span className="location-permission-banner-icon">📍</span>
-              <div className="location-permission-banner-text">
-                <strong>Location access is off</strong>
-                <span>Turn it on so the map can show where you are and navigate you across campus.</span>
-              </div>
-              <button className="location-permission-retry-btn" onClick={() => startTracking()}>
-                Retry
-              </button>
-            </div>
+          {!previewActive && (
+            <CompassWidget
+              active={tracking && hasRoute}
+              position={position}
+              destination={compassDestination}
+            />
           )}
-
-          <CompassWidget
-            active={tracking && hasRoute}
-            position={position}
-            destination={compassDestination}
-          />
 
           {guidance && (
             <div className={`guidance-banner ${offRoute ? 'off-route' : ''}`}>{guidance}</div>
           )}
 
-          {(routePath || tracking) && (
+          {!previewActive && (routePath || tracking) && (
             <div className="status-bar">
               {tracking && (
                 <span className="status-pill gps">
@@ -1219,28 +1222,42 @@ export default function Home() {
                   same ground, so this doesn't duplicate it. */}
               {previewSheet.tier === 'collapsed' && (
                 <div className="preview-collapsed-row">
-                  <div className="preview-collapsed-info">
-                    <div className="route-preview-dest" style={{ fontSize:'0.95rem' }}>
-                      {previewLoc ? displayLocationName(previewLoc) : '—'}
-                    </div>
-                    {previewRoutes?.[0] && (
-                      <div className="nav-dist-label" style={{ marginTop: 2 }}>
-                        {previewRoutes[0].etaMinutes} min · {formatDist(previewRoutes[0].distanceM)}
+                  <div className="preview-collapsed-header">
+                    <div className="preview-collapsed-info">
+                      <div className="preview-collapsed-label">Destination</div>
+                      <div className="route-preview-dest">
+                        {previewLoc ? displayLocationName(previewLoc) : '—'}
                       </div>
-                    )}
-                    {/* Priority 9 — food court menu, visible immediately,
-                        no need to drag the sheet open to see it. */}
-                    {['food', 'dining'].includes(previewLoc?.category) && (
-                      <VenueMenuInline venueId={previewLoc.id} />
-                    )}
+                    </div>
+                    <button className="route-preview-close" onClick={handleCancelPreview} aria-label="Close route preview">
+                      <UIIcon name="close" size={18} />
+                    </button>
                   </div>
-                  <button
-                    className="preview-collapsed-start-btn"
-                    onClick={handleStartNavigation}
-                    disabled={!previewRoutes?.[0] || previewLoading}
-                  >
-                    Start Navigation
-                  </button>
+                  <div className="preview-collapsed-origin">
+                    <UIIcon name="pin" size={15} />
+                    {routeFromFallbackRef.current ? 'From Main Gate' : 'From your location'}
+                  </div>
+                  {previewRoutes?.[0] && (
+                    <div className="preview-collapsed-stats">
+                      <div><strong>{Math.round(previewRoutes[0].etaMinutes)} min</strong><span>Estimated walk</span></div>
+                      <div><strong>{formatDist(previewRoutes[0].distanceM)}</strong><span>Route distance</span></div>
+                    </div>
+                  )}
+                  {previewLoading && <div className="preview-collapsed-message">Finding your route…</div>}
+                  {previewError && <div className="preview-collapsed-message error" role="alert">{previewError}</div>}
+                  {['food', 'dining'].includes(previewLoc?.category) && (
+                    <VenueMenuInline venueId={previewLoc.id} />
+                  )}
+                  <div className="preview-collapsed-actions">
+                    <button className="route-preview-btn secondary" onClick={handlePreviewRoute}
+                      disabled={!previewRoutes?.[0] || previewLoading}>
+                      <UIIcon name="route" size={18} /> Preview route
+                    </button>
+                    <button className="route-preview-btn primary" onClick={handleStartNavigation}
+                      disabled={!previewRoutes?.[0] || previewLoading}>
+                      <UIIcon name="straight" size={18} /> Start navigation
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1292,7 +1309,8 @@ export default function Home() {
                   )}
                 </div>
                 <button className={`location-btn ${tracking ? 'active' : ''}`} onClick={handleToggleTracking}>
-                  {tracking ? '📍 Tracking' : '📍 My location'}
+                  <UIIcon name="pin" size={16} />
+                  {tracking ? 'Tracking' : 'My location'}
                 </button>
               </div>
               <div
@@ -1300,6 +1318,18 @@ export default function Home() {
                 ref={resultsListRef}
                 tabIndex={-1}
               >
+                {gpsPermissionDenied && (
+                  <div className="location-permission-banner">
+                    <UIIcon name="info" size={18} className="location-permission-banner-icon" />
+                    <div className="location-permission-banner-text">
+                      <strong>Location is off</strong>
+                      <span>Turn it on for directions from where you are.</span>
+                    </div>
+                    <button className="location-permission-retry-btn" onClick={() => startTracking()}>
+                      Retry
+                    </button>
+                  </div>
+                )}
                 {searchResults === null && (
                   <NearbyFacilities locations={locations} fromLat={refLat} fromLng={refLng} onNavigate={handleDirections} />
                 )}
@@ -1328,7 +1358,7 @@ export default function Home() {
           {/* Phase 3 — Turn instruction card */}
           <div className="nav-instruction-card" ref={turnCardRef}>
             <div className="nav-turn-icon-wrap">
-              <span className="nav-turn-icon">{nextTurn ? turnIcon(nextTurn.direction) : '↑'}</span>
+              <span className="nav-turn-icon">{turnIcon(nextTurn?.direction)}</span>
             </div>
             <div className="nav-turn-details">
               <div className="nav-turn-label">
@@ -1350,11 +1380,6 @@ export default function Home() {
               <div className="nav-recalc-dot" title="Recalculating…">🔄</div>
             )}
           </div>
-
-          {/* Phase 6 — Exit Navigation button */}
-          <button className="nav-exit-btn" onClick={handleClear} aria-label="Exit navigation">
-            ✕ Exit
-          </button>
 
           {/* Priority 1 (Phase 4.3) — the Heading-Up toggle is now the
               native Leaflet rotate control rendered inside MapView (see
@@ -1410,29 +1435,14 @@ export default function Home() {
 
             {/* Visible at every tier: Next Turn · Distance · ETA */}
             <div className="nav-bottom-row-collapsed">
-              {nextTurn ? (
-                <div className="nav-sheet-turn-compact">
-                  <span className="nav-sheet-turn-icon">{turnIcon(nextTurn.direction)}</span>
-                  <div>
-                    <div className="nav-dist-big nav-turn-compact-label">{turnLabel(nextTurn.direction)}</div>
-                    <div className="nav-dist-label">in {formatDist(nextTurn.distanceM)}</div>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div className="nav-dist-big nav-turn-compact-label">Continue Straight</div>
-                  <div className="nav-dist-label">next turn</div>
-                </div>
-              )}
-              <div className="nav-divider-v" />
-              <div>
-                <div className="nav-dist-big">{formatDist(displayDist)}</div>
-                <div className="nav-dist-label">remaining</div>
+              <div className="nav-summary-metrics">
+                <strong>{displayEta != null ? `${displayEta} min left` : '—'}</strong>
+                <span>{formatDist(displayDist)} remaining</span>
               </div>
-              <div className="nav-divider-v" />
-              <div>
-                <div className="nav-eta-big">{displayEta != null ? `${displayEta} min` : '—'}</div>
-                <div className="nav-dist-label">estimated</div>
+              <div className="nav-summary-dest">Walking to <strong>{destName || 'destination'}</strong></div>
+              <div className="nav-summary-actions">
+                <button onClick={() => navSheet.snapToTier('half')}>Route details</button>
+                <button onClick={handleClear} className="nav-summary-exit">Exit navigation</button>
               </div>
             </div>
 
@@ -1558,7 +1568,7 @@ export default function Home() {
                 <path d="M4 12l5 5L20 6" />
               </svg>
             </div>
-            <div className="arrival-title">You've Arrived!</div>
+            <div className="arrival-title">You've arrived</div>
             <div className="arrival-subtitle">
               {destName && <span className="arrival-dest">{destName}</span>}
             </div>
@@ -1622,14 +1632,14 @@ export default function Home() {
 
             <div className="arrival-actions">
               <button className="arrival-btn primary" onClick={handleClear}>Done</button>
+              <button className="arrival-btn secondary" onClick={() => handleShareLocation(navDestLoc)}>
+                {shareCopied ? '✓ Link copied!' : <><UIIcon name="share" size={17} /> Share location</>}
+              </button>
               <button className="arrival-btn secondary" onClick={handleNavigateAgain}>
-                Navigate Again
+                Navigate again
               </button>
               <button className="arrival-btn secondary" onClick={handleClear}>
-                🔍 Go Somewhere Else
-              </button>
-              <button className="arrival-btn secondary" onClick={() => handleShareLocation(navDestLoc)}>
-                {shareCopied ? '✓ Link Copied!' : '↗ Share Location'}
+                Go somewhere else
               </button>
             </div>
           </div>

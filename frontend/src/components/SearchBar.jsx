@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import UIIcon from './UIIcon'
 
 /**
  * SearchBar — Priority X.2 (Phase 4.2.7): mobile keyboard UX.
@@ -44,10 +45,7 @@ export default function SearchBar({ value, onChange, placeholder, onSubmit }) {
   return (
     <div className="search-box">
       <span className="search-icon" aria-hidden="true">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="7" />
-          <path d="m20 20-3.5-3.5" />
-        </svg>
+        <UIIcon name="search" size={20} />
       </span>
       <input
         ref={inputRef}
@@ -64,14 +62,9 @@ export default function SearchBar({ value, onChange, placeholder, onSubmit }) {
           type="button"
           onClick={() => onChange('')}
           aria-label="Clear search"
-          style={{
-            width: 22, height: 22, borderRadius: 999,
-            display: 'grid', placeItems: 'center',
-            background: 'var(--ring)', color: 'var(--ink-2)',
-            fontSize: 12, lineHeight: 1,
-          }}
+          className="search-clear-btn"
         >
-          ✕
+          <UIIcon name="close" size={16} />
         </button>
       )}
     </div>

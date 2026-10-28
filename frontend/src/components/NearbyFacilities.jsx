@@ -9,11 +9,12 @@
  */
 import { nearestWithFacility, nearestCanteen } from '../utils/facilities'
 import { displayLocationName } from '../constants'
+import UIIcon from './UIIcon'
 
 const CARDS = [
-  { key: 'restroom',     icon: '🚻', label: 'Nearest Restroom' },
-  { key: 'water_station',icon: '💧', label: 'Nearest Water Station' },
-  { key: 'canteen',      icon: '🍴', label: 'Nearest Canteen' },
+  { key: 'restroom',     icon: 'restroom', label: 'Nearest restroom' },
+  { key: 'water_station',icon: 'water', label: 'Nearest water station' },
+  { key: 'canteen',      icon: 'food', label: 'Nearest canteen' },
 ]
 
 function formatDistance(m) {
@@ -38,16 +39,16 @@ export default function NearbyFacilities({ locations, fromLat, fromLng, onNaviga
       <div className="sheet-title" style={{ padding: '0 0 8px' }}>Nearby Facilities</div>
       <div className="facility-cards">
         {results.map(r => (
-          <div className="facility-card" key={r.key}>
-            <div className="facility-icon">{r.icon}</div>
+          <button className="facility-card" key={r.key}
+            onClick={() => onNavigate(r.hit.location)}
+            aria-label={`Navigate to ${displayLocationName(r.hit.location)}, ${r.label.toLowerCase()}`}>
+            <span className="facility-icon"><UIIcon name={r.icon} size={19} /></span>
             <div className="facility-info">
-              <div className="facility-label">{r.label}</div>
-              <div className="facility-sub">{displayLocationName(r.hit.location)} · {formatDistance(r.hit.distanceM)}</div>
+              <div className="facility-name">{displayLocationName(r.hit.location)}</div>
+              <div className="facility-sub">{r.label} · {formatDistance(r.hit.distanceM)} away</div>
             </div>
-            <button className="facility-nav-btn" onClick={() => onNavigate(r.hit.location)}>
-              Navigate
-            </button>
-          </div>
+            <UIIcon name="chevron" size={17} className="facility-chevron" />
+          </button>
         ))}
       </div>
     </div>

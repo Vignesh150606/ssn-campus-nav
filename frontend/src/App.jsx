@@ -3,6 +3,7 @@ import { useTheme } from './hooks/useTheme'
 import DevLocationPanel from './components/DevLocationPanel'
 import InstallPrompt from './components/InstallPrompt'
 import OfflineIndicator from './components/OfflineIndicator'
+import UIIcon from './components/UIIcon'
 
 export default function App() {
   const [theme, toggleTheme] = useTheme()
@@ -31,7 +32,7 @@ export default function App() {
             aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
           >
-            {theme === 'dark' ? '☀' : '◐'}
+            <UIIcon name={theme === 'dark' ? 'sun' : 'moon'} size={19} />
           </button>
         </nav>
       </header>

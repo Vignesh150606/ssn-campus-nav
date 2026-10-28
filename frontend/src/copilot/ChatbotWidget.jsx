@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'react'
 import { runTurn } from './copilotEngine'
 import { savedImageUrl } from './savedImage'
 import { retainIntentModel, warmIntentModel } from './intentModelClient'
+import UIIcon from '../components/UIIcon'
 
 const STARTER_PROMPTS = [
   'Take me to Main Auditorium',
@@ -145,7 +146,7 @@ function ChatCard({ card, onPreview, onStart, onDetails }) {
 function WelcomeScreen({ onSend }) {
   return (
     <div className="copilot-welcome">
-      <div className="copilot-welcome-icon">🧭</div>
+      <div className="copilot-welcome-icon"><UIIcon name="chat" size={25} /></div>
       <div className="copilot-welcome-title">Campus Copilot</div>
       <div className="copilot-welcome-subtitle">
         Buildings · Classrooms · Events · Facilities
@@ -293,7 +294,7 @@ export default function ChatbotWidget({
           onClick={toggleOpen}
           aria-label="Open campus assistant"
         >
-          💬
+          <UIIcon name="chat" size={22} />
           {hasUnread && <span className="copilot-fab-dot" />}
         </button>
       )}
@@ -303,7 +304,7 @@ export default function ChatbotWidget({
           {/* Header */}
           <div className="copilot-sheet-header">
             <div className="copilot-sheet-title">
-              <span className="copilot-sheet-avatar">🧭</span>
+              <span className="copilot-sheet-avatar"><UIIcon name="chat" size={20} /></span>
               <div>
                 <div className="copilot-sheet-title-text">Campus Copilot</div>
                 <div className="copilot-sheet-subtitle">
@@ -311,7 +312,9 @@ export default function ChatbotWidget({
                 </div>
               </div>
             </div>
-            <button className="copilot-sheet-close" onClick={() => setOpen(false)} aria-label="Close">✕</button>
+            <button className="copilot-sheet-close" onClick={() => setOpen(false)} aria-label="Close chat">
+              <UIIcon name="close" size={18} />
+            </button>
           </div>
 
           {/* Messages */}
@@ -384,7 +387,7 @@ export default function ChatbotWidget({
               disabled={busy || !input.trim()}
               aria-label="Send"
             >
-              ➤
+              <UIIcon name="send" size={20} />
             </button>
           </form>
         </div>

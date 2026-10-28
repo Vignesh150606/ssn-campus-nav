@@ -12,6 +12,7 @@
 import { SkeletonRoutePreview } from './Skeleton'
 import VenueMenuCard from './VenueMenuCard'
 import { displayLocationName } from '../constants'
+import UIIcon from './UIIcon'
 
 function formatDistance(m) {
   if (m == null) return '—'
@@ -40,7 +41,9 @@ export default function RoutePreviewPanel({
           <div className="route-preview-label">Destination</div>
           <div className="route-preview-dest">{displayLocationName(destination)}</div>
         </div>
-        <button className="route-preview-close" onClick={onCancel} aria-label="Cancel">✕</button>
+        <button className="route-preview-close" onClick={onCancel} aria-label="Close route preview">
+          <UIIcon name="close" size={18} />
+        </button>
       </div>
 
       {loading && <SkeletonRoutePreview />}
@@ -106,10 +109,10 @@ export default function RoutePreviewPanel({
 
           <div className="route-preview-actions">
             <button className="route-preview-btn secondary" onClick={onPreview}>
-              Preview Route
+              <UIIcon name="route" size={18} /> Preview route
             </button>
             <button className="route-preview-btn primary" onClick={onStart}>
-              Start Navigation
+              <UIIcon name="straight" size={18} /> Start navigation
             </button>
           </div>
         </>
